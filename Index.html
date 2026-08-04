@@ -1463,7 +1463,7 @@ function toast(msg) {
   toast._t = setTimeout(() => t.classList.remove('is-show'), 2400);
 }
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbzErxRVzVQySNokW3bCksEzVbkaU9uAtU7EZif6iz_06H4OOtc2uoGaWANQc9WUopQ/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyk15wYhyl6rIWVCf3pjxBZ18TXKZcDhJE4hik76b0o0Yf4P57g5g1GcXVKnJlMKXz_/exec';
 
 async function rawCall(fn, ...args) {
   const body = JSON.stringify({ action: fn, args, token: localStorage.getItem(AUTH_TOKEN_KEY) || '' });
