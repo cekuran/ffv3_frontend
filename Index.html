@@ -1698,6 +1698,8 @@ function actualizarNombreHojaUI() {
 async function iniciarAppAutenticada() {
   Estado.bootstrap = normalizarBootstrap(await call('bootstrapBase'));
   const user = (Estado.bootstrap.sesion && Estado.bootstrap.sesion.user) || '?';
+  const sinHojas = !((Estado.bootstrap.hojas || []).length);
+  const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
   aplicarRolesUI();
   aplicarRestriccionSinHojas();
   actualizarSelectorHoja();
@@ -1706,9 +1708,13 @@ async function iniciarAppAutenticada() {
   $('#avatarM').textContent = (user[0] || 'U').toUpperCase();
   $('#userName').textContent = user;
   $$('[data-menu-user]').forEach(el => { el.textContent = user; });
-  poblarFiltros();
-  go('dashboard');
-  sincronizarTransacciones({ render: true, toastOnError: true });
+  if (!sinHojas) {
+    poblarFiltros();
+    go('dashboard');
+    sincronizarTransacciones({ render: true, toastOnError: true });
+  } else {
+    go(isAdmin ? 'admin' : 'dashboard');
+  }
   mostrarApp();
 }
 
@@ -1774,6 +1780,9 @@ function aplicarRestriccionSinHojas() {
   const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
   const navSels = '.sidebar .nav-item, .bottom-nav .bn-item[data-route], .more-dropdown [data-route]';
   const banner = document.getElementById('noHojasBanner');
+  const mensajeSinDatos = isAdmin
+    ? '<strong>No hay datos financieros para mostrar para este usuario.</strong> Este usuario no tiene hojas de calculo registradas. Usa la vista Admin para vincular una hoja.'
+    : '<strong>No hay datos financieros para mostrar para este usuario.</strong> Este usuario no tiene hojas de calculo registradas. Pide al administrador que vincule una hoja.';
   const targetSel = isAdmin ? '.view[data-view="admin"]' : '.view[data-view="dashboard"] .bento';
   if (!sinHojas) {
     document.querySelectorAll(navSels).forEach(el => { el.style.display = ''; });
@@ -1781,14 +1790,18 @@ function aplicarRestriccionSinHojas() {
     return;
   }
   document.querySelectorAll(navSels).forEach(el => { el.style.display = el.dataset.route === 'admin' ? '' : 'none'; });
-  if (banner) { banner.style.display = ''; return; }
+  if (banner) {
+    banner.innerHTML = mensajeSinDatos;
+    banner.style.display = '';
+    return;
+  }
   const target = document.querySelector(targetSel);
   if (!target) return;
   const div = document.createElement('div');
   div.id = 'noHojasBanner';
   div.className = 'card card-pad-md';
   div.style.cssText = 'background: var(--tertiary-container); color: var(--on-tertiary-container); margin-top: var(--s-4);';
-  div.innerHTML = '<strong>No tienes ninguna hoja de datos enlazada.</strong> Pide al administrador que vincule una para empezar a usar la app.';
+  div.innerHTML = mensajeSinDatos;
   target.prepend(div);
 }
 
@@ -3870,12 +3883,19 @@ async function recargar() {
   if (token !== _txSyncToken) return;
   if (!boot) { toast('No se pudo recargar'); return; }
   Estado.bootstrap = normalizarBootstrap(boot);
+  const sinHojas = !((Estado.bootstrap.hojas || []).length);
   aplicarRolesUI();
+  aplicarRestriccionSinHojas();
   actualizarNombreHojaUI();
   limpiarFiltrosInvalidos();
-  poblarFiltros();
-  if (location.hash.startsWith('#/')) go(location.hash.slice(2));
-  else renderDashboard();
+  if (!sinHojas) {
+    poblarFiltros();
+    if (location.hash.startsWith('#/')) go(location.hash.slice(2));
+    else renderDashboard();
+  } else {
+    const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
+    go(isAdmin ? 'admin' : 'dashboard');
+  }
 }
 
 $('#btnNuevaTx').addEventListener('click', () => openTx());
