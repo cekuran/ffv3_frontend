@@ -1460,14 +1460,26 @@ async function rawCall(fn, ...args) {
     }
     throw new Error('No se pudo conectar con la API (posible CORS, URL incorrecta o deploy sin publicar).');
   }
+  const status = response.status;
+  const finalUrl = response.url || API_URL;
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
   const text = await response.text();
+
+  if (!response.ok) {
+    const vistaError = String(text || '').trim().slice(0, 180);
+    if (contentType.includes('text/html') || /^<!doctype html/i.test(vistaError) || /^<html/i.test(vistaError) || /^</.test(vistaError)) {
+      throw new Error('HTTP ' + status + ' devolvio HTML (' + finalUrl + '). Revisa que el Web App este desplegado en /exec y publicado como acceso publico (Anyone).');
+    }
+    throw new Error('HTTP ' + status + ' en API (' + finalUrl + '): ' + (vistaError || '[vacia]'));
+  }
+
   let payload;
   try {
     payload = JSON.parse(text);
   } catch (_) {
     const vista = String(text || '').trim().slice(0, 180);
     if (/^<!doctype html/i.test(vista) || /^<html/i.test(vista) || /^</.test(vista)) {
-      throw new Error('La API devolvio HTML en lugar de JSON. Revisa que API_URL apunte al despliegue Web App correcto (/exec) y que el deploy este publicado con acceso permitido.');
+      throw new Error('La API devolvio HTML en lugar de JSON (' + finalUrl + '). Revisa que API_URL apunte al Web App correcto (/exec) y que el deploy este publicado como Anyone.');
     }
     throw new Error('Respuesta invalida de la API: ' + (vista || '[vacia]'));
   }
@@ -1687,6 +1699,7 @@ async function iniciarAppAutenticada() {
   Estado.bootstrap = normalizarBootstrap(await call('bootstrapBase'));
   const user = (Estado.bootstrap.sesion && Estado.bootstrap.sesion.user) || '?';
   aplicarRolesUI();
+  aplicarRestriccionSinHojas();
   actualizarSelectorHoja();
   actualizarNombreHojaUI();
   $('#avatar').textContent = (user[0] || 'U').toUpperCase();
@@ -1754,6 +1767,29 @@ function aplicarRolesUI() {
   const rol = (Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '';
   const isAdmin = rol === 'admin';
   $$('[data-rol-required="admin"]').forEach(el => { el.style.display = isAdmin ? '' : 'none'; });
+}
+
+function aplicarRestriccionSinHojas() {
+  const sinHojas = !(((Estado.bootstrap && Estado.bootstrap.hojas) || []).length);
+  const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
+  const navSels = '.sidebar .nav-item, .bottom-nav .bn-item[data-route], .more-dropdown [data-route]';
+  const banner = document.getElementById('noHojasBanner');
+  const targetSel = isAdmin ? '.view[data-view="admin"]' : '.view[data-view="dashboard"] .bento';
+  if (!sinHojas) {
+    document.querySelectorAll(navSels).forEach(el => { el.style.display = ''; });
+    if (banner) banner.style.display = 'none';
+    return;
+  }
+  document.querySelectorAll(navSels).forEach(el => { el.style.display = el.dataset.route === 'admin' ? '' : 'none'; });
+  if (banner) { banner.style.display = ''; return; }
+  const target = document.querySelector(targetSel);
+  if (!target) return;
+  const div = document.createElement('div');
+  div.id = 'noHojasBanner';
+  div.className = 'card card-pad-md';
+  div.style.cssText = 'background: var(--tertiary-container); color: var(--on-tertiary-container); margin-top: var(--s-4);';
+  div.innerHTML = '<strong>No tienes ninguna hoja de datos enlazada.</strong> Pide al administrador que vincule una para empezar a usar la app.';
+  target.prepend(div);
 }
 
 function loadingBlockHtml(msg) {
@@ -1929,7 +1965,10 @@ async function sincronizarTransacciones(opciones) {
 const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'admin', 'configuracion'];
 function go(route) {
   if (!ROUTES.includes(route)) route = 'dashboard';
-  if (route === 'admin' && ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') !== 'admin') route = 'dashboard';
+  const sinHojas = !((Estado.bootstrap.hojas || []).length);
+  const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
+  if (sinHojas && isAdmin && route !== 'admin') route = 'admin';
+  if (route === 'admin' && !isAdmin) route = 'dashboard';
   $$('.view').forEach(v => v.classList.toggle('is-active', v.dataset.view === route));
   $$('.nav-item, .bn-item[data-route]').forEach(n => n.classList.toggle('is-active', n.dataset.route === route));
   updateMoreMenuActive(route);
