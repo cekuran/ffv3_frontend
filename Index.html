@@ -1515,6 +1515,32 @@ const AUTH_LAST_USER_KEY = 'ff_last_user';
 const AUTH_IS_LOGGED_KEY = 'ff_is_logged';
 const AUTH_TOKEN_KEY = 'ff_auth_token';
 
+// ponytail: cache de bootstrapBase en localStorage. Pinta la UI al instante en
+// la recarga y solo revalida si pasaron REVALIDATE_MS (evita el round-trip de
+// Apps Script en F5 seguidos). TTL duro: mas viejo que eso, se ignora.
+const BOOTSTRAP_CACHE_KEY = 'ff_bootstrap_cache';
+const BOOTSTRAP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const BOOTSTRAP_REVALIDATE_MS = 60 * 1000;
+
+function cacheBootstrap_(b) {
+  try {
+    // ponytail: guardamos solo la parte "base"; las transacciones las trae
+    // sincronizarTransacciones y llenarian la cuota de localStorage.
+    const { transacciones, ...base } = (b || {});
+    localStorage.setItem(BOOTSTRAP_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: base }));
+  } catch (_) { /* cuota llena: seguimos sin cache */ }
+}
+
+function readBootstrapCache_() {
+  try {
+    const c = JSON.parse(localStorage.getItem(BOOTSTRAP_CACHE_KEY) || 'null');
+    if (!c || !c.data) return null;
+    const edad = Date.now() - (c.ts || 0);
+    if (edad > BOOTSTRAP_CACHE_TTL_MS) return null;
+    return { data: c.data, fresco: edad < BOOTSTRAP_REVALIDATE_MS };
+  } catch (_) { return null; }
+}
+
 function showAuthError(msg) {
   const el = $('#authError');
   if (!msg) {
@@ -1542,28 +1568,6 @@ function mostrarApp() {
   $('#authScreen').style.display = 'none';
   $('.app').style.display = '';
   showAuthError('');
-}
-
-async function initApp() {
-  if (!API_URL) {
-    mostrarSetupApi();
-    return;
-  }
-  try {
-    await rawCall('ping');
-  } catch (e) {
-    if (typeof e.message === 'string' && e.message.startsWith('NO_MASTER_SPREADSHEET')) {
-      mostrarSetupSheet();
-      return;
-    }
-  }
-  mostrarLogin();
-}
-
-function mostrarSetupSheet() {
-  $('#setupScreen').style.display = 'grid';
-  $('#authScreen').style.display = 'none';
-  $('.app').style.display = 'none';
 }
 
 function mostrarSetupApi() {
@@ -1715,8 +1719,7 @@ function actualizarNombreHojaUI() {
   }
 }
 
-async function iniciarAppAutenticada() {
-  Estado.bootstrap = normalizarBootstrap(await call('bootstrapBase'));
+function pintarAppAutenticada_(primeraVez) {
   const user = (Estado.bootstrap.sesion && Estado.bootstrap.sesion.user) || '?';
   const sinHojas = usuarioSinHojas_();
   const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
@@ -1730,15 +1733,52 @@ async function iniciarAppAutenticada() {
   $$('[data-menu-user]').forEach(el => { el.textContent = user; });
   if (!sinHojas) {
     poblarFiltros();
-    go('dashboard');
-    sincronizarTransacciones({ render: true, toastOnError: true });
-  } else if (isAdmin) {
-    go('admin');
+    if (primeraVez) {
+      go('dashboard');
+      sincronizarTransacciones({ render: true, toastOnError: true });
+    } else {
+      // ponytail: revalidacion en segundo plano, no re-sincronizamos transacciones
+      // ni movemos al usuario de vista.
+      limpiarFiltrosInvalidos();
+      if (location.hash.startsWith('#/')) go(location.hash.slice(2));
+      else renderDashboard();
+    }
   } else {
-    go('sinHojas');
+    go(isAdmin ? 'admin' : 'sinHojas');
   }
   mostrarApp();
 }
+
+function descartarSesionLocal_() {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_IS_LOGGED_KEY);
+  localStorage.removeItem(BOOTSTRAP_CACHE_KEY);
+}
+
+async function iniciarAppAutenticada() {
+  const cache = readBootstrapCache_();
+  if (cache) {
+    Estado.bootstrap = normalizarBootstrap(cache.data);
+    pintarAppAutenticada_(true);
+    if (cache.fresco) return;
+    call('bootstrapBase').then(b => {
+      cacheBootstrap_(b);
+      Estado.bootstrap = normalizarBootstrap(b);
+      pintarAppAutenticada_(false);
+    }).catch(err => {
+      if (!esErrorAutenticacion(err)) return;
+      descartarSesionLocal_();
+      mostrarLogin();
+      showAuthError('Tu sesión expiró. Inicia sesión de nuevo.');
+    });
+    return;
+  }
+  const b = await call('bootstrapBase');
+  cacheBootstrap_(b);
+  Estado.bootstrap = normalizarBootstrap(b);
+  pintarAppAutenticada_(true);
+}
+
 
 function esErrorAutenticacion(err) {
   const msg = String((err && err.message) || err || '').toLowerCase();
@@ -3939,6 +3979,7 @@ async function recargar() {
   if (token !== _txSyncToken) return;
   if (!boot) { toast('No se pudo recargar'); return; }
   Estado.bootstrap = normalizarBootstrap(boot);
+  cacheBootstrap_(boot);
   const sinHojas = usuarioSinHojas_();
   aplicarRolesUI();
   aplicarRestriccionSinHojas();
@@ -3976,6 +4017,7 @@ $('#authForm').addEventListener('submit', async (e) => {
   showAuthError('');
   try {
     const r = await call('loginUsuario', user, pass);
+    localStorage.removeItem(BOOTSTRAP_CACHE_KEY);
     localStorage.setItem(AUTH_LAST_USER_KEY, r.user || user);
     if (r.token) localStorage.setItem(AUTH_TOKEN_KEY, r.token);
     else localStorage.removeItem(AUTH_TOKEN_KEY);
@@ -3996,8 +4038,7 @@ $('#authForm').addEventListener('submit', async (e) => {
 async function cerrarSesion() {
   const token = localStorage.getItem(AUTH_TOKEN_KEY) || '';
   try { await call('logoutUsuario', token); } catch (_) { /* ignore */ }
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-  localStorage.removeItem(AUTH_IS_LOGGED_KEY);
+  descartarSesionLocal_();
   closeUserMenus();
   mostrarLogin();
 }
@@ -4439,22 +4480,27 @@ window.addEventListener('hashchange', () => {
       mostrarSetupApi();
       return;
     }
-    try {
-      const ping = await rawCall('ping');
-      if (ping && ping.configurado === false) {
-        mostrarSetupSheet();
-        return;
-      }
-    } catch (e) {
-      if (typeof e.message === 'string' && e.message.startsWith('NO_MASTER_SPREADSHEET')) {
-        mostrarSetupSheet();
-        return;
-      }
-      throw e;
-    }
-
     const token = localStorage.getItem(AUTH_TOKEN_KEY) || '';
     const sesionExpirada = !!localStorage.getItem(AUTH_IS_LOGGED_KEY);
+
+    // ponytail: ping solo sirve para detectar que falta el spreadsheet maestro.
+    // Si ya hay token, la instalacion esta configurada: nos ahorramos el
+    // round-trip de Apps Script en cada recarga.
+    if (!token) {
+      try {
+        const ping = await rawCall('ping');
+        if (ping && ping.configurado === false) {
+          mostrarSetupSheet();
+          return;
+        }
+      } catch (e) {
+        if (typeof e.message === 'string' && e.message.startsWith('NO_MASTER_SPREADSHEET')) {
+          mostrarSetupSheet();
+          return;
+        }
+        throw e;
+      }
+    }
 
     // Arranque optimista: si hay token, intentamos cargar directamente la app
     // para evitar una llamada extra de authStatus en cada recarga.
@@ -4466,12 +4512,15 @@ window.addEventListener('hashchange', () => {
         localStorage.setItem(AUTH_IS_LOGGED_KEY, '1');
         return;
       } catch (err) {
+        if (typeof err.message === 'string' && err.message.startsWith('NO_MASTER_SPREADSHEET')) {
+          mostrarSetupSheet();
+          return;
+        }
         if (!esErrorAutenticacion(err)) throw err;
       }
     }
 
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_IS_LOGGED_KEY);
+    descartarSesionLocal_();
     mostrarLogin();
     if (sesionExpirada) showAuthError('Tu sesión expiró. Inicia sesión de nuevo.');
   } catch (e) {
