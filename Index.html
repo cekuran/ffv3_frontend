@@ -913,6 +913,22 @@
       <div class="bento" id="estList" style="margin-top: var(--s-4);"></div>
     </section>
 
+    <!-- Sin hojas asignadas -->
+    <section class="view" data-view="sinHojas">
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center; padding: var(--s-7) var(--s-4);">
+        <svg viewBox="0 0 24 24" width="96" height="96" fill="currentColor" style="color: var(--on-surface-variant); opacity: 0.5;">
+          <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm0 7V3.5L19.5 9H14z"/>
+        </svg>
+        <h2 style="margin: var(--s-5) 0 var(--s-3); font-size: 24px; line-height: 1.25; font-weight: 600;">No tienes hojas de cálculo asignadas</h2>
+        <p class="card-sub" style="max-width: 480px; margin: 0;">
+          Para empezar a usar la aplicación, el administrador debe asignarte al menos una hoja de cálculo.
+        </p>
+        <p class="card-sub" style="max-width: 480px; margin: var(--s-4) 0 0; font-size: 12px;">
+          Puedes cerrar sesión desde el menú de usuario.
+        </p>
+      </div>
+    </section>
+
     <!-- Admin -->
     <section class="view" data-view="admin">
       <div class="section-h">
@@ -1443,7 +1459,7 @@ function toast(msg) {
   toast._t = setTimeout(() => t.classList.remove('is-show'), 2400);
 }
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbzRco5xKlJXTXrnKJttSg5xu-mJFv8FpicjF93VHxZJQDL93WzoQch8yHuO3PDjUi2O/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzsAQxbWE8WZyM4U-I9kBBxzt3WvmkXq5s3v7LE07ZsaQ6GdpDca5apjXf19AXqsEy8/exec';
 
 async function rawCall(fn, ...args) {
   const body = JSON.stringify({ action: fn, args, token: localStorage.getItem(AUTH_TOKEN_KEY) || '' });
@@ -1712,8 +1728,10 @@ async function iniciarAppAutenticada() {
     poblarFiltros();
     go('dashboard');
     sincronizarTransacciones({ render: true, toastOnError: true });
+  } else if (isAdmin) {
+    go('admin');
   } else {
-    go(isAdmin ? 'admin' : 'dashboard');
+    go('sinHojas');
   }
   mostrarApp();
 }
@@ -1780,22 +1798,31 @@ function aplicarRestriccionSinHojas() {
   const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
   const navSels = '.sidebar .nav-item, .bottom-nav .bn-item[data-route], .more-dropdown [data-route]';
   const banner = document.getElementById('noHojasBanner');
+  const fab = $('#fab');
+  const btnConciliarTop = $('#btnConciliarTop');
   const mensajeSinDatos = isAdmin
     ? '<strong>No hay datos financieros para mostrar para este usuario.</strong> Este usuario no tiene hojas de calculo registradas. Usa la vista Admin para vincular una hoja.'
     : '<strong>No hay datos financieros para mostrar para este usuario.</strong> Este usuario no tiene hojas de calculo registradas. Pide al administrador que vincule una hoja.';
-  const targetSel = isAdmin ? '.view[data-view="admin"]' : '.view[data-view="dashboard"] .bento';
   if (!sinHojas) {
     document.querySelectorAll(navSels).forEach(el => { el.style.display = ''; });
     if (banner) banner.style.display = 'none';
+    if (fab) fab.style.display = '';
+    if (btnConciliarTop) btnConciliarTop.style.display = '';
     return;
   }
   document.querySelectorAll(navSels).forEach(el => { el.style.display = el.dataset.route === 'admin' ? '' : 'none'; });
+  if (fab) fab.style.display = 'none';
+  if (btnConciliarTop) btnConciliarTop.style.display = 'none';
+  if (!isAdmin) {
+    if (banner) banner.style.display = 'none';
+    return;
+  }
   if (banner) {
     banner.innerHTML = mensajeSinDatos;
     banner.style.display = '';
     return;
   }
-  const target = document.querySelector(targetSel);
+  const target = document.querySelector('.view[data-view="admin"]');
   if (!target) return;
   const div = document.createElement('div');
   div.id = 'noHojasBanner';
@@ -1975,13 +2002,14 @@ async function sincronizarTransacciones(opciones) {
 }
 
 // === Rutas ===
-const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'admin', 'configuracion'];
+const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'admin', 'configuracion', 'sinHojas'];
 function go(route) {
   if (!ROUTES.includes(route)) route = 'dashboard';
   const sinHojas = !((Estado.bootstrap.hojas || []).length);
   const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
   if (sinHojas && isAdmin && route !== 'admin') route = 'admin';
-  if (route === 'admin' && !isAdmin) route = 'dashboard';
+  if (sinHojas && !isAdmin) route = 'sinHojas';
+  if (route === 'admin' && !isAdmin) route = 'sinHojas';
   $$('.view').forEach(v => v.classList.toggle('is-active', v.dataset.view === route));
   $$('.nav-item, .bn-item[data-route]').forEach(n => n.classList.toggle('is-active', n.dataset.route === route));
   updateMoreMenuActive(route);
@@ -3894,7 +3922,7 @@ async function recargar() {
     else renderDashboard();
   } else {
     const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
-    go(isAdmin ? 'admin' : 'dashboard');
+    go(isAdmin ? 'admin' : 'sinHojas');
   }
 }
 
