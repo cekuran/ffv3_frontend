@@ -183,6 +183,10 @@
 
   .view { display: none; }
   .view.is-active { display: block; animation: fadeIn 0.25s ease-out; }
+  /* Cuando el body lleva esta clase (usuario autenticado sin hojas
+     vinculado que NO es admin), ocultamos cualquier vista que no sea
+     sinHojas aunque is-active se cuele por código o caché. */
+  body.app-sin-hojas-no-admin .view:not([data-view="sinHojas"]) { display: none !important; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
   /* === Bento grid === */
@@ -1459,7 +1463,7 @@ function toast(msg) {
   toast._t = setTimeout(() => t.classList.remove('is-show'), 2400);
 }
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbzsAQxbWE8WZyM4U-I9kBBxzt3WvmkXq5s3v7LE07ZsaQ6GdpDca5apjXf19AXqsEy8/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzErxRVzVQySNokW3bCksEzVbkaU9uAtU7EZif6iz_06H4OOtc2uoGaWANQc9WUopQ/exec';
 
 async function rawCall(fn, ...args) {
   const body = JSON.stringify({ action: fn, args, token: localStorage.getItem(AUTH_TOKEN_KEY) || '' });
@@ -1714,7 +1718,7 @@ function actualizarNombreHojaUI() {
 async function iniciarAppAutenticada() {
   Estado.bootstrap = normalizarBootstrap(await call('bootstrapBase'));
   const user = (Estado.bootstrap.sesion && Estado.bootstrap.sesion.user) || '?';
-  const sinHojas = !((Estado.bootstrap.hojas || []).length);
+  const sinHojas = usuarioSinHojas_();
   const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
   aplicarRolesUI();
   aplicarRestriccionSinHojas();
@@ -1794,7 +1798,7 @@ function aplicarRolesUI() {
 }
 
 function aplicarRestriccionSinHojas() {
-  const sinHojas = !(((Estado.bootstrap && Estado.bootstrap.hojas) || []).length);
+  const sinHojas = usuarioSinHojas_();
   const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
   const navSels = '.sidebar .nav-item, .bottom-nav .bn-item[data-route], .more-dropdown [data-route]';
   const banner = document.getElementById('noHojasBanner');
@@ -1803,6 +1807,9 @@ function aplicarRestriccionSinHojas() {
   const mensajeSinDatos = isAdmin
     ? '<strong>No hay datos financieros para mostrar para este usuario.</strong> Este usuario no tiene hojas de calculo registradas. Usa la vista Admin para vincular una hoja.'
     : '<strong>No hay datos financieros para mostrar para este usuario.</strong> Este usuario no tiene hojas de calculo registradas. Pide al administrador que vincule una hoja.';
+  // Marca el body para que el CSS oculte cualquier vista != sinHojas de
+  // forma defensiva (incluso si is-active se cuela por cache/código).
+  document.body.classList.toggle('app-sin-hojas-no-admin', sinHojas && !isAdmin);
   if (!sinHojas) {
     document.querySelectorAll(navSels).forEach(el => { el.style.display = ''; });
     if (banner) banner.style.display = 'none';
@@ -1977,6 +1984,12 @@ let _txSyncToken = 0;
 
 async function sincronizarTransacciones(opciones) {
   const opts = opciones || {};
+  // Defensa: si el usuario no tiene hojas y no es admin, no tiene sentido
+  // pedir transacciones; cualquier endpoint de datos será rechazado por el
+  // backend de todos modos.
+  if (usuarioSinHojas_() && ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') !== 'admin') {
+    return false;
+  }
   const token = ++_txSyncToken;
   if (opts.showLoading !== false) {
     const route = getActiveRoute();
@@ -2003,9 +2016,17 @@ async function sincronizarTransacciones(opciones) {
 
 // === Rutas ===
 const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'admin', 'configuracion', 'sinHojas'];
+
+function usuarioSinHojas_() {
+  const b = Estado.bootstrap || {};
+  const flag = b.sin_hojas === true;
+  const hojas = Array.isArray(b.hojas) ? b.hojas.length : 0;
+  return flag || hojas === 0;
+}
+
 function go(route) {
   if (!ROUTES.includes(route)) route = 'dashboard';
-  const sinHojas = !((Estado.bootstrap.hojas || []).length);
+  const sinHojas = usuarioSinHojas_();
   const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
   if (sinHojas && isAdmin && route !== 'admin') route = 'admin';
   if (sinHojas && !isAdmin) route = 'sinHojas';
@@ -2014,6 +2035,11 @@ function go(route) {
   $$('.nav-item, .bn-item[data-route]').forEach(n => n.classList.toggle('is-active', n.dataset.route === route));
   updateMoreMenuActive(route);
   location.hash = '#/' + route;
+  // Si no hay hojas y no somos admin, evitamos cualquier render de datos.
+  if (sinHojas && !isAdmin) {
+    closeUserMenus();
+    return;
+  }
   if (route === 'presupuesto') renderPresupuesto();
   if (route === 'cuentas') renderCuentas();
   if (route === 'movimientos') renderMovimientos();
@@ -3826,6 +3852,8 @@ $('#formRec').addEventListener('submit', async (e) => {
 
 // === Filtros ===
 function poblarFiltros() {
+  // Sin hojas y sin rol admin: los filtros no aplican, salimos.
+  if (usuarioSinHojas_() && ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') !== 'admin') return;
   poblarSelect('#filtroCuenta', Estado.bootstrap.cuentas, Estado.filtros.cuenta_id, c => c.nombre);
   $('#filtroTipo').value = Estado.filtros.tipo;
   $('#filtroCategoria').innerHTML = '<option value="">Todas</option>' + Estado.bootstrap.categorias.map(c =>
@@ -3911,7 +3939,7 @@ async function recargar() {
   if (token !== _txSyncToken) return;
   if (!boot) { toast('No se pudo recargar'); return; }
   Estado.bootstrap = normalizarBootstrap(boot);
-  const sinHojas = !((Estado.bootstrap.hojas || []).length);
+  const sinHojas = usuarioSinHojas_();
   aplicarRolesUI();
   aplicarRestriccionSinHojas();
   actualizarNombreHojaUI();
