@@ -1541,6 +1541,31 @@ function readBootstrapCache_() {
   } catch (_) { return null; }
 }
 
+// ponytail: copia acotada de las transacciones mas recientes (ya vienen
+// ordenadas desc por fecha desde el backend). Sirve solo para pintar el
+// Inicio al instante en un F5 "fresco" sin ir a la red; Movimientos y
+// cualquier filtro no trivial siguen dependiendo de sincronizarTransacciones
+// para tener el listado completo.
+const TX_RECENT_CACHE_KEY = 'ff_tx_recientes_cache';
+const TX_RECENT_CACHE_LIMIT = 50;
+
+function cacheTransaccionesRecientes_(txs) {
+  try {
+    const recientes = Array.isArray(txs) ? txs.slice(0, TX_RECENT_CACHE_LIMIT) : [];
+    localStorage.setItem(TX_RECENT_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: recientes }));
+  } catch (_) { /* cuota llena: seguimos sin cache de transacciones */ }
+}
+
+function readTransaccionesRecientesCache_() {
+  try {
+    const c = JSON.parse(localStorage.getItem(TX_RECENT_CACHE_KEY) || 'null');
+    if (!c || !Array.isArray(c.data)) return null;
+    const edad = Date.now() - (c.ts || 0);
+    if (edad > BOOTSTRAP_CACHE_TTL_MS) return null;
+    return { data: c.data, completo: false };
+  } catch (_) { return null; }
+}
+
 function showAuthError(msg) {
   const el = $('#authError');
   if (!msg) {
@@ -1719,7 +1744,7 @@ function actualizarNombreHojaUI() {
   }
 }
 
-function pintarAppAutenticada_(primeraVez) {
+function pintarAppAutenticada_(primeraVez, sincronizarTx) {
   const user = (Estado.bootstrap.sesion && Estado.bootstrap.sesion.user) || '?';
   const sinHojas = usuarioSinHojas_();
   const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
@@ -1735,7 +1760,12 @@ function pintarAppAutenticada_(primeraVez) {
     poblarFiltros();
     if (primeraVez) {
       go('dashboard');
+      // ponytail: si ya pintamos con el cache acotado de transacciones y el
+      // bootstrap seguia "fresco", no hace falta ir a la red otra vez en
+      // cada F5; sincronizarTx es false en ese caso (ver iniciarAppAutenticada).
+      if (sincronizarTx !== false) {
       sincronizarTransacciones({ render: true, toastOnError: true });
+      }
     } else {
       // ponytail: revalidacion en segundo plano, no re-sincronizamos transacciones
       // ni movemos al usuario de vista.
@@ -1753,17 +1783,32 @@ function descartarSesionLocal_() {
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(AUTH_IS_LOGGED_KEY);
   localStorage.removeItem(BOOTSTRAP_CACHE_KEY);
+  localStorage.removeItem(TX_RECENT_CACHE_KEY);
 }
 
 async function iniciarAppAutenticada() {
   const cache = readBootstrapCache_();
   if (cache) {
     Estado.bootstrap = normalizarBootstrap(cache.data);
-    pintarAppAutenticada_(true);
+    const txCache = readTransaccionesRecientesCache_();
+    // Solo nos saltamos el round-trip de obtenerTransacciones si el
+    // bootstrap seguia fresco (F5 dentro de la ventana de revalidacion) Y
+    // tenemos algo cacheado con que pintar. Si no hay tx cache (primer uso
+    // del navegador, cuota llena, etc.) sincronizamos igual que antes.
+    const usarTxCache = !!(txCache && cache.fresco);
+    if (usarTxCache) Estado.bootstrap.transacciones = txCache.data;
+    pintarAppAutenticada_(true, !usarTxCache);
     if (cache.fresco) return;
     call('bootstrapBase').then(b => {
       cacheBootstrap_(b);
+      // ponytail: bootstrapBase nunca trae transacciones (bootstrap "ligero").
+      // Si las pisamos aqui con normalizarBootstrap(b) se vacian de golpe las
+      // que ya estaban pintadas (por sincronizarTransacciones o por el cache
+      // acotado). Las preservamos y dejamos que sincronizarTransacciones sea
+      // la unica fuente que las actualiza.
+      const txActuales = Estado.bootstrap.transacciones;
       Estado.bootstrap = normalizarBootstrap(b);
+      Estado.bootstrap.transacciones = txActuales;
       pintarAppAutenticada_(false);
     }).catch(err => {
       if (!esErrorAutenticacion(err)) return;
@@ -1776,7 +1821,7 @@ async function iniciarAppAutenticada() {
   const b = await call('bootstrapBase');
   cacheBootstrap_(b);
   Estado.bootstrap = normalizarBootstrap(b);
-  pintarAppAutenticada_(true);
+  pintarAppAutenticada_(true, true);
 }
 
 
@@ -2043,6 +2088,7 @@ async function sincronizarTransacciones(opciones) {
     const txs = await call('obtenerTransacciones', {});
     if (token !== _txSyncToken) return false;
     Estado.bootstrap.transacciones = Array.isArray(txs) ? txs : [];
+    cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
     if (opts.render !== false) {
       renderDashboard();
       renderMovimientos();
@@ -2600,10 +2646,8 @@ async function renderPresupuesto() {
   $('#presPeriodo').textContent = 'Mismo presupuesto cada mes · gastos de ' + new Date(anio, mes - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
   $('#presMesLabel').textContent = new Date(anio, mes - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
   $('#presCats').innerHTML = loadingBlockHtml('Cargando presupuesto...');
-  const [resumen, resumenCats] = await Promise.all([
-    call('obtenerResumen', anio, mes),
-    call('obtenerCategoriasResumen', anio, mes)
-  ]);
+  const resumen = await call('obtenerResumen', anio, mes);
+  const resumenCats = await call('obtenerCategoriasResumen', anio, mes);
   if (anio !== Estado.pres.anio || mes !== Estado.pres.mes) return;
   const totalGastos = Number(resumen.gastosPresupuesto || 0);
   const totalEsperado = Estado.bootstrap.presupuestos
@@ -3980,6 +4024,7 @@ async function recargar() {
   if (!boot) { toast('No se pudo recargar'); return; }
   Estado.bootstrap = normalizarBootstrap(boot);
   cacheBootstrap_(boot);
+  cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
   const sinHojas = usuarioSinHojas_();
   aplicarRolesUI();
   aplicarRestriccionSinHojas();
@@ -4018,6 +4063,7 @@ $('#authForm').addEventListener('submit', async (e) => {
   try {
     const r = await call('loginUsuario', user, pass);
     localStorage.removeItem(BOOTSTRAP_CACHE_KEY);
+    localStorage.removeItem(TX_RECENT_CACHE_KEY);
     localStorage.setItem(AUTH_LAST_USER_KEY, r.user || user);
     if (r.token) localStorage.setItem(AUTH_TOKEN_KEY, r.token);
     else localStorage.removeItem(AUTH_TOKEN_KEY);
