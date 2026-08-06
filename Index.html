@@ -1554,18 +1554,27 @@ const BOOTSTRAP_CACHE_KEY = 'ff_bootstrap_cache';
 const BOOTSTRAP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const BOOTSTRAP_REVALIDATE_MS = 60 * 1000;
 
+// ponytail: namespace por sesión activa. Sin AUTH_TOKEN_KEY no se llega aquí
+// (AUTH_IS_LOGGED_KEY está limpio y la UI está en mostrarLogin). Si dos
+// usuarios comparten navegador sin logout explícito, cada login escribe su
+// token y los caches no se solapan. logout/login borra además las dos
+// claves explícitamente (descartarSesionLocal_ / submit handler).
+function bootstrapCacheKey_() {
+  return BOOTSTRAP_CACHE_KEY + ':' + (localStorage.getItem(AUTH_TOKEN_KEY) || 'anon');
+}
+
 function cacheBootstrap_(b) {
   try {
     // ponytail: guardamos solo la parte "base"; las transacciones las trae
     // sincronizarTransacciones y llenarian la cuota de localStorage.
     const { transacciones, ...base } = (b || {});
-    localStorage.setItem(BOOTSTRAP_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: base }));
+    localStorage.setItem(bootstrapCacheKey_(), JSON.stringify({ ts: Date.now(), data: base }));
   } catch (_) { /* cuota llena: seguimos sin cache */ }
 }
 
 function readBootstrapCache_() {
   try {
-    const c = JSON.parse(localStorage.getItem(BOOTSTRAP_CACHE_KEY) || 'null');
+    const c = JSON.parse(localStorage.getItem(bootstrapCacheKey_()) || 'null');
     if (!c || !c.data) return null;
     const edad = Date.now() - (c.ts || 0);
     if (edad > BOOTSTRAP_CACHE_TTL_MS) return null;
@@ -1581,16 +1590,20 @@ function readBootstrapCache_() {
 const TX_RECENT_CACHE_KEY = 'ff_tx_recientes_cache';
 const TX_RECENT_CACHE_LIMIT = 50;
 
+function txRecentCacheKey_() {
+  return TX_RECENT_CACHE_KEY + ':' + (localStorage.getItem(AUTH_TOKEN_KEY) || 'anon');
+}
+
 function cacheTransaccionesRecientes_(txs) {
   try {
     const recientes = Array.isArray(txs) ? txs.slice(0, TX_RECENT_CACHE_LIMIT) : [];
-    localStorage.setItem(TX_RECENT_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: recientes }));
+    localStorage.setItem(txRecentCacheKey_(), JSON.stringify({ ts: Date.now(), data: recientes }));
   } catch (_) { /* cuota llena: seguimos sin cache de transacciones */ }
 }
 
 function readTransaccionesRecientesCache_() {
   try {
-    const c = JSON.parse(localStorage.getItem(TX_RECENT_CACHE_KEY) || 'null');
+    const c = JSON.parse(localStorage.getItem(txRecentCacheKey_()) || 'null');
     if (!c || !Array.isArray(c.data)) return null;
     const edad = Date.now() - (c.ts || 0);
     if (edad > BOOTSTRAP_CACHE_TTL_MS) return null;
@@ -1814,8 +1827,13 @@ function pintarAppAutenticada_(primeraVez, sincronizarTx) {
 function descartarSesionLocal_() {
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(AUTH_IS_LOGGED_KEY);
+  // ponytail: limpiamos tanto la clave base como las namespace por sesión,
+  // por si quedó alguna entrada huérfana de un usuario anterior del mismo
+  // navegador.
   localStorage.removeItem(BOOTSTRAP_CACHE_KEY);
   localStorage.removeItem(TX_RECENT_CACHE_KEY);
+  localStorage.removeItem(bootstrapCacheKey_());
+  localStorage.removeItem(txRecentCacheKey_());
 }
 
 async function iniciarAppAutenticada() {
@@ -4094,8 +4112,13 @@ $('#authForm').addEventListener('submit', async (e) => {
   showAuthError('');
   try {
     const r = await call('loginUsuario', user, pass);
+    // ponytail: limpiamos cualquier cache de un usuario previo del mismo
+    // navegador antes de fijar el nuevo token. La escritura posterior usará
+    // la clave namespaceada por el token actual, así que no contamina.
     localStorage.removeItem(BOOTSTRAP_CACHE_KEY);
     localStorage.removeItem(TX_RECENT_CACHE_KEY);
+    localStorage.removeItem(bootstrapCacheKey_());
+    localStorage.removeItem(txRecentCacheKey_());
     localStorage.setItem(AUTH_LAST_USER_KEY, r.user || user);
     if (r.token) localStorage.setItem(AUTH_TOKEN_KEY, r.token);
     else localStorage.removeItem(AUTH_TOKEN_KEY);
