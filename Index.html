@@ -344,6 +344,21 @@
   .tx-amount.neg { color: var(--error); }
   .tx-amount.pos { color: var(--primary); }
   .tx-amount.neutral { color: var(--on-surface-variant); }
+  /* ponytail: en móvil la fila se reorganiza como tarjeta 2x2
+     info | monto / icono | acciones */
+  @media (max-width: 767px) {
+    .tx-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      gap: var(--s-2) var(--s-3);
+      align-items: center;
+    }
+    .tx-main { grid-column: 1; grid-row: 1; min-width: 0; }
+    .tx-amount { grid-column: 2; grid-row: 1; justify-self: end; }
+    .tx-ico { grid-column: 1; grid-row: 2; width: 36px; height: 36px; justify-self: start; }
+    .tx-row > div:last-child { grid-column: 2; grid-row: 2; justify-self: end; display: flex; gap: 2px; }
+  }
 
   /* === Account card === */
   .acct { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4); background: var(--surface-container-low); border: 1px solid var(--outline-variant); border-radius: var(--r-xl); transition: background 0.15s; }
