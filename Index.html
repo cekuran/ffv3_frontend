@@ -319,6 +319,27 @@
   .switch .knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: white; border-radius: 50%; transition: transform 0.2s; }
   .switch input:checked + .track { background: var(--primary); }
   .switch input:checked + .track .knob { transform: translateX(20px); }
+  /* === Recurrentes list row === */
+  .rec-card { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+  .rec-ico { flex: 0 0 auto; }
+  .rec-info { flex: 1 1 180px; min-width: 0; }
+  .rec-amount { white-space: nowrap; margin-left: auto; }
+  .rec-actions { display: flex; align-items: center; gap: var(--s-2); flex: 0 0 auto; }
+  .rec-switch { display: inline-flex; align-items: center; gap: 6px; width: auto; height: auto; }
+  .rec-switch .track { position: relative; width: 44px; height: 24px; }
+  .rec-switch .knob { position: absolute; }
+  .rec-switch-label { font-size: 12px; font-weight: 600; color: var(--on-surface-variant); text-transform: uppercase; letter-spacing: 0.05em; }
+  .rec-switch input:checked ~ .rec-switch-label { color: var(--primary); }
+  @media (max-width: 520px) {
+    .rec-card { gap: var(--s-3); }
+    .rec-info { flex-basis: 100%; order: 2; }
+    .rec-ico { order: 1; }
+    .rec-amount { order: 3; margin-left: 0; font-size: 18px; }
+    .rec-actions { order: 4; margin-left: auto; }
+    .rec-switch .track { width: 52px; height: 28px; }
+    .rec-switch .knob { width: 22px; height: 22px; top: 3px; left: 3px; }
+    .rec-switch input:checked + .track .knob { transform: translateX(24px); }
+  }
 
   /* === Pills === */
   .pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: var(--r-full); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -1315,6 +1336,18 @@
         </select>
       </div>
       <div class="field"><label>Cada (meses)</label><input class="input" type="number" min="1" max="12" name="periodo_meses" id="recPer" value="1" required></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Mes de inicio</label>
+        <select class="select" name="mes_inicio" id="recMesInicio">
+          <option value="">— Heredado —</option>
+          <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option>
+          <option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option>
+          <option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+      </div>
+      <div class="field"><label>Año de inicio</label><input class="input" type="number" min="1900" max="3000" name="anio_inicio" id="recAnioInicio" placeholder="ej. 2026"></div>
     </div>
     <div class="field"><label>Cuenta</label><select class="select" name="cuenta_id" id="recCuenta" required></select></div>
     <div class="field" id="wrapRecSubcuenta" style="display: none;"><label>Subcuenta</label><select class="select" name="subcuenta_id" id="recSubcuenta"><option value="">— Ninguna —</option></select></div>
@@ -2670,22 +2703,34 @@ function renderRecurrentes() {
     const detalleCuenta = isTransfer
       ? `${origenTxt} → ${escape(ctaD ? ctaD.nombre : '—')}${subsDNombres.length ? ' (' + subsDNombres.join(', ') + ')' : ''}`
       : origenTxt;
-    return `<div class="card card-pad-md" style="display: flex; align-items: center; gap: var(--s-4);">
-      <div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoCat(cat)}</div>
-      <div style="flex: 1;">
+    return `<div class="card card-pad-md rec-card">
+      <div class="tx-ico rec-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoCat(cat)}</div>
+      <div class="rec-info">
         <div class="title-sm">${escape(p.descripcion || '—')}</div>
         <div class="body-sm" style="color: var(--on-surface-variant);">${detalleCuenta}${establecimiento ? ' · ' + escape(establecimiento.nombre) : ''} · día ${p.dia_mes} · ${escape(fmtPeriodoMeses(p.periodo_meses))}</div>
       </div>
-      <div class="data-tabular" style="font-weight: 700; color: ${color};">${sign}${fmtMoneda(p.importe)}</div>
-      <label class="switch"><input type="checkbox" ${r.activa ? 'checked' : ''} data-rec-toggle="${r.id}"><span class="track"><span class="knob"></span></span></label>
-      <button class="icon-btn" data-rec-edit="${r.id}" title="Editar">${ICONOS.edit}</button>
-      <button class="icon-btn" data-rec-del="${r.id}" title="Eliminar">${ICONOS.delete}</button>
+      <div class="rec-amount data-tabular" style="font-weight: 700; color: ${color};">${sign}${fmtMoneda(p.importe)}</div>
+      <div class="rec-actions">
+        <label class="switch switch-lg rec-switch" title="${r.activa ? 'Activa' : 'Inactiva'}">
+          <input type="checkbox" ${r.activa ? 'checked' : ''} data-rec-toggle="${r.id}" aria-label="Plantilla activa">
+          <span class="track"><span class="knob"></span></span>
+          <span class="rec-switch-label">${r.activa ? 'Activa' : 'Inactiva'}</span>
+        </label>
+        <button class="icon-btn" data-rec-edit="${r.id}" title="Editar" aria-label="Editar">${ICONOS.edit}</button>
+        <button class="icon-btn" data-rec-del="${r.id}" title="Eliminar" aria-label="Eliminar">${ICONOS.delete}</button>
+      </div>
     </div>`;
   }).join('');
   $$('[data-rec-toggle]').forEach(b => b.addEventListener('change', async (e) => {
     const id = e.target.dataset.recToggle;
     const r = Estado.bootstrap.recurrentes.find(x => x.id === id);
     r.activa = e.target.checked;
+    const sw = e.target.closest('.rec-switch');
+    if (sw) {
+      const lbl = sw.querySelector('.rec-switch-label');
+      if (lbl) lbl.textContent = r.activa ? 'Activa' : 'Inactiva';
+      sw.title = r.activa ? 'Activa' : 'Inactiva';
+    }
     await call('guardarRecurrente', { id, plantilla: r.plantilla, activa: r.activa, ultima_generacion: r.ultima_generacion });
   }));
   $$('[data-rec-edit]').forEach(b => b.addEventListener('click', () => openRec(b.dataset.recEdit)));
@@ -4013,6 +4058,10 @@ function openRec(id) {
   $('#recImporte').value = p.importe || '';
   $('#recDia').value = p.dia_mes || 1;
   $('#recPer').value = p.periodo_meses || 1;
+  const mesIni = r && r.mes_inicio != null ? r.mes_inicio : '';
+  const anioIni = r && r.anio_inicio != null ? r.anio_inicio : '';
+  $('#recMesInicio').value = mesIni || '';
+  $('#recAnioInicio').value = anioIni || '';
   poblarSelect('#recCuenta', Estado.bootstrap.cuentas, p.cuenta_id || '', c => c.nombre + ' (' + c.moneda + ')');
   poblarSelect('#recEstablecimiento', Estado.bootstrap.establecimientos, p.tipo === 'transferencia' ? '' : (p.establecimiento_id || ''), e => e.nombre);
   syncFormRecurrente(p);
@@ -4060,6 +4109,11 @@ $('#formRec').addEventListener('submit', async (e) => {
   // subcuenta_destino_id simple (mutuamente excluyente en el formulario).
   const repartoInput = Estado.repRecDest.filter(r => r.subcuenta_id && Number(r.importe) > 0);
   const usarReparto = esTransfer && repartoInput.length > 0;
+  const mesInicio = f.get('mes_inicio') ? Number(f.get('mes_inicio')) : '';
+  const anioInicio = f.get('anio_inicio') ? Number(f.get('anio_inicio')) : '';
+  if ((mesInicio === '') !== (anioInicio === '')) {
+    toast('Indica mes y año de inicio, o deja los dos vacíos'); return;
+  }
   const plantilla = Object.assign({}, base, {
     descripcion: f.get('descripcion'),
     importe: Number(f.get('importe')),
@@ -4086,6 +4140,8 @@ $('#formRec').addEventListener('submit', async (e) => {
   if (!recDraft.id && !plantilla.inicio) plantilla.inicio = new Date().toISOString().slice(0, 10);
   try {
     const args = { plantilla, activa: true };
+    args.mes_inicio = mesInicio === '' ? null : mesInicio;
+    args.anio_inicio = anioInicio === '' ? null : anioInicio;
     if (recDraft.id) {
       args.id = recDraft.id;
       args.ultima_generacion = recDraft.ultima_generacion;
