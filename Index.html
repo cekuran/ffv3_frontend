@@ -186,7 +186,10 @@
   /* Cuando el body lleva esta clase (usuario autenticado sin hojas
      vinculado que NO es admin), ocultamos cualquier vista que no sea
      sinHojas aunque is-active se cuele por código o caché. */
-  body.app-sin-hojas-no-admin .view:not([data-view="sinHojas"]) { display: none !important; }
+  body.app-sin-hojas-no-admin .view:not([data-view="sinHojas"]):not([data-view="configuracion"]) { display: none !important; }
+  /* Defensa: usuario basico nunca debe ver admin (nav, dropdown ni vista)
+     aunque is-active / inline style se cuelen. */
+  body.app-no-es-admin [data-rol-required="admin"] { display: none !important; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
   /* === Bento grid === */
@@ -981,7 +984,7 @@
     </section>
 
     <!-- Admin -->
-    <section class="view" data-view="admin">
+    <section class="view" data-view="admin" data-rol-required="admin">
       <div class="section-h">
         <div>
           <h2 style="font-size: 24px;">Admin</h2>
@@ -1944,6 +1947,7 @@ async function cambiarHojaActivaUI(spreadsheetId) {
 function aplicarRolesUI() {
   const rol = (Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '';
   const isAdmin = rol === 'admin';
+  document.body.classList.toggle('app-no-es-admin', !isAdmin);
   $$('[data-rol-required="admin"]').forEach(el => { el.style.display = isAdmin ? '' : 'none'; });
 }
 
@@ -2180,14 +2184,14 @@ function go(route) {
   const sinHojas = usuarioSinHojas_();
   const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
   if (sinHojas && isAdmin && route !== 'admin') route = 'admin';
-  if (sinHojas && !isAdmin) route = 'sinHojas';
+  if (sinHojas && !isAdmin && route !== 'configuracion') route = 'sinHojas';
   if (route === 'admin' && !isAdmin) route = 'sinHojas';
   $$('.view').forEach(v => v.classList.toggle('is-active', v.dataset.view === route));
   $$('.nav-item, .bn-item[data-route]').forEach(n => n.classList.toggle('is-active', n.dataset.route === route));
   updateMoreMenuActive(route);
   location.hash = '#/' + route;
   // Si no hay hojas y no somos admin, evitamos cualquier render de datos.
-  if (sinHojas && !isAdmin) {
+  if (sinHojas && !isAdmin && route !== 'configuracion') {
     closeUserMenus();
     return;
   }
