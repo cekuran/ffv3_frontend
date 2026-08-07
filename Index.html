@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#00613e">
 <title id="docTitle">Finanzas Familia</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%2300613e'/><circle cx='32' cy='32' r='24' fill='none' stroke='%2397f6c2' stroke-width='2.5'/><text x='32' y='44' font-family='Arial Black,Helvetica,sans-serif' font-size='34' font-weight='900' text-anchor='middle' fill='%2397f6c2'>$</text></svg>">
 <style>
   /* === Sistema de diseño Finanzas Familia === */
   :root {
@@ -431,6 +432,19 @@
   .progress-fill { height: 100%; background: var(--primary); border-radius: inherit; transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
   .progress-fill.warn { background: var(--amber); }
   .progress-fill.danger { background: var(--error); }
+
+  /* === Presupuesto: fila por categoría === */
+  .ppto-row { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); margin-bottom: 6px; }
+  .ppto-row-l { display: flex; align-items: center; gap: var(--s-3); min-width: 0; flex: 1 1 auto; }
+  .ppto-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .ppto-row-r { display: flex; align-items: center; gap: var(--s-2); flex-shrink: 0; }
+  .ppto-row-r strong { white-space: nowrap; }
+  .ppto-input { width: 120px; min-width: 120px; flex-shrink: 0; }
+  @media (max-width: 480px) {
+    .ppto-row { flex-direction: column; align-items: stretch; gap: var(--s-2); }
+    .ppto-row-r { justify-content: space-between; gap: var(--s-3); }
+    .ppto-input { width: 100px; min-width: 100px; flex: none; }
+  }
 
   /* === Bottom nav === */
   .bottom-nav {
@@ -1882,7 +1896,7 @@ function actualizarNombreHojaUI() {
   const brand = $('#brandHoja');
   if (brand) brand.textContent = texto;
   const title = $('#docTitle');
-  if (title) title.textContent = texto;
+  if (title) title.textContent = 'Finanzas Familia';
   const foot = $('#sidebarFoot');
   if (foot) {
     foot.textContent = texto;
@@ -2820,15 +2834,15 @@ async function renderPresupuesto() {
     const p = r.esperado > 0 ? Math.min(100, Math.round((r.real / r.esperado) * 100)) : 0;
     const cls = p >= 100 ? 'danger' : (p >= 80 ? 'warn' : '');
     return `<div>
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); margin-bottom: 6px;">
-        <div style="display: flex; align-items: center; gap: var(--s-3);">
+      <div class="ppto-row">
+        <div class="ppto-row-l">
           <div class="tx-ico" style="${tintCat(c.color)}; width: 32px; height: 32px;">${icoCat(c)}</div>
-          <span class="title-sm">${escape(c.nombre)}</span>
+          <span class="title-sm ppto-row-name">${escape(c.nombre)}</span>
         </div>
-        <div style="display: flex; align-items: center; gap: var(--s-2);">
+        <div class="ppto-row-r">
           <strong class="data-tabular">${fmtMoneda(r.real)}</strong>
           <span style="color: var(--on-surface-variant);">/</span>
-          <input class="input data-tabular" type="number" min="0" step="0.01" inputmode="decimal" data-ppto-cat="${c.id}" value="${presupuesto ? Number(presupuesto.importe_esperado || 0) : ''}" placeholder="0,00" aria-label="Presupuesto para ${escape(c.nombre)}" style="width: 120px;">
+          <input class="input data-tabular ppto-input" type="number" min="0" step="0.01" inputmode="decimal" data-ppto-cat="${c.id}" value="${presupuesto ? Number(presupuesto.importe_esperado || 0) : ''}" placeholder="0,00" aria-label="Presupuesto para ${escape(c.nombre)}">
         </div>
       </div>
       <div class="progress"><div class="progress-fill ${cls}" style="width: ${p}%;"></div></div>
