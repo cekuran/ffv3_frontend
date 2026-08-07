@@ -256,13 +256,46 @@
   .btn-icon { width: 40px; height: 40px; padding: 0; border-radius: var(--r-full); }
   .btn-sm { padding: 6px 12px; font-size: 14px; }
 
-  /* === Icon picker === */
-  .icon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--s-2); }
-  .icon-grid button { display: flex; align-items: center; justify-content: center; aspect-ratio: 1; border-radius: var(--r-md); background: var(--surface-container); color: var(--on-surface-variant); border: 2px solid transparent; cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s; }
-  .icon-grid button:hover { background: var(--surface-container-high); color: var(--on-surface); }
-  .icon-grid button:active { transform: scale(0.94); }
-  .icon-grid button.is-active { background: var(--primary-container); color: var(--on-primary-container); border-color: var(--primary); }
-  @media (max-width: 480px) { .icon-grid { grid-template-columns: repeat(5, 1fr); } }
+  /* === Icon picker (dropdown con preview) === */
+  .icon-dd { position: relative; }
+  .icon-dd-trigger {
+    display: flex; align-items: center; gap: var(--s-2);
+    width: 100%; padding: 12px 14px;
+    background: var(--surface-container-low); color: var(--on-surface);
+    border: 1px solid transparent; border-radius: var(--r-md);
+    font-size: 16px; cursor: pointer; text-align: left;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .icon-dd-trigger:hover { background: var(--surface-container); }
+  .icon-dd-trigger:focus { border-color: var(--primary); background: var(--surface-container-lowest); outline: none; }
+  .icon-dd-preview { width: 28px; height: 28px; display: grid; place-items: center; flex-shrink: 0; color: var(--on-surface-variant); }
+  .icon-dd-label { flex: 1; }
+  .icon-dd-chev { color: var(--on-surface-variant); transition: transform 0.15s; flex-shrink: 0; }
+  .icon-dd-trigger[aria-expanded="true"] .icon-dd-chev { transform: rotate(180deg); }
+  .icon-dd-pop {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    z-index: 50; max-height: 320px; overflow-y: auto;
+    background: var(--surface-container-lowest);
+    border: 1px solid var(--surface-container);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-pop);
+    padding: 6px;
+  }
+  .icon-dd-group + .icon-dd-group { border-top: 1px solid var(--surface-container); margin-top: 4px; padding-top: 4px; }
+  .icon-dd-title {
+    padding: 8px 10px 4px; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--on-surface-variant);
+  }
+  .icon-dd-opt {
+    width: 100%; display: flex; align-items: center; gap: var(--s-2);
+    padding: 8px 10px; border-radius: var(--r-sm);
+    background: transparent; color: var(--on-surface);
+    text-align: left; font-size: 14px; cursor: pointer;
+  }
+  .icon-dd-opt:hover { background: var(--surface-container-low); }
+  .icon-dd-opt.is-active { background: var(--primary-container); color: var(--on-primary-container); }
+  .icon-dd-opt .ico { width: 22px; height: 22px; flex-shrink: 0; }
 
   /* === Inputs === */
   .field { display: flex; flex-direction: column; gap: 4px; }
@@ -1184,8 +1217,15 @@
     </div>
     <div class="field"><label>Saldo inicial</label><input class="input" type="number" step="0.01" name="saldo_inicial" id="ctaSaldo" value="0"></div>
     <div class="field" id="wrapCtaIcono"><label>Icono</label>
-      <input type="hidden" name="icono" id="ctaIcono">
-      <div class="icon-grid" id="ctaIconGrid" data-target="ctaIcono" data-default="account_balance_wallet"></div>
+      <div class="icon-dd" data-default="account_balance_wallet">
+        <input type="hidden" name="icono" id="ctaIcono" value="account_balance_wallet">
+        <button type="button" class="icon-dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+          <span class="icon-dd-preview" aria-hidden="true"></span>
+          <span class="icon-dd-label"></span>
+          <svg class="icon-dd-chev" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="m6 9 6 6 6-6z"/></svg>
+        </button>
+        <div class="icon-dd-pop" role="listbox" hidden></div>
+      </div>
     </div>
     <div style="display: flex; gap: var(--s-2); margin-top: var(--s-3);">
       <button type="button" class="btn btn-secondary" id="ctaCancel" style="flex: 1;">Cancelar</button>
@@ -1211,8 +1251,15 @@
       <div class="field"><label>Color</label><input class="input" type="color" name="color" id="catColor" value="#00613e" style="height: 50px; padding: 4px;"></div>
     </div>
     <div class="field"><label>Icono</label>
-      <input type="hidden" name="icono" id="catIcono">
-      <div class="icon-grid" id="catIconGrid" data-target="catIcono" data-default="category"></div>
+      <div class="icon-dd" data-default="category">
+        <input type="hidden" name="icono" id="catIcono" value="category">
+        <button type="button" class="icon-dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+          <span class="icon-dd-preview" aria-hidden="true"></span>
+          <span class="icon-dd-label"></span>
+          <svg class="icon-dd-chev" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="m6 9 6 6 6-6z"/></svg>
+        </button>
+        <div class="icon-dd-pop" role="listbox" hidden></div>
+      </div>
     </div>
     <div style="display: flex; gap: var(--s-2); margin-top: var(--s-3);">
       <button type="button" class="btn btn-secondary" id="catCancel" style="flex: 1;">Cancelar</button>
@@ -1451,43 +1498,78 @@ const iconoCat = cat => (cat && cat.icono) || CAT_ICON_BY_NAME[cat && cat.nombre
 const icoCat = cat => ICONOS[iconoCat(cat)] || ICONOS.category;
 const tintCat = (color) => color ? `background: ${color}20; color: ${color};` : 'background: var(--surface-container); color: var(--on-surface-variant);';
 
-const CAT_ICONS = [
-  'category', 'home', 'shopping_cart', 'shopping_bag', 'store', 'local_grocery_or_store', 'redeem', 'card_giftcard',
-  'directions_car', 'directions_bus', 'directions_bike', 'flight', 'two_wheeler',
-  'movie', 'sports_esports', 'sports_soccer', 'celebration', 'emoji_events', 'beach_access', 'park', 'pool',
-  'fitness_center', 'medical_services', 'local_hospital', 'spa',
-  'restaurant', 'local_cafe', 'local_bar', 'local_pizza', 'cake',
-  'subscriptions', 'bolt', 'payments', 'receipt_long', 'wifi', 'phone_iphone',
-  'water_drop', 'electric_bolt', 'local_fire_department', 'build', 'handyman', 'lightbulb',
-  'school', 'menu_book', 'child_care', 'pets', 'checkroom',
-  'work', 'volunteer_activism', 'attach_money', 'cloud'
+const CAT_ICON_GROUPS = [
+  ['General', ['category']],
+  ['Vivienda', ['home']],
+  ['Compras', ['shopping_cart', 'shopping_bag', 'store', 'local_grocery_or_store', 'redeem', 'card_giftcard']],
+  ['Comida', ['restaurant', 'local_cafe', 'local_bar', 'local_pizza', 'cake']],
+  ['Transporte', ['directions_car', 'directions_bus', 'directions_bike', 'flight', 'two_wheeler']],
+  ['Ocio', ['movie', 'sports_esports', 'sports_soccer', 'celebration', 'emoji_events', 'beach_access', 'park', 'pool']],
+  ['Salud', ['fitness_center', 'medical_services', 'local_hospital', 'spa']],
+  ['Servicios', ['subscriptions', 'bolt', 'payments', 'receipt_long', 'wifi', 'phone_iphone']],
+  ['Hogar', ['water_drop', 'electric_bolt', 'local_fire_department', 'build', 'handyman', 'lightbulb']],
+  ['Familia', ['school', 'menu_book', 'child_care', 'child_friendly', 'pets', 'checkroom']],
+  ['Trabajo', ['work', 'volunteer_activism', 'attach_money', 'cloud']]
 ];
-const CTA_ICONS = [
-  'account_balance_wallet', 'account_balance', 'savings', 'credit_card', 'card_membership',
-  'payments', 'attach_money', 'currency_exchange', 'trending_up',
-  'cloud', 'devices', 'laptop', 'smartphone', 'watch',
-  'home', 'house', 'apartment',
-  'directions_car', 'local_gas_station', 'two_wheeler',
-  'child_care', 'pets', 'fitness_center', 'school', 'lightbulb',
-  'verified', 'account_box', 'attach_email', 'diamond', 'checkroom', 'receipt_long'
+const CTA_ICON_GROUPS = [
+  ['Cartera', ['account_balance_wallet', 'account_balance', 'savings', 'credit_card', 'card_membership']],
+  ['Dinero', ['payments', 'attach_money', 'currency_exchange', 'trending_up']],
+  ['Digital', ['cloud', 'devices', 'laptop', 'smartphone', 'watch']],
+  ['Hogar', ['home', 'house', 'apartment']],
+  ['Transporte', ['directions_car', 'local_gas_station', 'two_wheeler']],
+  ['Familia', ['child_care', 'pets', 'fitness_center', 'school', 'lightbulb']],
+  ['Otros', ['verified', 'account_box', 'attach_email', 'diamond', 'checkroom', 'receipt_long']]
 ];
 
-function wireIconGrid(grid, icons) {
-  const target = $('#' + grid.dataset.target);
-  grid.innerHTML = icons.map(k => `<button type="button" data-icon="${k}" title="${k}" aria-label="${k}">${ICONOS[k] || ''}</button>`).join('');
-  grid.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-icon]');
-    if (!btn) return;
-    grid.querySelectorAll('button').forEach(b => b.classList.toggle('is-active', b === btn));
-    target.value = btn.dataset.icon;
+function wireIconPicker(hidden, groups) {
+  const root = hidden.parentElement;
+  const trigger = root.querySelector('.icon-dd-trigger');
+  const preview = root.querySelector('.icon-dd-preview');
+  const label = root.querySelector('.icon-dd-label');
+  const pop = root.querySelector('.icon-dd-pop');
+  const fallback = root.dataset.default;
+
+  pop.innerHTML = groups.map(([g, icons]) =>
+    `<div class="icon-dd-group"><div class="icon-dd-title">${escape(g)}</div>` +
+    icons.map(k => `<button type="button" class="icon-dd-opt" role="option" data-icon="${k}"><span class="ico">${ICONOS[k] || ''}</span><span>${k.replace(/_/g, ' ')}</span></button>`).join('') +
+    `</div>`
+  ).join('');
+
+  function sync() {
+    const v = hidden.value && ICONOS[hidden.value] ? hidden.value : fallback;
+    preview.innerHTML = ICONOS[v] || ICONOS[fallback] || '';
+    label.textContent = (v || fallback).replace(/_/g, ' ');
+    pop.querySelectorAll('.icon-dd-opt').forEach(b => b.classList.toggle('is-active', b.dataset.icon === v));
+  }
+
+  function setOpen(open) {
+    pop.hidden = !open;
+    trigger.setAttribute('aria-expanded', String(open));
+    if (open) requestAnimationFrame(() => pop.querySelector('.icon-dd-opt.is-active')?.scrollIntoView({ block: 'center' }));
+  }
+
+  pop.addEventListener('click', e => {
+    const b = e.target.closest('.icon-dd-opt');
+    if (!b) return;
+    hidden.value = b.dataset.icon;
+    sync();
+    setOpen(false);
+    trigger.focus();
   });
+
+  trigger.addEventListener('click', () => setOpen(pop.hidden));
+  document.addEventListener('click', e => { if (!root.contains(e.target) && !pop.hidden) setOpen(false); });
+  root.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden) { setOpen(false); trigger.focus(); } });
+  hidden.addEventListener('change', sync);
+
+  sync();
 }
-function setIconPick(grid, value) {
-  const target = $('#' + grid.dataset.target);
-  const fallback = grid.dataset.default;
-  const v = value && ICONOS[value] ? value : fallback;
-  target.value = v;
-  grid.querySelectorAll('button').forEach(b => b.classList.toggle('is-active', b.dataset.icon === v));
+function setIconPick(hidden, value) {
+  const root = hidden.parentElement;
+  const fallback = root.dataset.default;
+  const has = value && ICONOS[value] && root.querySelector(`.icon-dd-opt[data-icon="${value}"]`);
+  hidden.value = has ? value : fallback;
+  hidden.dispatchEvent(new Event('change'));
 }
 
 const Estado = {
@@ -3252,7 +3334,7 @@ function openCuenta(id, parentId) {
   $('#ctaTipo').value = (c && c.tipo) ? c.tipo : 'activo';
   $('#ctaMoneda').value = (c && c.moneda) ? c.moneda : 'EUR';
   $('#ctaSaldo').value = c ? c.saldo_inicial : 0;
-  setIconPick($('#ctaIconGrid'), (c && c.icono) || 'account_balance_wallet');
+  setIconPick($('#ctaIcono'), (c && c.icono) || 'account_balance_wallet');
   openSheet('sheetCuenta');
 }
 $('#ctaCancel').addEventListener('click', closeAllSheets);
@@ -3422,7 +3504,7 @@ function openCat(id) {
   $('#catNombre').value = c ? c.nombre : '';
   $('#catTipo').value = c ? c.tipo : 'gasto';
   $('#catColor').value = c ? c.color : '#00613e';
-  setIconPick($('#catIconGrid'), c ? iconoCat(c) : 'category');
+  setIconPick($('#catIcono'), c ? iconoCat(c) : 'category');
   openSheet('sheetCat');
 }
 $('#catCancel').addEventListener('click', closeAllSheets);
@@ -4582,8 +4664,8 @@ if (adminUsersList) {
   });
 }
 
-wireIconGrid($('#catIconGrid'), CAT_ICONS);
-wireIconGrid($('#ctaIconGrid'), CTA_ICONS);
+wireIconPicker($('#catIcono'), CAT_ICON_GROUPS);
+wireIconPicker($('#ctaIcono'), CTA_ICON_GROUPS);
 
 window.addEventListener('hashchange', () => {
   const r = (location.hash || '#/dashboard').slice(2);
