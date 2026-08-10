@@ -1629,7 +1629,15 @@ const Estado = {
   txRepartoDest: [],
   repRecDest: [],
   editing: null,
-  recPlantillaId: ''
+  recPlantillaId: '',
+  // Guards anti doble-envío mientras un guardado está en vuelo.
+  guardandoTx: false,
+  guardandoRec: false,
+  // Versión de datos del spreadsheet (backend _meta data_version). Sirve para
+  // detectar cambios hechos en otra pestaña/usuario y forzar revalidación.
+  dataVersion: '',
+  // Timestamp local de la última sync exitosa de transacciones.
+  lastTxSyncAt: 0
 };
 
 const $$ = (sel, ctx = document) => Array.from((ctx || document).querySelectorAll(sel));
@@ -1716,6 +1724,9 @@ function cacheBootstrap_(b) {
     // sincronizarTransacciones y llenarian la cuota de localStorage.
     const { transacciones, ...base } = (b || {});
     localStorage.setItem(bootstrapCacheKey_(), JSON.stringify({ ts: Date.now(), data: base }));
+    if (Array.isArray(base.cuentas) && base.cuentas.length) {
+      cacheSaldos_(base.cuentas, base.hojaActivaId || '');
+    }
   } catch (_) { /* cuota llena: seguimos sin cache */ }
 }
 
@@ -1757,6 +1768,168 @@ function readTransaccionesRecientesCache_() {
     return { data: c.data, completo: false };
   } catch (_) { return null; }
 }
+
+// ponytail: caché local de saldos/cuentas por hoja activa. Permite pintar
+// balances al instante y actualizarlos en el cliente al guardar una tx sin
+// esperar a que el backend recalcule obtenerCuentas (caro tras invalidar).
+const SALDOS_CACHE_KEY = 'ff_saldos_cache';
+const SALDOS_CACHE_TTL_MS = BOOTSTRAP_CACHE_TTL_MS;
+
+function saldosCacheKey_(hojaId) {
+  const hoja = String(hojaId || (Estado.bootstrap && Estado.bootstrap.hojaActivaId) || 'default');
+  return SALDOS_CACHE_KEY + ':' + (localStorage.getItem(AUTH_TOKEN_KEY) || 'anon') + ':' + hoja;
+}
+
+function cacheSaldos_(cuentas, hojaId) {
+  try {
+    if (!Array.isArray(cuentas)) return;
+    localStorage.setItem(saldosCacheKey_(hojaId), JSON.stringify({
+      ts: Date.now(),
+      hojaId: String(hojaId || (Estado.bootstrap && Estado.bootstrap.hojaActivaId) || ''),
+      data: cuentas
+    }));
+  } catch (_) { /* cuota llena: seguimos sin cache de saldos */ }
+}
+
+// Asigna cuentas en memoria y persiste el cache local de saldos.
+function setCuentasLocales_(cuentas) {
+  Estado.bootstrap.cuentas = Array.isArray(cuentas) ? cuentas : [];
+  cacheSaldos_(Estado.bootstrap.cuentas, Estado.bootstrap.hojaActivaId);
+}
+
+function readSaldosCache_(hojaId) {
+  try {
+    const c = JSON.parse(localStorage.getItem(saldosCacheKey_(hojaId)) || 'null');
+    if (!c || !Array.isArray(c.data)) return null;
+    const edad = Date.now() - (c.ts || 0);
+    if (edad > SALDOS_CACHE_TTL_MS) return null;
+    return { data: c.data, fresco: edad < BOOTSTRAP_REVALIDATE_MS, hojaId: c.hojaId || '' };
+  } catch (_) { return null; }
+}
+
+function clearSaldosCache_(hojaId) {
+  try {
+    if (hojaId) {
+      localStorage.removeItem(saldosCacheKey_(hojaId));
+      return;
+    }
+    // Borrar todas las entradas de saldos de este origen (token actual + residuales).
+    const prefix = SALDOS_CACHE_KEY + ':';
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf(prefix) === 0) keys.push(k);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+  } catch (_) { /* ignore */ }
+}
+
+// Parsea reparto_destino (string JSON o array) igual que el backend.
+function parseRepartoDestinoLocal_(raw) {
+  if (!raw) return [];
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try { parsed = JSON.parse(raw); } catch (_) { return []; }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map(r => ({
+      subcuenta_id: r && r.subcuenta_id,
+      importe: Number(r && r.importe || 0)
+    }))
+    .filter(r => r.subcuenta_id && r.importe > 0);
+}
+
+// Aplica el efecto de una tx sobre el array de cuentas (mutación in-place).
+// factor = +1 para aplicar, -1 para revertir (edición: -vieja +nueva).
+function aplicarDeltaTxSobreCuentas_(cuentas, tx, factor) {
+  if (!tx || !Array.isArray(cuentas) || !factor) return;
+  const tipo = tx.tipo;
+  const importe = Number(tx.importe || 0);
+  const importeDest = Number(tx.importe_destino || tx.importe || 0);
+  const mesTx = String(tx.fecha || '').slice(0, 7);
+  const f = Number(factor) || 0;
+
+  function bumpEvolucion(cta, delta) {
+    if (!delta || !mesTx || !Array.isArray(cta.evolucion)) return;
+    cta.evolucion.forEach(e => {
+      if (String(e.mes || '') >= mesTx) e.saldo = Number(e.saldo || 0) + delta;
+    });
+  }
+
+  function findCta(id) {
+    return cuentas.find(c => c.id === id) || null;
+  }
+  function findSub(cta, subId) {
+    if (!cta || !subId) return null;
+    return (cta.subcuentas || []).find(s => s.id === subId) || null;
+  }
+
+  // Origen
+  const ctaOrigen = findCta(tx.cuenta_id);
+  if (ctaOrigen) {
+    let deltaOrigen = 0;
+    if (tipo === 'ingreso') deltaOrigen = importe;
+    else if (tipo === 'gasto' || tipo === 'transferencia') deltaOrigen = -importe;
+
+    const subOrigen = findSub(ctaOrigen, tx.subcuenta_id);
+    if (subOrigen) {
+      subOrigen.saldo = Number(subOrigen.saldo || 0) + deltaOrigen * f;
+      // Modelo aditivo: el saldo del padre incluye el de las subcuentas.
+      ctaOrigen.saldo = Number(ctaOrigen.saldo || 0) + deltaOrigen * f;
+      bumpEvolucion(ctaOrigen, deltaOrigen * f);
+    } else if (deltaOrigen) {
+      ctaOrigen.saldo = Number(ctaOrigen.saldo || 0) + deltaOrigen * f;
+      bumpEvolucion(ctaOrigen, deltaOrigen * f);
+    }
+  }
+
+  // Destino (solo transferencias)
+  if (tipo === 'transferencia' && tx.cuenta_destino_id) {
+    const ctaDest = findCta(tx.cuenta_destino_id);
+    if (ctaDest) {
+      const reparto = parseRepartoDestinoLocal_(tx.reparto_destino);
+      if (reparto.length) {
+        reparto.forEach(r => {
+          const sub = findSub(ctaDest, r.subcuenta_id);
+          const d = Number(r.importe || 0);
+          if (sub) {
+            sub.saldo = Number(sub.saldo || 0) + d * f;
+            ctaDest.saldo = Number(ctaDest.saldo || 0) + d * f;
+          } else {
+            ctaDest.saldo = Number(ctaDest.saldo || 0) + d * f;
+          }
+        });
+        bumpEvolucion(ctaDest, importeDest * f);
+      } else {
+        const subDest = findSub(ctaDest, tx.subcuenta_destino_id);
+        if (subDest) {
+          subDest.saldo = Number(subDest.saldo || 0) + importeDest * f;
+          ctaDest.saldo = Number(ctaDest.saldo || 0) + importeDest * f;
+        } else {
+          ctaDest.saldo = Number(ctaDest.saldo || 0) + importeDest * f;
+        }
+        bumpEvolucion(ctaDest, importeDest * f);
+      }
+    }
+  }
+}
+
+// Actualiza saldos en memoria + localStorage a partir de la tx anterior (edit)
+// y la nueva. Si no hay anterior, solo aplica la nueva.
+function actualizarSaldosLocalesTrasTx_(txAnterior, txNueva) {
+  const cuentas = (Estado.bootstrap.cuentas || []).map(c => {
+    const copia = Object.assign({}, c);
+    if (c.subcuentas) copia.subcuentas = c.subcuentas.map(s => Object.assign({}, s));
+    if (c.evolucion) copia.evolucion = c.evolucion.map(e => Object.assign({}, e));
+    return copia;
+  });
+  if (txAnterior && txAnterior.id) aplicarDeltaTxSobreCuentas_(cuentas, txAnterior, -1);
+  if (txNueva && txNueva.id) aplicarDeltaTxSobreCuentas_(cuentas, txNueva, +1);
+  Estado.bootstrap.cuentas = cuentas;
+  cacheSaldos_(cuentas, Estado.bootstrap.hojaActivaId);
+}
+
 
 function showAuthError(msg) {
   const el = $('#authError');
@@ -1940,6 +2113,8 @@ function pintarAppAutenticada_(primeraVez, sincronizarTx) {
   const user = (Estado.bootstrap.sesion && Estado.bootstrap.sesion.user) || '?';
   const sinHojas = usuarioSinHojas_();
   const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
+  if (Estado.bootstrap && Estado.bootstrap.data_version) aplicarDataVersion_(Estado.bootstrap.data_version);
+  bindVisibilitySync_();
   aplicarRolesUI();
   aplicarRestriccionSinHojas();
   actualizarSelectorHoja();
@@ -1981,12 +2156,21 @@ function descartarSesionLocal_() {
   localStorage.removeItem(TX_RECENT_CACHE_KEY);
   localStorage.removeItem(bootstrapCacheKey_());
   localStorage.removeItem(txRecentCacheKey_());
+  clearSaldosCache_();
 }
 
 async function iniciarAppAutenticada() {
   const cache = readBootstrapCache_();
   if (cache) {
     Estado.bootstrap = normalizarBootstrap(cache.data);
+    // Preferir saldos del cache dedicado si están más frescos o si bootstrap
+    // llegó sin cuentas (defensivo).
+    const saldosCache = readSaldosCache_(Estado.bootstrap.hojaActivaId);
+    if (saldosCache && Array.isArray(saldosCache.data) && saldosCache.data.length) {
+      if (!Estado.bootstrap.cuentas.length || saldosCache.fresco) {
+        Estado.bootstrap.cuentas = saldosCache.data;
+      }
+    }
     const txCache = readTransaccionesRecientesCache_();
     // Solo nos saltamos el round-trip de obtenerTransacciones si el
     // bootstrap seguia fresco (F5 dentro de la ventana de revalidacion) Y
@@ -2190,6 +2374,7 @@ function normalizarBootstrap(b) {
     resumen: b.resumen || null,
     sesion: b.sesion || null,
     version: b.version || '',
+    data_version: b.data_version || '',
     hojas: Array.isArray(b.hojas) ? b.hojas : [],
     hojaActivaId: b.hojaActivaId || ''
   };
@@ -2264,6 +2449,108 @@ function updateMoreMenuActive(route) {
 }
 
 let _txSyncToken = 0;
+let _syncInFlight = null;
+let _visibilitySyncBound = false;
+
+// Parsea errores CONFLICT: del backend. Devuelve el payload o null.
+function parseConflictError_(err) {
+  const msg = String((err && err.message) || err || '');
+  if (!msg.startsWith('CONFLICT:')) return null;
+  try {
+    return JSON.parse(msg.slice('CONFLICT:'.length));
+  } catch (_) {
+    return { mensaje: msg.slice('CONFLICT:'.length) || 'Conflicto de sincronización' };
+  }
+}
+
+// Firma estable de una tx para comparar versiones locales vs servidor.
+function txVersionKey_(t) {
+  if (!t || !t.id) return '';
+  return String(t.id) + '|' + String(t.fecha_ultima_edicion || '') + '|' + String(t.importe || '') + '|' + String(t.fecha || '');
+}
+
+function resumenDiffTxs_(locales, servidor) {
+  const loc = Array.isArray(locales) ? locales : [];
+  const srv = Array.isArray(servidor) ? servidor : [];
+  const mapLoc = {};
+  loc.forEach(t => { if (t && t.id) mapLoc[t.id] = t; });
+  const mapSrv = {};
+  srv.forEach(t => { if (t && t.id) mapSrv[t.id] = t; });
+  let added = 0, removed = 0, changed = 0;
+  Object.keys(mapSrv).forEach(id => {
+    if (!mapLoc[id]) added++;
+    else if (txVersionKey_(mapLoc[id]) !== txVersionKey_(mapSrv[id])) changed++;
+  });
+  Object.keys(mapLoc).forEach(id => {
+    if (!mapSrv[id]) removed++;
+  });
+  return { added, removed, changed, dirty: (added + removed + changed) > 0 };
+}
+
+// Si el servidor trae cambios respecto al estado local, los saldos locales
+// (calculados por deltas) pueden estar desfasados: se piden de nuevo.
+async function reconciliarSaldosSiHaceFalta_(diff, opts) {
+  if (!diff || !diff.dirty) return false;
+  try {
+    const cuentas = await call('obtenerCuentas');
+    if (Array.isArray(cuentas)) {
+      setCuentasLocales_(cuentas);
+      return true;
+    }
+  } catch (e) {
+    if (opts && opts.toastOnError) toast('No se pudieron refrescar saldos: ' + e.message);
+  }
+  return false;
+}
+
+function aplicarDataVersion_(v) {
+  if (v == null || v === '') return;
+  Estado.dataVersion = String(v);
+  if (Estado.bootstrap) Estado.bootstrap.data_version = Estado.dataVersion;
+}
+
+// UI de conflicto: ofrece recargar descartando cambios locales del formulario.
+function manejarConflictoGuardado_(conflict, contexto) {
+  const quien = (conflict && conflict.ultima_edicion_por) ? (' (por ' + conflict.ultima_edicion_por + ')') : '';
+  const mensaje = (conflict && conflict.mensaje)
+    ? conflict.mensaje + quien
+    : ('Otro cambio se guardó antes que el tuyo' + quien + '.');
+  return new Promise(resolve => {
+    openConfirm({
+      title: 'Conflicto de sincronización',
+      message: mensaje + ' ¿Recargar los datos del servidor y descartar tus cambios no guardados?',
+      danger: false,
+      confirmLabel: 'Recargar',
+      onConfirm: async () => {
+        try {
+          if (conflict && conflict.transaccion && conflict.transaccion.id) {
+            const txs = Estado.bootstrap.transacciones || [];
+            const idx = txs.findIndex(t => t.id === conflict.transaccion.id);
+            if (idx >= 0) txs[idx] = Object.assign({}, txs[idx], conflict.transaccion);
+            else txs.unshift(conflict.transaccion);
+            Estado.bootstrap.transacciones = txs;
+            cacheTransaccionesRecientes_(txs);
+          }
+          await sincronizarTransacciones({ render: true, toastOnError: true, forceSaldos: true });
+          closeAllSheets();
+          toast('Datos actualizados desde el servidor');
+        } catch (e) {
+          toast('Error al recargar: ' + e.message);
+        }
+        resolve(true);
+      }
+    });
+    const cancelBtn = $('#sheetConfirmCancel');
+    if (cancelBtn) {
+      const prev = cancelBtn.onclick;
+      cancelBtn.onclick = () => {
+        if (typeof prev === 'function') prev();
+        else closeAllSheets();
+        resolve(false);
+      };
+    }
+  });
+}
 
 async function sincronizarTransacciones(opciones) {
   const opts = opciones || {};
@@ -2273,6 +2560,8 @@ async function sincronizarTransacciones(opciones) {
   if (usuarioSinHojas_() && ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') !== 'admin') {
     return false;
   }
+  // Coalescer llamadas concurrentes (p. ej. focus + route change).
+  if (_syncInFlight && !opts.force) return _syncInFlight;
   const token = ++_txSyncToken;
   if (opts.showLoading !== false) {
     const route = getActiveRoute();
@@ -2282,20 +2571,63 @@ async function sincronizarTransacciones(opciones) {
       $('#movBody').innerHTML = loadingTableRowHtml('Actualizando movimientos...', 8);
     }
   }
+  const run = (async () => {
   try {
+      const locales = Estado.bootstrap.transacciones || [];
     const txs = await call('obtenerTransacciones', {});
     if (token !== _txSyncToken) return false;
-    Estado.bootstrap.transacciones = Array.isArray(txs) ? txs : [];
-    cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
+      const servidor = Array.isArray(txs) ? txs : [];
+      const diff = resumenDiffTxs_(locales, servidor);
+      Estado.bootstrap.transacciones = servidor;
+      cacheTransaccionesRecientes_(servidor);
+      Estado.lastTxSyncAt = Date.now();
+      if (diff.dirty || opts.forceSaldos) {
+        await reconciliarSaldosSiHaceFalta_(diff.dirty ? diff : { dirty: true }, opts);
+      }
     if (opts.render !== false) {
       renderDashboard();
       renderMovimientos();
     }
+      if (diff.dirty && opts.notifyConflict) {
+        const partes = [];
+        if (diff.added) partes.push(diff.added + ' nueva' + (diff.added === 1 ? '' : 's'));
+        if (diff.changed) partes.push(diff.changed + ' modificada' + (diff.changed === 1 ? '' : 's'));
+        if (diff.removed) partes.push(diff.removed + ' eliminada' + (diff.removed === 1 ? '' : 's'));
+        if (partes.length) toast('Sincronizado: ' + partes.join(', '));
+      }
     return true;
   } catch (e) {
     if (opts.toastOnError) toast('Error al cargar movimientos: ' + e.message);
     return false;
+    } finally {
+      _syncInFlight = null;
   }
+  })();
+  _syncInFlight = run;
+  return run;
+}
+
+// Revalidación al volver a la pestaña: evita trabajar con cache stale tras
+// cambios en otro dispositivo o pestaña del mismo usuario.
+function bindVisibilitySync_() {
+  if (_visibilitySyncBound) return;
+  _visibilitySyncBound = true;
+  const revalidate = () => {
+    if (document.visibilityState && document.visibilityState !== 'visible') return;
+    if (!localStorage.getItem(AUTH_TOKEN_KEY)) return;
+    if (usuarioSinHojas_() && ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') !== 'admin') return;
+    const age = Date.now() - (Estado.lastTxSyncAt || 0);
+    // Solo si pasó la ventana de revalidación del bootstrap (60s).
+    if (age < BOOTSTRAP_REVALIDATE_MS) return;
+    sincronizarTransacciones({
+      showLoading: false,
+      render: true,
+      toastOnError: false,
+      notifyConflict: true
+    });
+  };
+  document.addEventListener('visibilitychange', revalidate);
+  window.addEventListener('focus', revalidate);
 }
 
 // === Rutas ===
@@ -2539,7 +2871,7 @@ function renderCuentas() {
 async function borrarCuenta(id) {
   const c = Estado.bootstrap.cuentas.find(c => c.id === id);
   if (!confirm('¿Eliminar "' + c.nombre + '"? Solo se permite si no tiene movimientos.')) return;
-  try { Estado.bootstrap.cuentas = await call('eliminarCuenta', id); toast('Cuenta eliminada'); refrescarCuentas(); }
+  try { setCuentasLocales_(await call('eliminarCuenta', id)); toast('Cuenta eliminada'); refrescarCuentas(); }
   catch (e) { toast('Error: ' + e.message); }
 }
 
@@ -2672,9 +3004,25 @@ function renderMovimientos() {
 
 async function borrarTx(id) {
   if (!confirm('¿Eliminar este movimiento?')) return;
-  await call('eliminarTransaccion', id);
-  await recargar();
+  const txAnterior = (Estado.bootstrap.transacciones || []).find(t => t.id === id) || null;
+  try {
+    const base = txAnterior && txAnterior.fecha_ultima_edicion ? txAnterior.fecha_ultima_edicion : '';
+    await call('eliminarTransaccion', id, base);
+    // Quitar de la lista local y revertir su efecto en saldos (cache local).
+    Estado.bootstrap.transacciones = (Estado.bootstrap.transacciones || []).filter(t => t.id !== id);
+    cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
+    if (txAnterior) actualizarSaldosLocalesTrasTx_(txAnterior, null);
+    if (location.hash.startsWith('#/')) go(location.hash.slice(2));
+    else renderDashboard();
   toast('Movimiento eliminado');
+  } catch (err) {
+    const conflict = parseConflictError_(err);
+    if (conflict) {
+      await manejarConflictoGuardado_(conflict, 'delete');
+    } else {
+      toast('Error: ' + err.message);
+    }
+  }
 }
 
 function renderRecurrentes() {
@@ -3315,7 +3663,10 @@ $('#txRecPeriodoMeses').addEventListener('input', () => {
 $('#txCancel').addEventListener('click', closeAllSheets);
 $('#formTx').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const f = new FormData(e.target);
+  if (Estado.guardandoTx) return;
+  const form = e.target;
+  const btn = form.querySelector('button[type="submit"]');
+  const f = new FormData(form);
   const editingId = (Estado.editing && Estado.editing.id) ? Estado.editing.id : '';
   const txId = (f.get('id') || editingId || '').trim();
   const recurrenteOn = $('#txRecurrenteSwitch').checked;
@@ -3354,15 +3705,42 @@ $('#formTx').addEventListener('submit', async (e) => {
   } else {
     tx.recurrente_id = '';
   }
+  // Base optimista: la fecha_ultima_edicion que teníamos al abrir el editor.
+  if (txId && Estado.editing && Estado.editing.fecha_ultima_edicion) {
+    tx.base_fecha_ultima_edicion = Estado.editing.fecha_ultima_edicion;
+  } else if (txId) {
+    const previa = (Estado.bootstrap.transacciones || []).find(t => t.id === txId);
+    if (previa && previa.fecha_ultima_edicion) tx.base_fecha_ultima_edicion = previa.fecha_ultima_edicion;
+  }
+  Estado.guardandoTx = true;
+  const btnLabel = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+  // Snapshot de la tx previa (si es edición) para revertir su efecto en saldos locales.
+  const txAnterior = (txId
+    ? (Estado.bootstrap.transacciones || []).find(t => t.id === txId)
+    : null) || null;
   try {
-    await call('guardarTransaccion', tx);
+    const result = await call('guardarTransaccion', tx);
     if (Estado.recPlantillaId && !recurrenteOn) {
       await call('eliminarRecurrente', Estado.recPlantillaId);
     }
+    // Refresco ligero: usa el payload del backend y/o actualiza saldos en local.
+    aplicarResultadoGuardadoTx_(result, txAnterior);
+    if (result && result.data_version) aplicarDataVersion_(result.data_version);
     closeAllSheets();
-    await recargar();
     toast('Transacción guardada');
-  } catch (err) { toast('Error: ' + err.message); }
+  } catch (err) {
+    const conflict = parseConflictError_(err);
+    if (conflict) {
+      await manejarConflictoGuardado_(conflict, 'tx');
+    } else {
+      toast('Error: ' + err.message);
+    }
+  }
+  finally {
+    Estado.guardandoTx = false;
+    if (btn) { btn.disabled = false; btn.textContent = btnLabel || 'Guardar'; }
+  }
 });
 function poblarSelect(sel, items, val, label) {
   const el = $(sel); if (!el) return;
@@ -3401,7 +3779,7 @@ $('#formCuenta').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
   try {
-    Estado.bootstrap.cuentas = await call('guardarCuenta', {
+    setCuentasLocales_(await call('guardarCuenta', {
       id: f.get('id') || '',
       parent_id: f.get('parent_id') || '',
       nombre: f.get('nombre'),
@@ -3409,7 +3787,7 @@ $('#formCuenta').addEventListener('submit', async (e) => {
       moneda: f.get('moneda'),
       icono: f.get('icono') || 'account_balance_wallet',
       saldo_inicial: Number(f.get('saldo_inicial') || 0)
-    });
+    }));
     closeAllSheets();
     refrescarCuentas();
     toast('Cuenta guardada');
@@ -3421,7 +3799,7 @@ async function borrarSubcuenta(id, parentId) {
   const sub = parent && (parent.subcuentas || []).find(s => s.id === id);
   if (!confirm('¿Eliminar la subcuenta "' + (sub ? sub.nombre : '') + '"?')) return;
   try {
-    Estado.bootstrap.cuentas = await call('eliminarCuenta', id);
+    setCuentasLocales_(await call('eliminarCuenta', id));
     refrescarCuentas();
     toast('Subcuenta eliminada');
   } catch (err) { toast('Error: ' + err.message); }
@@ -3458,7 +3836,7 @@ function wireAccountDragReorder() {
       cards.splice(dstIdx, 0, moved);
       cards.forEach(c => list.appendChild(c));
       try {
-        Estado.bootstrap.cuentas = await call('reordenarCuentas', cards.map(c => c.dataset.ctaId));
+        setCuentasLocales_(await call('reordenarCuentas', cards.map(c => c.dataset.ctaId)));
         refrescarCuentas();
         toast('Orden guardado');
       } catch (err) {
@@ -3501,7 +3879,7 @@ function wireDragReorder() {
       rows.splice(dstIdx, 0, moved);
       rows.forEach(r => container.appendChild(r));
       try {
-        Estado.bootstrap.cuentas = await call('reordenarSubcuentas', parentId, rows.map(r => r.dataset.subId));
+        setCuentasLocales_(await call('reordenarSubcuentas', parentId, rows.map(r => r.dataset.subId)));
         refrescarCuentas();
         toast('Orden guardado');
       } catch (err) {
@@ -4094,6 +4472,7 @@ $('#recPer').addEventListener('input', () => {
 });
 $('#formRec').addEventListener('submit', async (e) => {
   e.preventDefault();
+  if (Estado.guardandoRec) return;
   const f = new FormData(e.target);
   let base = {};
   if (recDraft.plantilla) {
@@ -4138,6 +4517,11 @@ $('#formRec').addEventListener('submit', async (e) => {
     plantilla.reparto_destino = '';
   }
   if (!recDraft.id && !plantilla.inicio) plantilla.inicio = new Date().toISOString().slice(0, 10);
+  const formRecEl = e.target;
+  const btnRec = formRecEl.querySelector('button[type="submit"]');
+  Estado.guardandoRec = true;
+  const btnRecLabel = btnRec ? btnRec.textContent : '';
+  if (btnRec) { btnRec.disabled = true; btnRec.textContent = 'Guardando...'; }
   try {
     const args = { plantilla, activa: true };
     args.mes_inicio = mesInicio === '' ? null : mesInicio;
@@ -4148,11 +4532,20 @@ $('#formRec').addEventListener('submit', async (e) => {
     } else {
       args.ultima_generacion = '';
     }
-    await call('guardarRecurrente', args);
+    const recurrentes = await call('guardarRecurrente', args);
+    if (Array.isArray(recurrentes)) {
+      Estado.bootstrap.recurrentes = recurrentes;
+    }
     closeAllSheets();
-    await recargar();
+    // Solo re-render de la vista actual; no hace falta bootstrap completo.
+    if (location.hash.startsWith('#/')) go(location.hash.slice(2));
+    else renderDashboard();
     toast(recDraft.id ? 'Plantilla actualizada' : 'Plantilla creada');
   } catch (err) { toast('Error: ' + err.message); }
+  finally {
+    Estado.guardandoRec = false;
+    if (btnRec) { btnRec.disabled = false; btnRec.textContent = btnRecLabel || 'Guardar'; }
+  }
 });
 
 // === Filtros ===
@@ -4238,6 +4631,40 @@ function refrescarCuentas() {
 }
 
 // === Boot ===
+// Aplica el resultado enriquecido de guardarTransaccion sin bootstrap completo.
+function aplicarResultadoGuardadoTx_(result, txAnterior) {
+  if (!result) return;
+  const fila = result.transaccion || result;
+  let limpia = null;
+  if (fila && fila.id) {
+    const txs = Estado.bootstrap.transacciones || [];
+    const idx = txs.findIndex(t => t.id === fila.id);
+    // Extraer solo campos de tx (sin cuentas/recurrentes anidados del payload).
+    limpia = Object.assign({}, fila);
+    delete limpia.transaccion;
+    delete limpia.cuentas;
+    delete limpia.recurrentes;
+    if (idx >= 0) txs[idx] = Object.assign({}, txs[idx], limpia);
+    else txs.unshift(limpia);
+    Estado.bootstrap.transacciones = txs;
+    cacheTransaccionesRecientes_(txs);
+  }
+  if (Array.isArray(result.cuentas) && result.cuentas.length) {
+    // Servidor devolvió saldos frescos: autoritativos.
+    setCuentasLocales_(result.cuentas);
+  } else if (limpia) {
+    // Sin saldos del servidor: aplicar delta local (rápido, sin round-trip extra).
+    actualizarSaldosLocalesTrasTx_(txAnterior || null, limpia);
+  }
+  if (Array.isArray(result.recurrentes)) {
+    Estado.bootstrap.recurrentes = result.recurrentes;
+  }
+  limpiarFiltrosInvalidos();
+  poblarFiltros();
+  if (location.hash.startsWith('#/')) go(location.hash.slice(2));
+  else renderDashboard();
+}
+
 async function recargar() {
   const token = ++_txSyncToken;
   const boot = await call('bootstrap');
@@ -4246,6 +4673,7 @@ async function recargar() {
   Estado.bootstrap = normalizarBootstrap(boot);
   cacheBootstrap_(boot);
   cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
+  cacheSaldos_(Estado.bootstrap.cuentas, Estado.bootstrap.hojaActivaId);
   const sinHojas = usuarioSinHojas_();
   aplicarRolesUI();
   aplicarRestriccionSinHojas();
