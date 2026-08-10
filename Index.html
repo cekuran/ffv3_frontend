@@ -199,6 +199,11 @@
   .col-12 { grid-column: span 1; }
   @media (min-width: 768px) { .col-12 { grid-column: span 12; } .col-8 { grid-column: span 8; } .col-7 { grid-column: span 7; } .col-5 { grid-column: span 5; } .col-4 { grid-column: span 4; } .col-6 { grid-column: span 6; } }
 
+  /* recResumen: responsive grid independiente del bento global */
+  .recResumen-grid { display: grid; gap: var(--s-4); grid-template-columns: 1fr; }
+  @media (min-width: 600px) { .recResumen-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); } }
+  .recResumen-grid > .card { min-width: 0; }
+
   .card {
     background: var(--surface-container-lowest);
     border: 1px solid var(--surface-container);
@@ -3089,7 +3094,7 @@ function renderResumenRecurrentes_(recs) {
       fila('Transferencias', g.transferencias, g.nTransferencias, 'var(--on-surface-variant)');
     const neto = g.ingresos - g.gastos;
     const netoColor = neto > 0 ? 'var(--primary)' : (neto < 0 ? 'var(--error)' : 'var(--on-surface)');
-    return `<div class="card col-4" style="padding: var(--s-4);">
+    return `<div class="card" style="padding: var(--s-4); min-width: 0;">
       <div class="label-md" style="color: var(--on-surface-variant); margin-bottom: 2px;">${escape(titulo)}</div>
       <div class="body-sm" style="color: var(--on-surface-variant); margin-bottom: var(--s-3);">${escape(sub)}</div>
       ${body || '<div class="body-sm" style="color: var(--on-surface-variant);">Sin importes</div>'}
@@ -3099,7 +3104,7 @@ function renderResumenRecurrentes_(recs) {
       </div>
     </div>`;
   };
-  el.innerHTML = `<div class="bento" style="margin-bottom: var(--s-2);">${grupos.map(card).join('')}</div>`;
+  el.innerHTML = `<div class="recResumen-grid" style="margin-bottom: var(--s-2);">${grupos.map(card).join('')}</div>`;
 }
 
 function renderRecurrentes() {
