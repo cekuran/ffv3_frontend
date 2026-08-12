@@ -586,7 +586,7 @@
 
   .section-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s-3); }
   .section-h h2 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0; }
-  .section-h a, .section-h .link { color: var(--primary); font-weight: 600; font-size: 13px; cursor: pointer; text-decoration: none; }
+  .section-h a, .section-h .link, .card-h .link { color: var(--primary); font-weight: 600; font-size: 13px; cursor: pointer; text-decoration: none; }
 
   .seg-control { display: inline-flex; background: var(--surface-container-low); border-radius: var(--r-md); padding: 4px; gap: 4px; }
   .seg-control button { padding: 6px 12px; border-radius: var(--r-sm); font-size: 13px; font-weight: 600; color: var(--on-surface-variant); }
@@ -654,6 +654,42 @@
   .vincula-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; padding-left: 12px; }
   .vincula-nombre { flex: 1; font-size: 14px; }
   .vincula-defecto { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--on-surface-variant); }
+  // ponytail: loader visible por defecto para que la pagina nunca quede en
+  // blanco mientras corre bootstrapBase (Apps Script cold start ~2-5s). El
+  // skeleton imita el dashboard (la unica vista visible durante el cold
+  // bootstrap); las demas vistas no necesitan skeleton porque el usuario no
+  // llega a ellas hasta despues de cargar.
+  .boot-loader {
+    min-height: 100dvh;
+    display: grid;
+    place-content: center;
+    gap: var(--s-5);
+    padding: var(--s-6);
+    background:
+      radial-gradient(900px 460px at 20% -10%, color-mix(in srgb, var(--primary-container) 36%, transparent), transparent 60%),
+      radial-gradient(900px 460px at 100% 0%, color-mix(in srgb, var(--tertiary-container) 26%, transparent), transparent 62%),
+      var(--surface);
+  }
+  .boot-loader[hidden] { display: none; }
+  .boot-skel {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: var(--s-3);
+    width: min(560px, 100%);
+  }
+  .boot-skel-block {
+    grid-column: span 3;
+    height: 56px;
+    border-radius: var(--r-lg);
+    background: linear-gradient(90deg, var(--surface-container) 0%, var(--surface-container-high) 50%, var(--surface-container) 100%);
+    background-size: 200% 100%;
+    animation: boot-shimmer 1.4s ease-in-out infinite;
+  }
+  .boot-skel-block.is-wide { grid-column: span 6; height: 110px; }
+  .boot-skel-block.is-half { grid-column: span 3; }
+  .boot-label { color: var(--on-surface-variant); font-size: 14px; letter-spacing: 0.2px; text-align: center; }
+  .boot-label strong { color: var(--on-surface); font-weight: 600; }
+  @keyframes boot-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
   .auth-screen {
     min-height: 100dvh;
     display: grid;
@@ -679,6 +715,27 @@
 </style>
 </head>
 <body>
+<div class="boot-loader" id="bootLoader">
+  <div class="boot-skel">
+    <div class="boot-skel-block is-wide"></div>
+    <div class="boot-skel-block is-half"></div>
+    <div class="boot-skel-block is-half"></div>
+    <div class="boot-skel-block"></div>
+    <div class="boot-skel-block"></div>
+  </div>
+  <div class="boot-label">Finanzas Familia · <strong id="bootUser"></strong></div>
+</div>
+<script>
+  // ponytail: leer el ultimo usuario conocido de localStorage antes que el
+  // resto del JS arranque, asi el nombre aparece sin flicker en el splash.
+  // AUTH_LAST_USER_KEY esta definida mas abajo; el string literal es seguro.
+  (function () {
+    try {
+      var u = localStorage.getItem('ff_last_user');
+      if (u) document.getElementById('bootUser').textContent = 'Hola, ' + u;
+    } catch (e) { /* sin storage: label vacio, no pasa nada */ }
+  })();
+</script>
 <section class="auth-screen" id="authScreen" style="display:none;">
   <div class="auth-card">
     <h2 class="auth-title">Acceso</h2>
@@ -818,14 +875,15 @@
         <div class="card col-7">
           <div class="card-h">
             <h2>Movimientos recientes</h2>
-            <div style="display: flex; gap: 4px;">
+            <div style="display: flex; gap: 4px; align-items: center;">
+              <span class="link" data-go="movimientos">Ver todas →</span>
               <button class="icon-btn" id="dashFilter" title="Filtros"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 5h18v2l-7 8v6l-4-2v-4L3 7z"/></svg></button>
             </div>
           </div>
           <div id="dashTx"></div>
         </div>
         <div class="card col-5">
-          <div class="card-h"><h2>Próximos pagos</h2></div>
+          <div class="card-h"><h2>Próximos pagos</h2><span class="link" data-go="recurrentes">Ver recurrentes →</span></div>
           <div id="dashProx"></div>
         </div>
       </div>
@@ -1712,7 +1770,10 @@ const AUTH_TOKEN_KEY = 'ff_auth_token';
 // la recarga y solo revalida si pasaron REVALIDATE_MS (evita el round-trip de
 // Apps Script en F5 seguidos). TTL duro: mas viejo que eso, se ignora.
 const BOOTSTRAP_CACHE_KEY = 'ff_bootstrap_cache';
-const BOOTSTRAP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+// ponytail: TTL a 7d. Los datos de bootstrap (cuentas/categorias/hojas) cambian
+// poco; transacciones NO se cachean (siempre se revalidan). Si pasa mas de
+// una semana, el loader cubre el round-trip en frio de Apps Script.
+const BOOTSTRAP_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const BOOTSTRAP_REVALIDATE_MS = 60 * 1000;
 
 // ponytail: namespace por sesión activa. Sin AUTH_TOKEN_KEY no se llega aquí
@@ -1951,6 +2012,7 @@ function showAuthError(msg) {
 function mostrarLogin() {
   $('#authScreen').style.display = 'grid';
   $('.app').style.display = 'none';
+  $('#bootLoader').hidden = true;
   $('#authSubmit').disabled = false;
   $('#authSubmit').textContent = 'Entrar';
   const lastUser = localStorage.getItem(AUTH_LAST_USER_KEY) || '';
@@ -1963,6 +2025,7 @@ function mostrarLogin() {
 function mostrarApp() {
   $('#authScreen').style.display = 'none';
   $('.app').style.display = '';
+  $('#bootLoader').hidden = true;
   showAuthError('');
 }
 
