@@ -2729,9 +2729,19 @@ function renderDashboard() {
   $$('#dashTx [data-tx-edit]').forEach(b => b.addEventListener('click', () => openTx(b.dataset.txEdit)));
   $$('#dashTx [data-tx-del]').forEach(b => b.addEventListener('click', () => borrarTx(b.dataset.txDel)));
 
-  // Próximos pagos
-  const prox = (resumen.proximos || []).slice(0, 4);
-  $('#dashProx').innerHTML = prox.length ? prox.map(p => `
+  // Próximos pagos — los 4 más cercanos desde hoy, calculados por el backend
+  const all = (resumen.proximos || []).slice();
+  const ordenados = all
+    .filter(p => p.proximo_disparo)
+    .map(p => ({ p, fire: new Date(p.proximo_disparo) }))
+    .sort((a, b) => a.fire - b.fire)
+    .slice(0, 4);
+  const prox = ordenados.map(x => x.p);
+  const m = new Date().getMonth();
+  const etiqueta = (prox.length && ordenados[0].fire.getMonth() !== m)
+    ? `<div class="label-md" style="color: var(--on-surface-variant); padding: 0 0 var(--s-2);">${escape(MES_ABBR[ordenados[0].fire.getMonth()])}</div>`
+    : '';
+  $('#dashProx').innerHTML = prox.length ? etiqueta + prox.map(p => `
     <div style="display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) 0; border-bottom: 1px solid var(--surface-container);">
       <div class="acct-ico" style="background: var(--primary-container); color: var(--on-primary-container);">${ICONOS.event_repeat || ICONOS.subscriptions}</div>
       <div style="flex: 1;">
@@ -3114,8 +3124,9 @@ function renderRecurrentes() {
     $('#recList').innerHTML = emptyHtml('Sin plantillas', 'Crea tu primera plantilla recurrente.');
     return;
   }
-  $('#recList').innerHTML = recs.map(r => {
-    const p = typeof r.plantilla === 'string' ? JSON.parse(r.plantilla) : r.plantilla;
+  const parsed = recs.map(r => ({ r, p: typeof r.plantilla === 'string' ? JSON.parse(r.plantilla) : r.plantilla }));
+  parsed.sort((a, b) => (Number(a.p.dia_mes) || 0) - (Number(b.p.dia_mes) || 0));
+  $('#recList').innerHTML = parsed.map(({ r, p }) => {
     const cta = Estado.bootstrap.cuentas.find(c => c.id === p.cuenta_id);
     const ctaD = Estado.bootstrap.cuentas.find(c => c.id === p.cuenta_destino_id);
     const cat = Estado.bootstrap.categorias.find(c => c.id === p.categoria_id);
