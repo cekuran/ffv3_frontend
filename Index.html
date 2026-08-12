@@ -3444,9 +3444,29 @@ async function renderPresupuesto() {
   const ahVal = Number(resumen.ingresosPresupuesto != null ? resumen.ingresosPresupuesto : resumen.ingresos || 0) - totalGastos;
   $('#presAhorro').textContent = fmtMoneda(ahVal);
   $('#presAhorro').style.color = ahVal >= 0 ? 'var(--primary)' : 'var(--error)';
-  const recVal = (resumen.proximos || []).reduce((s, p) => s + Number(p.importe || 0), 0);
-  $('#presRec').textContent = fmtMoneda(recVal);
-  $('#presRec').style.color = recVal > 0 ? 'var(--primary)' : (recVal < 0 ? 'var(--error)' : 'var(--on-surface)');
+  // ponytail: total de "próximos recurrentes" filtrado en cliente con datos ya
+  // cacheados en bootstrap (recurrentes + cuentas). Sin round-trip nuevo.
+  // Solo cuenta gastos y transferencias activo→pasivo cuyo dia_mes sea
+  // estrictamente mayor que hoy (los que disparan este mes).
+  const _hoyDom = new Date().getDate();
+  const _cuentasById = {};
+  (Estado.bootstrap.cuentas || []).forEach(c => { _cuentasById[c.id] = c; });
+  const recVal = (Estado.bootstrap.recurrentes || []).filter(r => r.activa).reduce((s, r) => {
+    try {
+      const p = JSON.parse(r.plantilla || '{}');
+      if (Number(p.dia_mes) <= _hoyDom) return s;
+      const isGasto = p.tipo === 'gasto';
+      const isTransGasto = p.tipo === 'transferencia'
+        && _cuentasById[p.cuenta_id] && _cuentasById[p.cuenta_id].tipo === 'activo'
+        && _cuentasById[p.cuenta_destino_id] && _cuentasById[p.cuenta_destino_id].tipo === 'pasivo';
+      return (isGasto || isTransGasto) ? s + Number(p.importe || 0) : s;
+    } catch (e) { return s; }
+  }, 0);
+  // ponytail: recVal trae outflows (gastos + transf activo→pasivo), se muestran
+  // como negativos en rojo. Verde solo si el neto llegara a ser positivo
+  // (recVal < 0), p.ej. si más adelante se suman ingresos recurrentes.
+  $('#presRec').textContent = fmtMoneda(-recVal);
+  $('#presRec').style.color = recVal > 0 ? 'var(--error)' : (recVal < 0 ? 'var(--primary)' : 'var(--on-surface)');
 
   const cats = Estado.bootstrap.categorias.filter(c => c.tipo === 'gasto');
   $('#presCats').innerHTML = cats.map(c => {
