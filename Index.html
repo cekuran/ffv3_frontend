@@ -587,6 +587,21 @@
   .section-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s-3); }
   .section-h h2 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0; }
   .section-h a, .section-h .link, .card-h .link { color: var(--primary); font-weight: 600; font-size: 13px; cursor: pointer; text-decoration: none; }
+  .filter-pop {
+    display: none; position: fixed; z-index: 200;
+    width: min(280px, calc(100vw - 24px)); padding: var(--s-3);
+    max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain;
+    background: var(--surface-container-lowest);
+    border: 1px solid var(--surface-container);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-pop);
+    animation: fadeIn 0.15s ease-out;
+  }
+  .filter-pop.is-open { display: block; }
+  .filter-pop .field { margin-bottom: var(--s-2); }
+  .filter-pop .field:last-child { margin-bottom: 0; }
+  .filter-pop-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--s-3); padding-bottom: var(--s-2); border-bottom: 1px solid var(--surface-container); }
+  #dashFilter.is-active { background: var(--primary-container); color: var(--on-primary-container); }
 
   .seg-control { display: inline-flex; background: var(--surface-container-low); border-radius: var(--r-md); padding: 4px; gap: 4px; }
   .seg-control button { padding: 6px 12px; border-radius: var(--r-sm); font-size: 13px; font-weight: 600; color: var(--on-surface-variant); }
@@ -877,7 +892,19 @@
             <h2>Movimientos recientes</h2>
             <div style="display: flex; gap: 4px; align-items: center;">
               <span class="link" data-go="movimientos">Ver todas →</span>
-              <button class="icon-btn" id="dashFilter" title="Filtros"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 5h18v2l-7 8v6l-4-2v-4L3 7z"/></svg></button>
+              <div class="filter-pop-wrap">
+                <button class="icon-btn" id="dashFilter" title="Filtros" aria-expanded="false"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 5h18v2l-7 8v6l-4-2v-4L3 7z"/></svg></button>
+                <div class="filter-pop" id="dashFilterPop" role="dialog" aria-label="Filtrar movimientos recientes">
+                  <div class="filter-pop-head">
+                    <span class="title-sm">Filtrar</span>
+                    <button class="btn btn-ghost btn-sm" id="dashFilterClear" type="button">Limpiar</button>
+                  </div>
+                  <div class="field"><label>Tipo</label><select class="select" id="dashFiltroTipo"><option value="">Todos</option><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option><option value="transferencia">Transferencia</option></select></div>
+                  <div class="field"><label>Cuenta</label><select class="select" id="dashFiltroCuenta"><option value="">Todas</option></select></div>
+                  <div class="field"><label>Categoría</label><select class="select" id="dashFiltroCategoria"><option value="">Todas</option></select></div>
+                  <div class="field"><label>Búsqueda</label><input class="input" type="text" id="dashFiltroQ" placeholder="Buscar…"></div>
+                </div>
+              </div>
             </div>
           </div>
           <div id="dashTx"></div>
@@ -2788,9 +2815,7 @@ function renderDashboard() {
   `).join('') || emptyHtml('Sin cuentas aún', 'Crea tu primera cuenta para empezar.');
 
   // Movimientos recientes
-  $('#dashTx').innerHTML = txs.length ? txs.map(txRow).join('') : emptyHtml('Sin movimientos', 'Registra un gasto o ingreso.');
-  $$('#dashTx [data-tx-edit]').forEach(b => b.addEventListener('click', () => openTx(b.dataset.txEdit)));
-  $$('#dashTx [data-tx-del]').forEach(b => b.addEventListener('click', () => borrarTx(b.dataset.txDel)));
+  renderDashTx_();
 
   // Próximos pagos — los 4 más cercanos desde hoy, calculados por el backend
   const all = (resumen.proximos || []).slice();
@@ -2814,6 +2839,38 @@ function renderDashboard() {
       <div class="data-tabular" style="font-weight: 700;">-${fmtMoneda(p.importe)}</div>
     </div>
   `).join('') : emptyHtml('Sin pagos recurrentes', 'Crea una plantilla para automatizarlos.');
+}
+
+function renderDashTx_() {
+  const f = Estado.filtros;
+  let lista = Estado.bootstrap.transacciones.slice();
+  if (f.cuenta_id) lista = lista.filter(t => t.cuenta_id === f.cuenta_id || t.cuenta_destino_id === f.cuenta_id);
+  if (f.subcuenta_id) lista = lista.filter(t => {
+    if (t.subcuenta_id === f.subcuenta_id) return true;
+    if (t.subcuenta_destino_id === f.subcuenta_id) return true;
+    const rep = parseRepartoFromTx_(t);
+    return rep ? rep.some(r => r.subcuenta_id === f.subcuenta_id) : false;
+  });
+  if (f.tipo) lista = lista.filter(t => t.tipo === f.tipo);
+  if (f.categoria_id) lista = lista.filter(t => {
+    if (t.categoria_id === f.categoria_id) return true;
+    const rep = parseRepartoFromTx_(t);
+    return rep ? rep.some(r => r.categoria_id === f.categoria_id) : false;
+  });
+  if (f.desde) lista = lista.filter(t => String(t.fecha) >= f.desde);
+  if (f.hasta) lista = lista.filter(t => String(t.fecha) <= f.hasta);
+  if (f.q) {
+    const q = f.q.toLowerCase();
+    lista = lista.filter(t => String(t.descripcion || '').toLowerCase().includes(q) || String(t.notas || '').toLowerCase().includes(q));
+  }
+  const txs = lista.slice(0, 5);
+  const total = lista.length;
+  const subtitulo = total > txs.length
+    ? `<div class="body-sm" style="color: var(--on-surface-variant); padding: 0 0 var(--s-2);">Mostrando 5 de ${total} con filtros</div>`
+    : '';
+  $('#dashTx').innerHTML = subtitulo + (txs.length ? txs.map(txRow).join('') : emptyHtml('Sin movimientos', 'Registra un gasto o ingreso.'));
+  $$('#dashTx [data-tx-edit]').forEach(b => b.addEventListener('click', () => openTx(b.dataset.txEdit)));
+  $$('#dashTx [data-tx-del]').forEach(b => b.addEventListener('click', () => borrarTx(b.dataset.txDel)));
 }
 
 function emptyHtml(t, s) {
@@ -4756,9 +4813,94 @@ Object.keys(FILTRO_KEY).forEach(id => {
     Estado.filtros[FILTRO_KEY[id]] = e.target.value;
     if (id === 'filtroCuenta') actualizarFiltroSubcuenta();
     renderMovimientos();
+    renderDashTx_();
+    updateDashFilterActive_();
   });
 });
 $$('[data-mov-sort]').forEach(b => b.addEventListener('click', () => ordenarMovimientos(b.dataset.movSort)));
+
+const DASH_FILTRO_KEY = {
+  dashFiltroTipo: 'tipo',
+  dashFiltroCuenta: 'cuenta_id',
+  dashFiltroCategoria: 'categoria_id',
+  dashFiltroQ: 'q'
+};
+function poblarDashFiltros_() {
+  $('#dashFiltroTipo').value = Estado.filtros.tipo;
+  poblarSelect('#dashFiltroCuenta', Estado.bootstrap.cuentas, Estado.filtros.cuenta_id, c => c.nombre);
+  $('#dashFiltroCategoria').innerHTML = '<option value="">Todas</option>' + Estado.bootstrap.categorias.map(c =>
+    `<option value="${c.id}" ${c.id === Estado.filtros.categoria_id ? 'selected' : ''}>${escape(c.nombre)}</option>`
+  ).join('');
+  $('#dashFiltroQ').value = Estado.filtros.q;
+}
+function filtrosActivosCount_() {
+  const f = Estado.filtros;
+  return [f.cuenta_id, f.tipo, f.categoria_id, f.q].filter(v => String(v || '').trim() !== '').length;
+}
+function updateDashFilterActive_() {
+  const btn = $('#dashFilter');
+  if (!btn) return;
+  btn.classList.toggle('is-active', filtrosActivosCount_() > 0);
+}
+Object.keys(DASH_FILTRO_KEY).forEach(id => {
+  const el = $('#' + id);
+  if (!el) return;
+  el.addEventListener('input', e => {
+    Estado.filtros[DASH_FILTRO_KEY[id]] = e.target.value;
+    renderMovimientos();
+    renderDashTx_();
+    updateDashFilterActive_();
+  });
+});
+function toggleDashFilterPop_() {
+  const pop = $('#dashFilterPop');
+  const btn = $('#dashFilter');
+  if (!pop || !btn) return;
+  const willOpen = !pop.classList.contains('is-open');
+  pop.classList.toggle('is-open', willOpen);
+  btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  if (willOpen) {
+    poblarDashFiltros_();
+    const r = btn.getBoundingClientRect();
+    const popW = pop.offsetWidth || 280;
+    let left = r.right - popW;
+    const margin = 8;
+    if (left < margin) left = margin;
+    if (left + popW > window.innerWidth - margin) left = window.innerWidth - popW - margin;
+    pop.style.left = left + 'px';
+    pop.style.top = (r.bottom + 6) + 'px';
+    setTimeout(() => { $('#dashFiltroQ').focus(); }, 0);
+  } else {
+    pop.style.left = '';
+    pop.style.top = '';
+  }
+}
+function closeDashFilterPop_() {
+  const pop = $('#dashFilterPop');
+  const btn = $('#dashFilter');
+  if (!pop || !btn) return;
+  pop.classList.remove('is-open');
+  btn.setAttribute('aria-expanded', 'false');
+  pop.style.left = '';
+  pop.style.top = '';
+}
+$('#dashFilter')?.addEventListener('click', e => {
+  e.stopPropagation();
+  toggleDashFilterPop_();
+});
+$('#dashFilterPop')?.addEventListener('click', e => e.stopPropagation());
+$('#dashFilterClear')?.addEventListener('click', () => {
+  ['cuenta_id', 'subcuenta_id', 'tipo', 'categoria_id', 'desde', 'hasta', 'q'].forEach(k => { Estado.filtros[k] = ''; });
+  poblarDashFiltros_();
+  renderMovimientos();
+  renderDashTx_();
+  updateDashFilterActive_();
+});
+document.addEventListener('click', e => {
+  const pop = $('#dashFilterPop');
+  if (!pop || !pop.classList.contains('is-open')) return;
+  if (!pop.contains(e.target) && e.target !== $('#dashFilter')) closeDashFilterPop_();
+});
 
 function limpiarFiltrosInvalidos() {
   const ctaIds = new Set(), subIds = new Set();
@@ -4777,6 +4919,7 @@ function limpiarFiltrosInvalidos() {
   if (Estado.filtros.categoria_id && !catIds.has(Estado.filtros.categoria_id)) {
     Estado.filtros.categoria_id = '';
   }
+  updateDashFilterActive_();
 }
 
 function refrescarCuentas() {
