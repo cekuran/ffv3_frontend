@@ -990,11 +990,11 @@
       </div>
 
       <div class="bento" style="margin-bottom: var(--s-6);">
-        <div class="card col-8">
+        <div class="card col-7">
           <div style="display: flex; justify-content: space-between; align-items: end; margin-bottom: var(--s-5);">
             <div>
               <div class="label-md" style="color: var(--on-surface-variant);">Gasto actual</div>
-              <div class="display-lg" style="color: var(--primary);" id="presGasto">0,00 €</div>
+              <div class="display-lg" style="color: #d32f2f;" id="presGasto">0,00 €</div>
             </div>
             <div style="text-align: right;">
               <div class="label-md" style="color: var(--on-surface-variant);">Presupuesto</div>
@@ -1007,21 +1007,30 @@
             <span id="presRest">0,00 € restantes</span>
           </div>
         </div>
-        <div class="card col-4">
-          <div class="kpi" style="margin-bottom: var(--s-4);">
+        <div class="card col-5" style="grid-row: span 2; display: flex; flex-direction: column; gap: var(--s-4);">
+          <div class="kpi" style="flex: 1;">
             <div class="kpi-ico bg-primary"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17 9 11l4 4 8-8v6h2V3h-10v2h6l-6 6-4-4-7 7z"/></svg></div>
             <div>
-              <div class="label-md" style="color: var(--on-surface-variant);">Ahorro estimado</div>
-              <div class="title-md" id="presAhorro">0,00 €</div>
+              <div class="body-lg" style="color: var(--on-surface-variant);">Ahorro estimado</div>
+              <div class="display-lg" id="presAhorro">0,00 €</div>
             </div>
           </div>
-          <div class="kpi">
+          <div class="kpi" style="flex: 1;">
             <div class="kpi-ico bg-tertiary"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l5-4-5-4v3H5v6h2zm10 10H7v-3l-5 4 5 4v-3h12v-6h-2z"/></svg></div>
             <div>
-              <div class="label-md" style="color: var(--on-surface-variant);">Próximos recurrentes</div>
-              <div class="title-md" id="presRec">0,00 €</div>
+              <div class="body-lg" style="color: var(--on-surface-variant);">Próximos recurrentes</div>
+              <div class="display-lg" id="presRec">0,00 €</div>
             </div>
           </div>
+        </div>
+        <div class="card col-7">
+          <div style="display: flex; justify-content: space-between; align-items: end; margin-bottom: var(--s-5);">
+            <div>
+              <div class="label-md" style="color: var(--on-surface-variant);">Ingresos</div>
+              <div class="display-lg" style="color: var(--primary);" id="presIngTotal">0,00 €</div>
+            </div>
+          </div>
+          <div id="presIngresos" style="display: flex; flex-direction: column; gap: var(--s-4);"></div>
         </div>
       </div>
 
@@ -3432,8 +3441,12 @@ async function renderPresupuesto() {
   $('#presBar').className = 'progress-fill' + (pct >= 100 ? ' danger' : (pct >= 80 ? ' warn' : ''));
   $('#presPct').textContent = pct + '% utilizado';
   $('#presRest').textContent = fmtMoneda(Math.max(0, totalEsperado - totalGastos)) + ' restantes';
-  $('#presAhorro').textContent = fmtMoneda(Number(resumen.ingresosPresupuesto != null ? resumen.ingresosPresupuesto : resumen.ingresos || 0) - totalGastos);
-  $('#presRec').textContent = '-' + fmtMoneda((resumen.proximos || []).reduce((s, p) => s + Number(p.importe || 0), 0));
+  const ahVal = Number(resumen.ingresosPresupuesto != null ? resumen.ingresosPresupuesto : resumen.ingresos || 0) - totalGastos;
+  $('#presAhorro').textContent = fmtMoneda(ahVal);
+  $('#presAhorro').style.color = ahVal >= 0 ? 'var(--primary)' : 'var(--error)';
+  const recVal = (resumen.proximos || []).reduce((s, p) => s + Number(p.importe || 0), 0);
+  $('#presRec').textContent = fmtMoneda(recVal);
+  $('#presRec').style.color = recVal > 0 ? 'var(--primary)' : (recVal < 0 ? 'var(--error)' : 'var(--on-surface)');
 
   const cats = Estado.bootstrap.categorias.filter(c => c.tipo === 'gasto');
   $('#presCats').innerHTML = cats.map(c => {
@@ -3457,6 +3470,36 @@ async function renderPresupuesto() {
       ${r.diferencia > 0 ? `<div class="body-sm" style="color: var(--error); margin-top: 4px;">Excedido en ${fmtMoneda(r.diferencia)}</div>` : ''}
     </div>`;
   }).join('');
+
+  const catsIng = Estado.bootstrap.categorias.filter(c => c.tipo === 'ingreso');
+  const PALETA_BAR = ['#00613e', '#0050af', '#d27b1b', '#b13c68', '#7c4dff', '#00838f', '#e53935', '#6a1b9a'];
+  const realIngPorCat = catsIng
+    .map(c => {
+      const r = resumenCats.find(x => x.id === c.id) || { real: 0 };
+      return { cat: c, real: Number(r.real || 0) };
+    })
+    .filter(x => x.real > 0)
+    .map((x, i) => ({ ...x, barColor: PALETA_BAR[i % PALETA_BAR.length] }));
+  const totalIng = realIngPorCat.reduce((s, x) => s + x.real, 0);
+  $('#presIngTotal').textContent = fmtMoneda(totalIng);
+  $('#presIngresos').innerHTML = realIngPorCat.length === 0 ? '' : `
+    <div style="display: flex; height: 16px; border-radius: var(--r-full); overflow: hidden; background: var(--surface-container-high); gap: 2px;">
+      ${realIngPorCat.map(({ cat: c, real, barColor }) => {
+        const pct = totalIng > 0 ? (real / totalIng) * 100 : 0;
+        return `<div data-bar-seg data-cat="${escape(c.nombre)}" data-pct="${pct.toFixed(1)}" data-amount="${real}" style="width: ${pct}%; background: ${barColor}; transition: width 0.6s;"></div>`;
+      }).join('')}
+    </div>
+    <div style="display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-3);">
+      ${realIngPorCat.map(({ cat: c, real, barColor }) => {
+        const pct = totalIng > 0 ? Math.round((real / totalIng) * 100) : 0;
+        return `<div style="display: flex; align-items: center; gap: var(--s-3);">
+          <span style="width: 12px; height: 12px; border-radius: 3px; background: ${barColor}; flex-shrink: 0;"></span>
+          <span class="body-sm" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escape(c.nombre)}</span>
+          <span class="body-sm data-tabular" style="color: var(--on-surface-variant); white-space: nowrap;">${pct}% · ${fmtMoneda(real)}</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
 }
 
 $$('[data-nav]').forEach(b => b.addEventListener('click', () => {
@@ -5527,6 +5570,32 @@ window.addEventListener('hashchange', () => {
   } catch (e) {
     document.body.innerHTML = '<div class="empty"><h2>Error de carga</h2><p>' + escape(e.message) + '</p></div>';
   }
+})();
+</script>
+<div id="ingBarTip" style="position: fixed; background: var(--on-surface); color: var(--surface); padding: 6px 10px; border-radius: var(--r-md); font-size: 13px; pointer-events: none; opacity: 0; transition: opacity 0.12s; z-index: 1000; white-space: nowrap; box-shadow: var(--shadow-pop);"></div>
+<script>
+(function() {
+  const tip = document.getElementById('ingBarTip');
+  const cont = document.getElementById('presIngresos');
+  if (!tip || !cont) return;
+  cont.addEventListener('mouseover', e => {
+    const seg = e.target.closest('[data-bar-seg]');
+    if (!seg) return;
+    tip.textContent = seg.dataset.cat + ' · ' + seg.dataset.pct + '% · ' + fmtMoneda(Number(seg.dataset.amount));
+    tip.style.left = (e.clientX + 12) + 'px';
+    tip.style.top = (e.clientY - 36) + 'px';
+    tip.style.opacity = '1';
+  });
+  cont.addEventListener('mousemove', e => {
+    if (tip.style.opacity !== '1') return;
+    tip.style.left = (e.clientX + 12) + 'px';
+    tip.style.top = (e.clientY - 36) + 'px';
+  });
+  cont.addEventListener('mouseout', e => {
+    const seg = e.target.closest('[data-bar-seg]');
+    if (!seg) return;
+    tip.style.opacity = '0';
+  });
 })();
 </script>
 </body>
