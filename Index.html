@@ -1752,6 +1752,93 @@ function toast(msg) {
 
 const API_URL = 'https://finanzas-cors-proxy.marquezhh.workers.dev';
 
+const AUTH_LAST_USER_KEY = 'ff_last_user';
+const AUTH_IS_LOGGED_KEY = 'ff_is_logged';
+const AUTH_TOKEN_KEY = 'ff_auth_token';
+
+const API_READ_CACHE_PREFIX = 'ff_api_read_cache';
+const API_READ_CACHE_TTL_BY_ACTION = {
+  listarUsuariosAdmin: 30 * 1000,
+  listarSpreadsheetsAdmin: 30 * 1000,
+  listarVinculacionesAdmin: 30 * 1000,
+  obtenerResumen: 20 * 1000,
+  obtenerCategoriasResumen: 20 * 1000,
+  obtenerResumenEstablecimientos: 20 * 1000
+};
+const API_READ_ACTIONS = new Set([
+  'bootstrap',
+  'bootstrapBase',
+  'obtenerTransacciones',
+  'obtenerCuentas',
+  'obtenerResumen',
+  'obtenerCategoriasResumen',
+  'obtenerResumenEstablecimientos',
+  'listarUsuariosAdmin',
+  'listarSpreadsheetsAdmin',
+  'listarVinculacionesAdmin',
+  'ejecutarSelfTestAdmin',
+  'ping'
+]);
+const _apiReadCacheMem = new Map();
+const _apiReadInFlight = new Map();
+
+function apiReadCacheScope_() {
+  const token = localStorage.getItem(AUTH_TOKEN_KEY) || 'anon';
+  const hoja = (Estado && Estado.bootstrap && Estado.bootstrap.hojaActivaId) || '';
+  const version = (Estado && Estado.dataVersion) || '';
+  return token + '|' + hoja + '|' + version;
+}
+
+function apiReadCacheKey_(fn, args) {
+  return fn + '|' + JSON.stringify(args || []) + '|' + apiReadCacheScope_();
+}
+
+function readApiReadCache_(cacheKey, ttlMs, persistente) {
+  if (!ttlMs) return null;
+  const now = Date.now();
+  const mem = _apiReadCacheMem.get(cacheKey);
+  if (mem && (now - mem.ts) < ttlMs) return mem.data;
+  if (!persistente) return null;
+  try {
+    const raw = localStorage.getItem(API_READ_CACHE_PREFIX + ':' + cacheKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.ts !== 'number') return null;
+    if ((now - parsed.ts) >= ttlMs) return null;
+    _apiReadCacheMem.set(cacheKey, parsed);
+    return parsed.data;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeApiReadCache_(cacheKey, data, persistente) {
+  const entry = { ts: Date.now(), data: data };
+  _apiReadCacheMem.set(cacheKey, entry);
+  if (!persistente) return;
+  try {
+    localStorage.setItem(API_READ_CACHE_PREFIX + ':' + cacheKey, JSON.stringify(entry));
+  } catch (_) {
+    // Si no hay cuota, mantenemos al menos el caché en memoria.
+  }
+}
+
+function clearApiReadCache_() {
+  _apiReadCacheMem.clear();
+  _apiReadInFlight.clear();
+  try {
+    const prefix = API_READ_CACHE_PREFIX + ':';
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf(prefix) === 0) keys.push(k);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+  } catch (_) {
+    // ignore
+  }
+}
+
 async function rawCall(fn, ...args) {
   const body = JSON.stringify({ action: fn, args, token: localStorage.getItem(AUTH_TOKEN_KEY) || '' });
   let response;
@@ -1795,12 +1882,28 @@ async function rawCall(fn, ...args) {
 }
 
 async function call(fn, ...args) {
-  return rawCall(fn, ...args);
-}
+  const ttlMs = API_READ_CACHE_TTL_BY_ACTION[fn] || 0;
+  const cacheable = ttlMs > 0;
+  const persistente = cacheable;
+  if (cacheable) {
+    const cacheKey = apiReadCacheKey_(fn, args);
+    const cached = readApiReadCache_(cacheKey, ttlMs, persistente);
+    if (cached != null) return cached;
+    if (_apiReadInFlight.has(cacheKey)) return _apiReadInFlight.get(cacheKey);
+    const req = rawCall(fn, ...args).then(data => {
+      writeApiReadCache_(cacheKey, data, persistente);
+      return data;
+    }).finally(() => {
+      _apiReadInFlight.delete(cacheKey);
+    });
+    _apiReadInFlight.set(cacheKey, req);
+    return req;
+  }
 
-const AUTH_LAST_USER_KEY = 'ff_last_user';
-const AUTH_IS_LOGGED_KEY = 'ff_is_logged';
-const AUTH_TOKEN_KEY = 'ff_auth_token';
+  const data = await rawCall(fn, ...args);
+  if (!API_READ_ACTIONS.has(fn)) clearApiReadCache_();
+  return data;
+}
 
 // ponytail: cache de bootstrapBase en localStorage. Pinta la UI al instante en
 // la recarga y solo revalida si pasaron REVALIDATE_MS (evita el round-trip de
@@ -2452,6 +2555,7 @@ function descartarSesionLocal_() {
   localStorage.removeItem(bootstrapCacheKey_());
   localStorage.removeItem(txRecentCacheKey_());
   clearSaldosCache_();
+  clearApiReadCache_();
 }
 
 async function iniciarAppAutenticada() {
@@ -5299,6 +5403,7 @@ $('#authForm').addEventListener('submit', async (e) => {
   showAuthError('');
   try {
     const r = await call('loginUsuario', user, pass);
+    clearApiReadCache_();
     // ponytail: limpiamos cualquier cache de un usuario previo del mismo
     // navegador antes de fijar el nuevo token. La escritura posterior usará
     // la clave namespaceada por el token actual, así que no contamina.
