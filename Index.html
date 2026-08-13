@@ -1938,9 +1938,199 @@ function parseRepartoDestinoLocal_(raw) {
   return parsed
     .map(r => ({
       subcuenta_id: r && r.subcuenta_id,
-      importe: Number(r && r.importe || 0)
+      importe: Number(r && r.importe || 0),
+      categoria_id: (r && r.categoria_id) || ''
     }))
     .filter(r => r.subcuenta_id && r.importe > 0);
+}
+
+// ── Cálculos locales de resúmenes (evitan round-trips a Apps Script) ──
+// Replican la lógica de obtenerResumen / obtenerCategoriasResumen /
+// obtenerResumenEstablecimientos usando las transacciones ya en memoria.
+function cuentasByIdLocal_() {
+  const map = {};
+  (Estado.bootstrap.cuentas || []).forEach(c => { map[c.id] = c; });
+  return map;
+}
+
+function tipoTransferenciaPresupuestoLocal_(t, cuentasById) {
+  if (!t || t.tipo !== 'transferencia') return 'neutro';
+  const origen = cuentasById[String(t.cuenta_id || '')];
+  const destino = cuentasById[String(t.cuenta_destino_id || '')];
+  if (!origen || !destino) return 'neutro';
+  if (origen.tipo === 'activo' && destino.tipo === 'pasivo') return 'gasto';
+  if (origen.tipo === 'pasivo' && destino.tipo === 'activo') return 'ingreso';
+  return 'neutro';
+}
+
+function txEnMes_(t, anio, mes) {
+  const f = new Date(t.fecha);
+  if (isNaN(f.getTime())) return false;
+  return f.getFullYear() === Number(anio) && (f.getMonth() + 1) === Number(mes);
+}
+
+function calcularProximosRecurrentesLocal_() {
+  const recs = (Estado.bootstrap.recurrentes || []).filter(r => r.activa);
+  const hoy = new Date();
+  return recs.map(r => {
+    try {
+      const p = JSON.parse(r.plantilla || '{}');
+      const periodo = Number(p.periodo_meses) || 1;
+      const dia = Number(p.dia_mes) || 1;
+      const inicio = p.inicio ? new Date(p.inicio) : new Date();
+      if (isNaN(inicio.getTime())) return null;
+      const mesIniRaw = r.mes_inicio != null && r.mes_inicio !== '' ? Number(r.mes_inicio) : null;
+      const anioIniRaw = r.anio_inicio != null && r.anio_inicio !== '' ? Number(r.anio_inicio) : null;
+      let cursor;
+      if (r.ultima_generacion) {
+        const u = new Date(r.ultima_generacion);
+        cursor = !isNaN(u.getTime()) ? new Date(u) : new Date(inicio);
+      } else {
+        cursor = new Date(inicio);
+      }
+      if (mesIniRaw && anioIniRaw) {
+        const minY = anioIniRaw * 12 + (mesIniRaw - 1);
+        const curY = cursor.getFullYear() * 12 + cursor.getMonth();
+        if (curY < minY) cursor = new Date(anioIniRaw, mesIniRaw - 1, 1);
+      }
+      cursor.setDate(dia);
+      while (cursor <= hoy) {
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() + periodo, dia);
+      }
+      return {
+        id: r.id,
+        descripcion: p.descripcion,
+        importe: Number(p.importe),
+        dia_mes: p.dia_mes,
+        periodo_meses: p.periodo_meses || 1,
+        proximo_disparo: cursor.toISOString().slice(0, 10)
+      };
+    } catch (_) { return null; }
+  }).filter(Boolean);
+}
+
+function calcularResumenLocal_(anio, mes) {
+  const a = Number(anio || new Date().getFullYear());
+  const m = Number(mes || (new Date().getMonth() + 1));
+  const txs = Estado.bootstrap.transacciones || [];
+  const cuentasById = cuentasByIdLocal_();
+  const enMes = txs.filter(t => txEnMes_(t, a, m));
+  const ingresos = enMes.filter(t => t.tipo === 'ingreso').reduce((s, t) => s + Number(t.importe || 0), 0);
+  const gastos = enMes.filter(t => t.tipo === 'gasto').reduce((s, t) => s + Number(t.importe || 0), 0);
+  const transferenciasGasto = enMes
+    .filter(t => t.tipo === 'transferencia' && tipoTransferenciaPresupuestoLocal_(t, cuentasById) === 'gasto')
+    .reduce((s, t) => s + Number(t.importe || 0), 0);
+  const transferenciasIngreso = enMes
+    .filter(t => t.tipo === 'transferencia' && tipoTransferenciaPresupuestoLocal_(t, cuentasById) === 'ingreso')
+    .reduce((s, t) => s + Number(t.importe || 0), 0);
+  const pendiente = enMes.filter(t => t.estado === 'pendiente').length;
+  const vencido = enMes.filter(t => t.estado === 'vencido').length;
+  const evol = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(a, m - 1 - i, 1);
+    const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const en = txs.filter(t => String(t.fecha).slice(0, 7) === k);
+    evol.push({
+      mes: k,
+      ingresos: en.filter(t => t.tipo === 'ingreso').reduce((s, t) => s + Number(t.importe || 0), 0),
+      gastos: en.filter(t => t.tipo === 'gasto').reduce((s, t) => s + Number(t.importe || 0), 0)
+    });
+  }
+  return {
+    anio: a,
+    mes: m,
+    ingresos,
+    ingresosPresupuesto: ingresos + transferenciasIngreso,
+    gastos,
+    gastosPresupuesto: gastos + transferenciasGasto,
+    neto: ingresos - gastos,
+    pendiente,
+    vencido,
+    evol,
+    proximos: calcularProximosRecurrentesLocal_()
+  };
+}
+
+function calcularCategoriasResumenLocal_(anio, mes) {
+  const a = Number(anio || new Date().getFullYear());
+  const m = Number(mes || (new Date().getMonth() + 1));
+  const txs = (Estado.bootstrap.transacciones || []).filter(t => ['gasto', 'ingreso', 'transferencia'].includes(t.tipo));
+  const ps = Estado.bootstrap.presupuestos || [];
+  const cats = Estado.bootstrap.categorias || [];
+  const catsById = {};
+  cats.forEach(c => { catsById[c.id] = c; });
+  const cuentasById = cuentasByIdLocal_();
+  const porCatRep = {};
+  txs.forEach(t => {
+    if (t.tipo !== 'transferencia') return;
+    if (!txEnMes_(t, a, m)) return;
+    const tipoPresupuesto = tipoTransferenciaPresupuestoLocal_(t, cuentasById);
+    if (tipoPresupuesto === 'neutro') return;
+    const rep = parseRepartoDestinoLocal_(t.reparto_destino);
+    if (!rep.length) return;
+    rep.forEach(r => {
+      const imp = Number(r.importe || 0);
+      if (!(imp > 0)) return;
+      const catId = r.categoria_id || '';
+      const cat = catsById[catId];
+      if (!cat || cat.tipo !== tipoPresupuesto) return;
+      porCatRep[catId] = (porCatRep[catId] || 0) + imp;
+    });
+  });
+  return cats.map(c => {
+    const esperado = ps.filter(p => p.categoria_id === c.id).reduce((s, p) => s + Number(p.importe_esperado || 0), 0);
+    const real = txs.filter(t => {
+      if (t.tipo === 'transferencia') return false;
+      if (t.categoria_id !== c.id) return false;
+      return txEnMes_(t, a, m);
+    }).reduce((s, t) => s + Number(t.importe || 0), 0) + (porCatRep[c.id] || 0);
+    return { id: c.id, nombre: c.nombre, color: c.color, esperado, real, diferencia: real - esperado };
+  });
+}
+
+function calcularResumenEstablecimientosLocal_(anio, mes) {
+  const a = Number(anio || new Date().getFullYear());
+  const m = Number(mes || (new Date().getMonth() + 1));
+  const filas = (Estado.bootstrap.establecimientos || []).map(e => ({
+    id: e.id,
+    nombre: e.nombre,
+    ingresos: 0,
+    gastos: 0,
+    neto: 0
+  }));
+  filas.push({ id: '', nombre: 'Sin establecimiento', ingresos: 0, gastos: 0, neto: 0 });
+  const porId = {};
+  filas.forEach(f => { porId[f.id] = f; });
+  const periodo = a + '-' + String(m).padStart(2, '0');
+  (Estado.bootstrap.transacciones || [])
+    .filter(t => String(t.fecha).slice(0, 7) === periodo && (t.tipo === 'gasto' || t.tipo === 'ingreso'))
+    .forEach(t => {
+      const fila = porId[String(t.establecimiento_id || '')] || porId[''];
+      if (!fila) return;
+      fila[t.tipo === 'ingreso' ? 'ingresos' : 'gastos'] += Number(t.importe || 0);
+    });
+  filas.forEach(f => { f.neto = f.ingresos - f.gastos; });
+  return { anio: a, mes: m, filas: filas };
+}
+
+// True si ya tenemos el listado completo de transacciones en memoria
+// (no solo el cache acotado de 50 recientes del F5).
+function transaccionesCompletasEnMemoria_() {
+  const txs = Estado.bootstrap.transacciones;
+  if (!Array.isArray(txs)) return false;
+  // Tras sincronizarTransacciones siempre hay lastTxSyncAt; el cache de
+  // arranque solo trae hasta TX_RECENT_CACHE_LIMIT y no marca lastTxSyncAt.
+  if (Estado.lastTxSyncAt) return true;
+  // Si hay más de 50, claramente no es el cache acotado.
+  if (txs.length > TX_RECENT_CACHE_LIMIT) return true;
+  // Sin datos: conviene ir al servidor (puede haber 0 txs reales).
+  return false;
+}
+
+function refrescarResumenDashboardLocal_() {
+  if (!transaccionesCompletasEnMemoria_()) return;
+  const now = new Date();
+  Estado.bootstrap.resumen = calcularResumenLocal_(now.getFullYear(), now.getMonth() + 1);
 }
 
 // Aplica el efecto de una tx sobre el array de cuentas (mutación in-place).
@@ -2304,10 +2494,14 @@ async function iniciarAppAutenticada() {
     });
     return;
   }
-  const b = await call('bootstrapBase');
+  // Arranque en frío: un solo round-trip con bootstrap (incluye txs)
+  // en lugar de bootstrapBase + sincronizarTransacciones secuenciales.
+  const b = await call('bootstrap');
   cacheBootstrap_(b);
   Estado.bootstrap = normalizarBootstrap(b);
-  pintarAppAutenticada_(true, true);
+  cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
+  Estado.lastTxSyncAt = Date.now();
+  pintarAppAutenticada_(true, false);
 }
 
 
@@ -2686,6 +2880,9 @@ async function sincronizarTransacciones(opciones) {
       Estado.bootstrap.transacciones = servidor;
       cacheTransaccionesRecientes_(servidor);
       Estado.lastTxSyncAt = Date.now();
+      // Resúmenes del mes actual en cliente: el dashboard no necesita
+      // otro round-trip a obtenerResumen tras cada sync.
+      refrescarResumenDashboardLocal_();
       if (diff.dirty || opts.forceSaldos) {
         await reconciliarSaldosSiHaceFalta_(diff.dirty ? diff : { dirty: true }, opts);
       }
@@ -3157,6 +3354,7 @@ async function borrarTx(id) {
     Estado.bootstrap.transacciones = (Estado.bootstrap.transacciones || []).filter(t => t.id !== id);
     cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
     if (txAnterior) actualizarSaldosLocalesTrasTx_(txAnterior, null);
+    refrescarResumenDashboardLocal_();
     if (location.hash.startsWith('#/')) go(location.hash.slice(2));
     else renderDashboard();
   toast('Movimiento eliminado');
@@ -3367,9 +3565,19 @@ function renderCategorias() {
 async function renderEstablecimientos() {
   const { anio, mes } = Estado.estMes;
   $('#estMesLabel').textContent = new Date(anio, mes - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
+  // Preferir cálculo local si ya tenemos el listado completo de txs en memoria.
+  let resumen;
+  if (transaccionesCompletasEnMemoria_()) {
+    resumen = calcularResumenEstablecimientosLocal_(anio, mes);
+  } else {
   $('#estList').innerHTML = loadingBlockHtml('Cargando establecimientos...');
   try {
-    const resumen = await call('obtenerResumenEstablecimientos', anio, mes);
+      resumen = await call('obtenerResumenEstablecimientos', anio, mes);
+    } catch (e) {
+      $('#estList').innerHTML = emptyHtml('No se pudo cargar', e.message || 'Inténtalo de nuevo.');
+      return;
+    }
+  }
     if (anio !== Estado.estMes.anio || mes !== Estado.estMes.mes) return;
     const filas = (resumen && resumen.filas) || [];
     $('#estList').innerHTML = filas.map(f => {
@@ -3397,9 +3605,6 @@ async function renderEstablecimientos() {
     }).join('');
     $$('[data-est-edit]', $('#estList')).forEach(b => b.addEventListener('click', () => openEstablecimiento(b.dataset.estEdit)));
     $$('[data-est-del]', $('#estList')).forEach(b => b.addEventListener('click', () => borrarEstablecimiento(b.dataset.estDel)));
-  } catch (e) {
-    $('#estList').innerHTML = emptyHtml('No se pudo cargar', e.message || 'Inténtalo de nuevo.');
-  }
 }
 
 async function borrarEstablecimiento(id) {
@@ -3427,9 +3632,24 @@ async function renderPresupuesto() {
   const { anio, mes } = Estado.pres;
   $('#presPeriodo').textContent = 'Mismo presupuesto cada mes · gastos de ' + new Date(anio, mes - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
   $('#presMesLabel').textContent = new Date(anio, mes - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
+  // Preferir cálculo local (0 round-trips) cuando ya tenemos txs completas.
+  // Si no, un solo Promise.all en lugar de dos awaits secuenciales.
+  let resumen, resumenCats;
+  if (transaccionesCompletasEnMemoria_()) {
+    resumen = calcularResumenLocal_(anio, mes);
+    resumenCats = calcularCategoriasResumenLocal_(anio, mes);
+  } else {
   $('#presCats').innerHTML = loadingBlockHtml('Cargando presupuesto...');
-  const resumen = await call('obtenerResumen', anio, mes);
-  const resumenCats = await call('obtenerCategoriasResumen', anio, mes);
+    try {
+      [resumen, resumenCats] = await Promise.all([
+        call('obtenerResumen', anio, mes),
+        call('obtenerCategoriasResumen', anio, mes)
+      ]);
+    } catch (e) {
+      $('#presCats').innerHTML = emptyHtml('No se pudo cargar', e.message || 'Inténtalo de nuevo.');
+      return;
+    }
+  }
   if (anio !== Estado.pres.anio || mes !== Estado.pres.mes) return;
   const totalGastos = Number(resumen.gastosPresupuesto || 0);
   const totalEsperado = Estado.bootstrap.presupuestos
@@ -5023,6 +5243,9 @@ function aplicarResultadoGuardadoTx_(result, txAnterior) {
   if (Array.isArray(result.recurrentes)) {
     Estado.bootstrap.recurrentes = result.recurrentes;
   }
+  // Dashboard y presupuesto leen resumen/cats desde memoria: actualizar
+  // sin round-trip tras cada alta/edición de movimiento.
+  refrescarResumenDashboardLocal_();
   limpiarFiltrosInvalidos();
   poblarFiltros();
   if (location.hash.startsWith('#/')) go(location.hash.slice(2));
@@ -5038,6 +5261,7 @@ async function recargar() {
   cacheBootstrap_(boot);
   cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
   cacheSaldos_(Estado.bootstrap.cuentas, Estado.bootstrap.hojaActivaId);
+  Estado.lastTxSyncAt = Date.now();
   const sinHojas = usuarioSinHojas_();
   aplicarRolesUI();
   aplicarRestriccionSinHojas();
