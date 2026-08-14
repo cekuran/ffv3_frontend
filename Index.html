@@ -447,7 +447,10 @@
   .acct-actions { display: flex; gap: 4px; }
 
   .subcuentas { display: flex; flex-direction: column; gap: 6px; border-top: 1px dashed var(--outline-variant); padding-top: var(--s-3); }
-  .subcta-row { display: flex; align-items: center; gap: var(--s-2); padding: 8px 10px; border-radius: var(--r-md); background: var(--surface-container-lowest); cursor: grab; }
+  .subcta-row { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: var(--r-md); background: var(--surface-container-lowest); cursor: grab; }
+  .subcta-top { display: flex; align-items: center; gap: var(--s-2); }
+  .subcta-bottom { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
+  .subcta-actions { display: flex; gap: 4px; }
   .subcta-row.is-dragging { opacity: 0.4; }
   .subcta-row.is-drop-target { box-shadow: 0 -2px 0 var(--primary); }
   .acct.is-dragging, .cat-card.is-dragging { opacity: 0.4; }
@@ -459,8 +462,13 @@
   .cat-card .title-sm, .cat-card .body-sm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .subcta-grip { color: var(--on-surface-variant); font-size: 16px; line-height: 1; cursor: grab; padding: 0 4px; user-select: none; }
   .subcta-name { flex: 1; font-size: 13px; color: var(--on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .subcta-balance { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .subcta-balance { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .subcta-add { padding: 6px 8px; font-size: 12px; }
+  .subcta-more { text-align: center; padding: 4px; color: var(--on-surface-variant); font-size: 13px; }
+  .acct-header-clickable { cursor: pointer; }
+  .subcta-row.subcta-row-lg { padding: 14px 16px; gap: 8px; }
+  .subcta-row.subcta-row-lg .subcta-name { font-size: 15px; }
+  .subcta-row.subcta-row-lg .subcta-balance { font-size: 16px; }
 
   /* === Bar chart === */
   .bars { display: flex; align-items: end; gap: 6px; height: 140px; padding: 0 4px; }
@@ -1555,6 +1563,17 @@
   </div>
 </div>
 
+<!-- Sheet: detalle de subcuentas (vista ampliada) -->
+<div class="sheet bottom" id="sheetCuentasDetalle" role="dialog" aria-modal="true" aria-labelledby="sheetCuentasDetalleTitle">
+  <div class="sheet-handle"></div>
+  <h3 id="sheetCuentasDetalleTitle">Subcuentas</h3>
+  <div id="sheetCuentasDetalleSub" class="body-sm" style="color: var(--on-surface-variant); margin: 0 0 var(--s-3);"></div>
+  <div id="sheetCuentasDetalleList" class="subcuentas"></div>
+  <div style="display: flex; gap: var(--s-2); margin-top: var(--s-4);">
+    <button type="button" class="btn btn-secondary" id="sheetCuentasDetalleClose" style="flex: 1;">Cerrar</button>
+  </div>
+</div>
+
 <!-- Sheet: configurar reset de hoja -->
 <div class="sheet bottom" id="sheetResetConfig" role="dialog" aria-modal="true" aria-labelledby="sheetResetConfigTitle">
   <div class="sheet-handle"></div>
@@ -1824,6 +1843,7 @@ const Estado = {
   txTipo: 'gasto',
   txRepartoDest: [],
   repRecDest: [],
+  cuentasExpandidas: new Set(),
   editing: null,
   recPlantillaId: '',
   // Guards anti doble-envío mientras un guardado está en vuelo.
@@ -3425,9 +3445,13 @@ function renderCuentas() {
   $('#cuentasList').innerHTML = cuentas.length ? cuentas.map(c => {
     const estCta = Estado.bootstrap.establecimientos.find(e => e.id === c.establecimiento_id);
     const icoCta = faviconHostEst_(estCta) ? faviconImgEst_(estCta, 36) : (ICONOS[c.icono] || ICONOS.account_balance_wallet);
+    const subs = c.subcuentas || [];
+    const expanded = Estado.cuentasExpandidas.has(c.id);
+    const visSubs = (subs.length > 5 && !expanded) ? subs.slice(0, 5) : subs;
+    const oculto = subs.length - visSubs.length;
     return `
     <div class="card col-4 acct" draggable="true" data-cta-id="${c.id}" style="flex-direction: column; align-items: stretch; gap: var(--s-3);">
-      <div style="display: flex; align-items: center; gap: var(--s-3);">
+      <div class="acct-header-clickable" data-cta-open="${c.id}" style="display: flex; align-items: center; gap: var(--s-3);">
         <div class="acct-ico" style="${c.tipo === 'pasivo' ? 'background: var(--error-container); color: var(--on-error-container);' : ''}">${icoCta}</div>
         <div class="acct-body">
           <div class="acct-name">${escape(c.nombre)} · ${escape(c.moneda)}</div>
@@ -3441,14 +3465,20 @@ function renderCuentas() {
           return `<div class="bar"><div class="bar-stack" style="height: ${Math.max(6, h)}%;"><div class="bar-fill" style="height: 100%; background: ${c.tipo === 'pasivo' ? 'var(--error)' : 'var(--primary)'};"></div></div><div class="bar-label">${fmtMesCorto(p.mes)}</div></div>`;
         }).join('')}
       </div>
-      ${(c.subcuentas && c.subcuentas.length) ? `<div class="subcuentas" data-subcuentas-parent="${c.id}">${c.subcuentas.map(s => `
+      ${subs.length ? `<div class="subcuentas" data-subcuentas-parent="${c.id}">${visSubs.map(s => `
         <div class="subcta-row" draggable="true" data-sub-id="${s.id}">
-          <div class="subcta-grip" title="Arrastra para reordenar">≡</div>
-          <div class="subcta-name">↳ ${escape(s.nombre)}</div>
-          <div class="subcta-balance">${fmtMoneda(s.saldo, c.moneda)}</div>
-          <button class="icon-btn" data-sub-edit="${s.id}" data-sub-parent="${c.id}" title="Editar subcuenta">${ICONOS.edit}</button>
-          <button class="icon-btn" data-sub-del="${s.id}" data-sub-parent="${c.id}" title="Eliminar subcuenta">${ICONOS.delete}</button>
-        </div>`).join('')}</div>` : ''}
+          <div class="subcta-top">
+            <div class="subcta-grip" title="Arrastra para reordenar">≡</div>
+            <div class="subcta-name">${escape(s.nombre)}</div>
+          </div>
+          <div class="subcta-bottom">
+            <div class="subcta-balance">${fmtMoneda(s.saldo, c.moneda)}</div>
+            <div class="subcta-actions">
+              <button class="icon-btn" data-sub-edit="${s.id}" data-sub-parent="${c.id}" title="Editar subcuenta">${ICONOS.edit}</button>
+              <button class="icon-btn" data-sub-del="${s.id}" data-sub-parent="${c.id}" title="Eliminar subcuenta">${ICONOS.delete}</button>
+            </div>
+          </div>
+        </div>`).join('')}${subs.length > 5 ? `<div class="subcta-more">${expanded ? `<button class="btn-link" data-toggle-subcuentas="${c.id}" style="background: none; border: none; color: var(--primary); cursor: pointer; font: inherit; padding: 0 4px;">Ver menos</button>` : `··· +${subs.length - 5} más <button class="btn-link" data-toggle-subcuentas="${c.id}" style="background: none; border: none; color: var(--primary); cursor: pointer; font: inherit; padding: 0 4px;">Ver todas</button>`}</div>` : ''}</div>` : ''}
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 4px;">
         <button class="btn btn-sm btn-ghost subcta-add" data-cta-add-sub="${c.id}">+ Subcuenta</button>
         <div style="display: flex; gap: 4px;">
@@ -3461,10 +3491,40 @@ function renderCuentas() {
   $$('[data-cta-edit]').forEach(b => b.addEventListener('click', () => openCuenta(b.dataset.ctaEdit)));
   $$('[data-cta-del]').forEach(b => b.addEventListener('click', () => borrarCuenta(b.dataset.ctaDel)));
   $$('[data-cta-add-sub]').forEach(b => b.addEventListener('click', () => openCuenta('', b.dataset.ctaAddSub)));
+  $$('[data-cta-open]').forEach(b => b.addEventListener('click', () => openCuentasDetalle(b.dataset.ctaOpen)));
+  $$('[data-toggle-subcuentas]').forEach(b => b.addEventListener('click', () => {
+    Estado.cuentasExpandidas.has(b.dataset.toggleSubcuentas) ? Estado.cuentasExpandidas.delete(b.dataset.toggleSubcuentas) : Estado.cuentasExpandidas.add(b.dataset.toggleSubcuentas);
+    renderCuentas();
+  }));
   $$('[data-sub-edit]').forEach(b => b.addEventListener('click', () => openCuenta(b.dataset.subEdit, b.dataset.subParent)));
   $$('[data-sub-del]').forEach(b => b.addEventListener('click', () => borrarSubcuenta(b.dataset.subDel, b.dataset.subParent)));
   wireDragReorder();
   wireAccountDragReorder();
+}
+
+function openCuentasDetalle(cuentaId) {
+  const c = Estado.bootstrap.cuentas.find(x => x.id === cuentaId);
+  if (!c) return;
+  const subs = c.subcuentas || [];
+  $('#sheetCuentasDetalleTitle').textContent = c.nombre + ' — Subcuentas';
+  $('#sheetCuentasDetalleSub').textContent = `${subs.length} subcuenta${subs.length === 1 ? '' : 's'} · ${fmtMoneda(c.saldo, c.moneda)}`;
+  $('#sheetCuentasDetalleList').innerHTML = subs.map(s => `
+    <div class="subcta-row subcta-row-lg">
+      <div class="subcta-top">
+        <div class="subcta-name">${escape(s.nombre)}</div>
+      </div>
+      <div class="subcta-bottom">
+        <div class="subcta-balance">${fmtMoneda(s.saldo, c.moneda)}</div>
+        <div class="subcta-actions">
+          <button class="icon-btn" data-detalle-sub-edit="${s.id}" data-detalle-parent="${c.id}" title="Editar subcuenta">${ICONOS.edit}</button>
+          <button class="icon-btn" data-detalle-sub-del="${s.id}" data-detalle-parent="${c.id}" title="Eliminar subcuenta">${ICONOS.delete}</button>
+        </div>
+      </div>
+    </div>
+  `).join('') || '<div class="body-sm" style="color: var(--on-surface-variant); padding: var(--s-3); text-align: center;">Esta cuenta no tiene subcuentas.</div>';
+  $$('[data-detalle-sub-edit]').forEach(b => b.addEventListener('click', () => { closeSheet(); openCuenta(b.dataset.detalleSubEdit, b.dataset.detalleParent); }));
+  $$('[data-detalle-sub-del]').forEach(b => b.addEventListener('click', () => borrarSubcuenta(b.dataset.detalleSubDel, b.dataset.detalleParent)));
+  openSheet('sheetCuentasDetalle');
 }
 
 async function borrarCuenta(id) {
@@ -4069,6 +4129,7 @@ async function openEstablecimientoTxList(id, nombre) {
 }
 
 $('#estTxListClose').addEventListener('click', closeAllSheets);
+$('#sheetCuentasDetalleClose').addEventListener('click', closeAllSheets);
 
 $$('[data-est-nav]').forEach(b => b.addEventListener('click', () => {
   let { anio, mes } = Estado.estMes;
