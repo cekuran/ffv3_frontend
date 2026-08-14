@@ -1401,6 +1401,7 @@
       </div>
     </div>
     <div class="field"><label>Saldo inicial</label><input class="input" type="number" step="0.01" name="saldo_inicial" id="ctaSaldo" value="0"></div>
+    <div class="field" id="wrapCtaEstablecimiento"><label>Establecimiento (opcional)</label><select class="select" name="establecimiento_id" id="ctaEstablecimiento"><option value="">— Ninguno —</option></select></div>
     <div class="field" id="wrapCtaIcono"><label>Icono</label>
       <div class="icon-dd" data-default="account_balance_wallet">
         <input type="hidden" name="icono" id="ctaIcono" value="account_balance_wallet">
@@ -1710,6 +1711,11 @@ function faviconImgEst_(est, size) {
   return `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=${px}" alt="" width="${px}" height="${px}" style="border-radius: 4px; object-fit: contain;" onerror="this.replaceWith(document.createTextNode(''))">`;
 }
 function _assert_(cond, msg) { if (!cond) { try { console.error('[assert]', msg); } catch (_) {} } }
+// ponytail: prioriza el favicon del establecimiento sobre el icono de categoría.
+function icoMov_(cat, establecimiento, size) {
+  if (establecimiento && faviconHostEst_(establecimiento)) return faviconImgEst_(establecimiento, size || 24);
+  return icoCat(cat);
+}
 
 const CAT_ICON_GROUPS = [
   ['General', ['category']],
@@ -3216,15 +3222,19 @@ function renderDashboard() {
 
   // Cuentas preview
   const preview = cuentas.slice(0, 3);
-  $('#dashCuentas').innerHTML = preview.map(c => `
+  $('#dashCuentas').innerHTML = preview.map(c => {
+    const estCta = Estado.bootstrap.establecimientos.find(e => e.id === c.establecimiento_id);
+    const icoCta = faviconHostEst_(estCta) ? faviconImgEst_(estCta, 36) : (ICONOS[c.icono] || ICONOS.account_balance_wallet);
+    return `
     <div class="card col-4 acct">
-      <div class="acct-ico" style="${c.tipo === 'pasivo' ? 'background: var(--error-container); color: var(--on-error-container);' : ''}">${ICONOS[c.icono] || ICONOS.account_balance_wallet}</div>
+      <div class="acct-ico" style="${c.tipo === 'pasivo' ? 'background: var(--error-container); color: var(--on-error-container);' : ''}">${icoCta}</div>
       <div class="acct-body">
         <div class="acct-name">${escape(c.nombre)}</div>
         <div class="acct-balance" style="color: ${c.tipo === 'pasivo' ? 'var(--error)' : 'var(--on-surface)'};">${fmtMoneda(c.saldo, c.moneda)}</div>
       </div>
     </div>
-  `).join('') || emptyHtml('Sin cuentas aún', 'Crea tu primera cuenta para empezar.');
+  `;
+  }).join('') || emptyHtml('Sin cuentas aún', 'Crea tu primera cuenta para empezar.');
 
   // Movimientos recientes
   renderDashTx_();
@@ -3249,9 +3259,14 @@ function renderDashboard() {
   $('#dashProx').innerHTML = prox.length ? etiqueta + ordenados.map(({ p, fm, fy }) => {
     const mesTxt = (fy === y && fm === m + 1) ? 'Este mes' : MES_ABBR[fm - 1];
     const sub = `${p.dia_mes} · ${mesTxt} · ${fmtPeriodoMeses(p.periodo_meses)}`;
+    const rec = Estado.bootstrap.recurrentes.find(r => r.id === p.id);
+    const plantillaRec = rec ? (typeof rec.plantilla === 'string' ? JSON.parse(rec.plantilla) : rec.plantilla) : null;
+    const estRec = plantillaRec && plantillaRec.establecimiento_id
+      ? Estado.bootstrap.establecimientos.find(e => e.id === plantillaRec.establecimiento_id)
+      : null;
     return `
     <div style="display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) 0; border-bottom: 1px solid var(--surface-container);">
-      <div class="acct-ico" style="background: var(--primary-container); color: var(--on-primary-container);">${ICONOS.event_repeat || ICONOS.subscriptions}</div>
+      <div class="acct-ico" style="background: var(--primary-container); color: var(--on-primary-container);">${faviconHostEst_(estRec) ? faviconImgEst_(estRec, 24) : (ICONOS.event_repeat || ICONOS.subscriptions)}</div>
       <div style="flex: 1;">
         <div class="title-sm">${escape(p.descripcion || 'Recurrente')}</div>
         <div class="body-sm" style="color: var(--on-surface-variant);">${sub}</div>
@@ -3303,6 +3318,7 @@ function emptyHtml(t, s) {
 
 function txRow(t) {
   const cat = Estado.bootstrap.categorias.find(c => c.id === t.categoria_id);
+  const establecimiento = Estado.bootstrap.establecimientos.find(e => e.id === t.establecimiento_id);
   const cta = Estado.bootstrap.cuentas.find(c => c.id === t.cuenta_id);
   const sub = (cta && t.subcuenta_id) ? (cta.subcuentas || []).find(s => s.id === t.subcuenta_id) : null;
   const ctaD = Estado.bootstrap.cuentas.find(c => c.id === t.cuenta_destino_id);
@@ -3332,7 +3348,7 @@ function txRow(t) {
     ? origen + ' ' + detalleDest
     : origen + ' · ' + escape(cat ? cat.nombre : '—');
   return `<div class="tx-row">
-    <div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoCat(cat)}</div>
+    <div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoMov_(cat, establecimiento)}</div>
     <div class="tx-main">
       <div class="tx-title">${escape(t.descripcion || (cat ? cat.nombre : 'Sin descripción'))}</div>
       <div class="tx-sub">${escape(t.fecha || '')} · ${detalle}</div>
@@ -3382,10 +3398,13 @@ function syncCategoriasTransferenciaTx_(categoriaPreferida) {
 
 function renderCuentas() {
   const cuentas = Estado.bootstrap.cuentas;
-  $('#cuentasList').innerHTML = cuentas.length ? cuentas.map(c => `
+  $('#cuentasList').innerHTML = cuentas.length ? cuentas.map(c => {
+    const estCta = Estado.bootstrap.establecimientos.find(e => e.id === c.establecimiento_id);
+    const icoCta = faviconHostEst_(estCta) ? faviconImgEst_(estCta, 36) : (ICONOS[c.icono] || ICONOS.account_balance_wallet);
+    return `
     <div class="card col-4 acct" draggable="true" data-cta-id="${c.id}" style="flex-direction: column; align-items: stretch; gap: var(--s-3);">
       <div style="display: flex; align-items: center; gap: var(--s-3);">
-        <div class="acct-ico" style="${c.tipo === 'pasivo' ? 'background: var(--error-container); color: var(--on-error-container);' : ''}">${ICONOS[c.icono] || ICONOS.account_balance_wallet}</div>
+        <div class="acct-ico" style="${c.tipo === 'pasivo' ? 'background: var(--error-container); color: var(--on-error-container);' : ''}">${icoCta}</div>
         <div class="acct-body">
           <div class="acct-name">${escape(c.nombre)} · ${escape(c.moneda)}</div>
           <div class="acct-balance" style="color: ${c.tipo === 'pasivo' ? 'var(--error)' : 'var(--on-surface)'};">${fmtMoneda(c.saldo, c.moneda)}</div>
@@ -3687,7 +3706,7 @@ function renderRecurrentes() {
       ? `${origenTxt} → ${escape(ctaD ? ctaD.nombre : '—')}${subsDNombres.length ? ' (' + subsDNombres.join(', ') + ')' : ''}`
       : origenTxt;
     return `<div class="card card-pad-md rec-card">
-      <div class="tx-ico rec-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoCat(cat)}</div>
+      <div class="tx-ico rec-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoMov_(cat, establecimiento)}</div>
       <div class="rec-info">
         <div class="title-sm">${escape(p.descripcion || '—')}</div>
         <div class="body-sm" style="color: var(--on-surface-variant);">${detalleCuenta}${establecimiento ? ' · ' + escape(establecimiento.nombre) : ''} · día ${p.dia_mes} · ${escape(fmtPeriodoMeses(p.periodo_meses))}</div>
@@ -4618,10 +4637,12 @@ function openCuenta(id, parentId) {
   $('#ctaParentLabel').textContent = parent ? (parent.nombre + ' · ' + parent.moneda) : '';
   $('#ctaTopFields').style.display = parent ? 'none' : '';
   $('#wrapCtaIcono').style.display = parent ? 'none' : '';
+  $('#wrapCtaEstablecimiento').style.display = parent ? 'none' : '';
   $('#ctaNombre').value = c ? c.nombre : '';
   $('#ctaTipo').value = (c && c.tipo) ? c.tipo : 'activo';
   $('#ctaMoneda').value = (c && c.moneda) ? c.moneda : 'EUR';
   $('#ctaSaldo').value = c ? c.saldo_inicial : 0;
+  poblarSelect('#ctaEstablecimiento', Estado.bootstrap.establecimientos, c ? (c.establecimiento_id || '') : '', e => e.nombre);
   setIconPick($('#ctaIcono'), (c && c.icono) || 'account_balance_wallet');
   openSheet('sheetCuenta');
 }
@@ -4637,7 +4658,8 @@ $('#formCuenta').addEventListener('submit', async (e) => {
       tipo: f.get('tipo'),
       moneda: f.get('moneda'),
       icono: f.get('icono') || 'account_balance_wallet',
-      saldo_inicial: Number(f.get('saldo_inicial') || 0)
+      saldo_inicial: Number(f.get('saldo_inicial') || 0),
+      establecimiento_id: f.get('establecimiento_id') || ''
     }));
     closeAllSheets();
     refrescarCuentas();
@@ -6225,6 +6247,7 @@ _assert_(faviconHostEst_({web: 'https://www.ejemplo.com/p'}) === 'www.ejemplo.co
 _assert_(faviconHostEst_({web: 'https://carrefour.es'}) === 'carrefour.es', 'faviconHostEst_ limpio');
 _assert_(faviconImgEst_({web: ''}, 32) === '', 'faviconImgEst_ vacío');
 _assert_(faviconImgEst_({web: 'https://x.com'}, 32).includes('google.com/s2/favicons'), 'faviconImgEst_ URL');
+_assert_(icoMov_({}, null).includes('category'), 'icoMov_ sin cat');
 // ponytail: el frontend NO normaliza (el backend lo hace). Si nos llega sin
 // esquema al front, devolvemos string vacío; el backend añadirá https://.
 </script>
