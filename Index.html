@@ -3992,14 +3992,18 @@ async function renderPresupuesto() {
     .reduce((s, p) => s + Number(p.importe_esperado || 0), 0);
   const pct = totalEsperado > 0 ? Math.round((totalGastos / totalEsperado) * 100) : 0;
   const excedido = totalGastos > totalEsperado;
+  const colorEstado = excedido ? 'var(--error)' : 'var(--primary)';
   $('#presGasto').textContent = fmtMoneda(totalGastos);
+  $('#presGasto').style.color = colorEstado;
   $('#presTotal').textContent = fmtMoneda(totalEsperado);
   $('#presBar').style.width = Math.min(100, pct) + '%';
   $('#presBar').className = 'progress-fill' + (excedido ? ' danger' : (pct >= 80 ? ' warn' : ''));
   $('#presPct').textContent = pct + '% utilizado';
+  $('#presPct').style.color = colorEstado;
   $('#presRest').textContent = excedido
     ? fmtMoneda(totalGastos - totalEsperado) + ' en exceso'
     : fmtMoneda(totalEsperado - totalGastos) + ' restantes';
+  $('#presRest').style.color = colorEstado;
   const ahVal = Number(resumen.ingresosPresupuesto != null ? resumen.ingresosPresupuesto : resumen.ingresos || 0) - totalGastos;
   $('#presAhorro').textContent = fmtMoneda(ahVal);
   $('#presAhorro').style.color = ahVal >= 0 ? 'var(--primary)' : 'var(--error)';
