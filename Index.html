@@ -3218,18 +3218,21 @@ function renderDashboard() {
   const all = (resumen.proximos || []).slice();
   const ordenados = all
     .filter(p => p.proximo_disparo)
-    .map(p => ({ p, fire: new Date(p.proximo_disparo + 'T00:00:00') }))
+    .map(p => {
+      const [fy, fm] = p.proximo_disparo.split('-').map(Number);
+      return { p, fy, fm, fire: new Date(p.proximo_disparo + 'T00:00:00') };
+    })
     .sort((a, b) => a.fire - b.fire)
     .slice(0, 6);
   const prox = ordenados.map(x => x.p);
   const hoy = new Date();
   const m = hoy.getMonth();
   const y = hoy.getFullYear();
-  const etiqueta = (prox.length && (ordenados[0].fire.getMonth() !== m || ordenados[0].fire.getFullYear() !== y))
-    ? `<div class="label-md" style="color: var(--on-surface-variant); padding: 0 0 var(--s-2);">${escape(MES_ABBR[ordenados[0].fire.getMonth()])}</div>`
+  const etiqueta = (prox.length && (ordenados[0].fm !== m + 1 || ordenados[0].fy !== y))
+    ? `<div class="label-md" style="color: var(--on-surface-variant); padding: 0 0 var(--s-2);">${escape(MES_ABBR[ordenados[0].fm - 1])}</div>`
     : '';
-  $('#dashProx').innerHTML = prox.length ? etiqueta + ordenados.map(({ p, fire }) => {
-    const mesTxt = (fire.getMonth() === m && fire.getFullYear() === y) ? 'Este mes' : MES_ABBR[fire.getMonth()];
+  $('#dashProx').innerHTML = prox.length ? etiqueta + ordenados.map(({ p, fm, fy }) => {
+    const mesTxt = (fy === y && fm === m + 1) ? 'Este mes' : MES_ABBR[fm - 1];
     const sub = `${p.dia_mes} · ${mesTxt} · ${fmtPeriodoMeses(p.periodo_meses)}`;
     return `
     <div style="display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) 0; border-bottom: 1px solid var(--surface-container);">
