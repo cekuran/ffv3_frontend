@@ -1460,6 +1460,7 @@
   <form id="formEst" style="display: flex; flex-direction: column; gap: var(--s-3);">
     <input type="hidden" name="id" id="estId">
     <div class="field"><label>Nombre</label><input class="input" type="text" name="nombre" id="estNombre" required></div>
+    <div class="field"><label>Página web (opcional)</label><input class="input" type="text" inputmode="url" name="web" id="estWeb" placeholder="ejemplo.com"></div>
     <div style="display: flex; gap: var(--s-2); margin-top: var(--s-3);">
       <button type="button" class="btn btn-secondary" id="estCancel" style="flex: 1;">Cancelar</button>
       <button type="submit" class="btn btn-primary" style="flex: 2;">Guardar</button>
@@ -1695,6 +1696,21 @@ const CAT_ICON_BY_NAME = { 'Vivienda': 'home', 'Alimentación': 'shopping_cart',
 const iconoCat = cat => (cat && cat.icono) || CAT_ICON_BY_NAME[cat && cat.nombre] || 'category';
 const icoCat = cat => ICONOS[iconoCat(cat)] || ICONOS.category;
 const tintCat = (color) => color ? `background: ${color}20; color: ${color};` : 'background: var(--surface-container); color: var(--on-surface-variant);';
+// ponytail: usa el servicio de favicons de Google (sin CORS, sin scraping).
+// Devuelve null si el establecimiento no tiene URL válida.
+function faviconHostEst_(est) {
+  if (!est || !est.web) return null;
+  const m = /^https?:\/\/([^\/?#]+)/i.exec(String(est.web));
+  return m ? m[1] : null;
+}
+function faviconImgEst_(est, size) {
+  const host = faviconHostEst_(est);
+  if (!host) return '';
+  const px = size || 32;
+  return `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=${px}" alt="" width="${px}" height="${px}" style="border-radius: 4px; object-fit: contain;" onerror="this.replaceWith(document.createTextNode(''))">`;
+}
+function _assert_(cond, msg) { if (!cond) { try { console.error('[assert]', msg); } catch (_) {} } }
+}
 
 const CAT_ICON_GROUPS = [
   ['General', ['category']],
@@ -3526,7 +3542,7 @@ function renderMovimientos() {
     }, '');
     const catsHtml = pillsHtml || '—';
     return `<tr>
-      <td class="icon-cell"><div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}; width: 36px; height: 36px;">${icoCat(cat)}</div></td>
+      <td class="icon-cell"><div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}; width: 36px; height: 36px;">${establecimiento && faviconHostEst_(establecimiento) ? faviconImgEst_(establecimiento, 32) : icoCat(cat)}</div></td>
       <td>${escape(t.fecha)}</td>
       <td><div style="font-weight: 600;">${escape(t.descripcion || '—')}</div>${establecimiento ? `<div class="body-sm" style="color: var(--on-surface-variant);">Establecimiento: ${escape(establecimiento.nombre)}</div>` : ''}${t.notas ? `<div class="body-sm" style="color: var(--on-surface-variant);">${escape(t.notas)}</div>` : ''}<div class="body-sm" style="color: var(--on-surface-variant);">Alta: ${escape(t.owner || '—')} · Última edición: ${escape(t.ultima_edicion_por || t.owner || '—')} · ${escape(fmtFechaHora(t.fecha_ultima_edicion))}</div></td>
       <td>${cuentaHtml}</td>
@@ -3922,6 +3938,10 @@ async function renderEstablecimientos() {
     $('#estList').innerHTML = filas.map(f => {
       const neto = Number(f.neto || 0);
       const colorNeto = neto > 0 ? 'var(--primary)' : (neto < 0 ? 'var(--error)' : 'var(--on-surface)');
+      const est = f.id ? Estado.bootstrap.establecimientos.find(e => e.id === f.id) : null;
+      const icoEst = faviconHostEst_(est)
+        ? faviconImgEst_(est, 28)
+        : (f.id ? ICONOS.store : ICONOS.receipt_long);
       const acciones = f.id ? `
         <div style="display: flex; gap: 4px;">
           <button class="icon-btn" type="button" data-est-edit="${f.id}" title="Editar establecimiento" aria-label="Editar ${escape(f.nombre)}">${ICONOS.edit}</button>
@@ -3930,7 +3950,7 @@ async function renderEstablecimientos() {
       return `<div class="card col-4 card-pad-md">
         <div class="card-h" style="align-items: center;">
           <div style="display: flex; align-items: center; gap: var(--s-3); min-width: 0;">
-            <div class="tx-ico" style="background: var(--primary-container); color: var(--on-primary-container);">${f.id ? ICONOS.store : ICONOS.receipt_long}</div>
+            <div class="tx-ico" style="background: var(--primary-container); color: var(--on-primary-container);">${icoEst}</div>
             <div class="title-sm" style="overflow: hidden; text-overflow: ellipsis;">${escape(f.nombre)}</div>
           </div>
           ${acciones}
@@ -4802,6 +4822,7 @@ function openEstablecimiento(id) {
   $('#sheetEstTitle').textContent = est ? 'Editar establecimiento' : 'Nuevo establecimiento';
   $('#estId').value = est ? est.id : '';
   $('#estNombre').value = est ? est.nombre : '';
+  $('#estWeb').value = est ? (est.web || '') : '';
   openSheet('sheetEst');
 }
 $('#estCancel').addEventListener('click', closeAllSheets);
@@ -4811,7 +4832,8 @@ $('#formEst').addEventListener('submit', async (e) => {
   try {
     Estado.bootstrap.establecimientos = await call('guardarEstablecimiento', {
       id: f.get('id') || '',
-      nombre: f.get('nombre')
+      nombre: f.get('nombre'),
+      web: f.get('web') || ''
     });
     closeAllSheets();
     await renderEstablecimientos();
@@ -6196,6 +6218,16 @@ window.addEventListener('hashchange', () => {
     tip.style.opacity = '0';
   });
 })();
+
+// ponytail: self-check mínimo del helper de favicon (corre al cargar la página).
+_assert_(faviconHostEst_(null) === null, 'faviconHostEst_ null');
+_assert_(faviconHostEst_({}) === null, 'faviconHostEst_ vacío');
+_assert_(faviconHostEst_({web: 'https://www.ejemplo.com/p'}) === 'www.ejemplo.com', 'faviconHostEst_ con path');
+_assert_(faviconHostEst_({web: 'https://carrefour.es'}) === 'carrefour.es', 'faviconHostEst_ limpio');
+_assert_(faviconImgEst_({web: ''}, 32) === '', 'faviconImgEst_ vacío');
+_assert_(faviconImgEst_({web: 'https://x.com'}, 32).includes('google.com/s2/favicons'), 'faviconImgEst_ URL');
+// ponytail: el frontend NO normaliza (el backend lo hace). Si nos llega sin
+// esquema al front, devolvemos string vacío; el backend añadirá https://.
 </script>
 </body>
 </html>
