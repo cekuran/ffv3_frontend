@@ -3433,7 +3433,7 @@ function renderCuentas() {
         </div>
       </div>
     </div>
-  `).join('') : emptyHtml('Sin cuentas', 'Crea tu primera cuenta.');
+  `}).join('') : emptyHtml('Sin cuentas', 'Crea tu primera cuenta.');
   $$('[data-cta-edit]').forEach(b => b.addEventListener('click', () => openCuenta(b.dataset.ctaEdit)));
   $$('[data-cta-del]').forEach(b => b.addEventListener('click', () => borrarCuenta(b.dataset.ctaDel)));
   $$('[data-cta-add-sub]').forEach(b => b.addEventListener('click', () => openCuenta('', b.dataset.ctaAddSub)));
