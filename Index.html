@@ -3218,7 +3218,7 @@ function renderDashboard() {
   const all = (resumen.proximos || []).slice();
   const ordenados = all
     .filter(p => p.proximo_disparo)
-    .map(p => ({ p, fire: new Date(p.proximo_disparo) }))
+    .map(p => ({ p, fire: new Date(p.proximo_disparo + 'T00:00:00') }))
     .sort((a, b) => a.fire - b.fire)
     .slice(0, 6);
   const prox = ordenados.map(x => x.p);
@@ -3857,10 +3857,13 @@ async function eliminarConciliacionUI(id) {
 }
 
 async function doConciliar() {
+  const btn = $('#conOk');
+  if (btn.disabled) return;
   const id = $('#conCuenta').value;
   const fecha = $('#conFecha').value;
   const banco = Number($('#conBanco').value);
   if (!banco && banco !== 0) { toast('Introduce el saldo del banco'); return; }
+  btn.disabled = true;
   try {
     const r = await call('conciliar', id, banco, fecha);
     $('#conSistema').textContent = fmtMoneda(r.sistema);
@@ -3870,6 +3873,7 @@ async function doConciliar() {
     await recargar();
     toast('Conciliación registrada');
   } catch (e) { toast('Error: ' + e.message); }
+  finally { btn.disabled = false; }
 }
 
 function renderCategorias() {
@@ -3986,13 +3990,16 @@ async function renderPresupuesto() {
   const totalGastos = Number(resumen.gastosPresupuesto || 0);
   const totalEsperado = Estado.bootstrap.presupuestos
     .reduce((s, p) => s + Number(p.importe_esperado || 0), 0);
-  const pct = totalEsperado > 0 ? Math.min(100, Math.round((totalGastos / totalEsperado) * 100)) : 0;
+  const pct = totalEsperado > 0 ? Math.round((totalGastos / totalEsperado) * 100) : 0;
+  const excedido = totalGastos > totalEsperado;
   $('#presGasto').textContent = fmtMoneda(totalGastos);
   $('#presTotal').textContent = fmtMoneda(totalEsperado);
-  $('#presBar').style.width = pct + '%';
-  $('#presBar').className = 'progress-fill' + (pct >= 100 ? ' danger' : (pct >= 80 ? ' warn' : ''));
+  $('#presBar').style.width = Math.min(100, pct) + '%';
+  $('#presBar').className = 'progress-fill' + (excedido ? ' danger' : (pct >= 80 ? ' warn' : ''));
   $('#presPct').textContent = pct + '% utilizado';
-  $('#presRest').textContent = fmtMoneda(Math.max(0, totalEsperado - totalGastos)) + ' restantes';
+  $('#presRest').textContent = excedido
+    ? fmtMoneda(totalGastos - totalEsperado) + ' en exceso'
+    : fmtMoneda(totalEsperado - totalGastos) + ' restantes';
   const ahVal = Number(resumen.ingresosPresupuesto != null ? resumen.ingresosPresupuesto : resumen.ingresos || 0) - totalGastos;
   $('#presAhorro').textContent = fmtMoneda(ahVal);
   $('#presAhorro').style.color = ahVal >= 0 ? 'var(--primary)' : 'var(--error)';
