@@ -1099,12 +1099,42 @@
         </div>
       </div>
       <div class="card" style="margin-top: var(--s-5);">
-        <div class="card-h"><h2>Historial</h2></div>
+        <div class="card-h" style="display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap;">
+          <h2>Historial</h2>
+          <div style="display: flex; gap: var(--s-2); flex-wrap: wrap; align-items: center;">
+            <input class="input" type="date" id="conHistDesde" aria-label="Desde" style="max-width: 150px;">
+            <input class="input" type="date" id="conHistHasta" aria-label="Hasta" style="max-width: 150px;">
+            <button class="btn btn-secondary btn-sm" type="button" id="conHistLimpiarFechas">Limpiar</button>
+            <select class="select" id="conHistCuenta" style="max-width: 220px;" aria-label="Filtrar por cuenta">
+              <option value="">Todas las cuentas</option>
+            </select>
+          </div>
+        </div>
         <div id="conHist"></div>
+        <div id="conHistMas" style="display: none; margin-top: var(--s-3); text-align: center;">
+          <button class="btn btn-secondary btn-sm" type="button" id="conHistVerMas">Ver más</button>
+        </div>
       </div>
     </section>
 
-    <!-- Categorías -->
+    <dialog id="conEditDialog" style="border: 1px solid var(--outline-variant); border-radius: 12px; padding: var(--s-5); max-width: 420px; width: 90%;">
+      <form method="dialog" id="conEditForm" style="display: grid; gap: var(--s-3);">
+        <h2 style="font-size: 18px; margin: 0;">Editar conciliación</h2>
+        <div class="body-sm" id="conEditMeta" style="color: var(--on-surface-variant);">—</div>
+        <div class="field">
+          <label>Saldo real del banco (€)</label>
+          <input class="input" type="number" step="0.01" id="conEditBanco" required>
+        </div>
+        <div class="field">
+          <label>Notas</label>
+          <input class="input" type="text" id="conEditNotas" maxlength="200">
+        </div>
+        <div style="display: flex; gap: var(--s-2); justify-content: flex-end;">
+          <button class="btn btn-secondary btn-sm" type="button" id="conEditCancel">Cancelar</button>
+          <button class="btn btn-primary btn-sm" type="submit" id="conEditSave">Guardar</button>
+        </div>
+      </form>
+    </dialog>
     <section class="view" data-view="categorias">
       <div class="section-h">
         <div>
@@ -1734,6 +1764,7 @@ const Estado = {
   // Guards anti doble-envío mientras un guardado está en vuelo.
   guardandoTx: false,
   guardandoRec: false,
+  conHist: { limit: 25, offset: 0, total: 0, cargandoMas: false, filtroFecha: { desde: '', hasta: '' } },
   // Versión de datos del spreadsheet (backend _meta data_version). Sirve para
   // detectar cambios hechos en otra pestaña/usuario y forzar revalidación.
   dataVersion: '',
@@ -3664,10 +3695,109 @@ function renderConciliar() {
   $('#conSistema').textContent = '—';
   $('#conDif').textContent = '—';
   $('#conEstado').textContent = 'Selecciona una cuenta e introduce el saldo real.';
+  renderConHist();
 }
 
 function poblarConCuenta() {
   $('#conCuenta').innerHTML = Estado.bootstrap.cuentas.map(c => `<option value="${c.id}">${escape(c.nombre)} (${c.moneda})</option>`).join('');
+}
+
+async function renderConHist(append) {
+  const sel = $('#conHistCuenta');
+  sel.innerHTML = '<option value="">Todas las cuentas</option>' +
+    Estado.bootstrap.cuentas.map(c => `<option value="${c.id}">${escape(c.nombre)}</option>`).join('');
+  if (!append) {
+    Estado.conHist.offset = 0;
+    $('#conHist').innerHTML = '<div class="body-sm" style="color: var(--on-surface-variant);">Cargando…</div>';
+  }
+  let payload = { total: 0, rows: [] };
+  try {
+    payload = await call('obtenerConciliaciones', {
+      limit: Estado.conHist.limit,
+      offset: Estado.conHist.offset
+    }) || payload;
+  } catch (e) { payload = { total: 0, rows: [] }; }
+  Estado.conHist.total = Number(payload.total || 0);
+  const filtro = sel.value;
+  const { desde, hasta } = Estado.conHist.filtroFecha;
+  const visibles = (payload.rows || []).filter(r => {
+    if (filtro && r.cuenta_id !== filtro) return false;
+    if (desde && (r.fecha || '') < desde) return false;
+    if (hasta && (r.fecha || '') > hasta) return false;
+    return true;
+  });
+  const cuentasById = {};
+  Estado.bootstrap.cuentas.forEach(c => { cuentasById[c.id] = c; });
+  const htmlRows = visibles.map(r => {
+    const cta = cuentasById[r.cuenta_id];
+    const ok = Number(r.diferencia) === 0;
+    const dif = Number(r.diferencia || 0);
+    return `
+      <div style="display: grid; grid-template-columns: 110px 1fr auto auto auto auto auto; gap: var(--s-3); align-items: center; padding: var(--s-3); border: 1px solid var(--outline-variant); border-radius: 8px;">
+        <div class="body-sm">${escape(r.fecha || '—')}</div>
+        <div class="title-sm">${escape(cta ? cta.nombre : 'Cuenta eliminada')}</div>
+        <div class="body-sm" style="color: var(--on-surface-variant);">sis ${fmtMoneda(Number(r.saldo_sistema || 0))}</div>
+        <div class="body-sm" style="color: var(--on-surface-variant);">ban ${fmtMoneda(Number(r.saldo_banco || 0))}</div>
+        <div class="title-sm" style="color: ${ok ? 'var(--primary)' : 'var(--error)'};">${(dif >= 0 ? '+' : '') + fmtMoneda(dif)}</div>
+        <button class="icon-btn" type="button" data-con-edit="${escape(r.id)}" aria-label="Editar">${ICONOS.edit}</button>
+        <button class="icon-btn" type="button" data-con-del="${escape(r.id)}" aria-label="Eliminar">${ICONOS.delete}</button>
+      </div>`;
+  }).join('');
+  const vacio = !htmlRows && !append;
+  const masVisible = Estado.conHist.offset + visibles.length < Estado.conHist.total;
+  if (append) {
+    const cont = $('#conHist').querySelector('[data-con-hist-list]');
+    if (cont) cont.insertAdjacentHTML('beforeend', htmlRows);
+    else $('#conHist').innerHTML = `<div data-con-hist-list style="display: flex; flex-direction: column; gap: var(--s-2);">${htmlRows}</div>`;
+  } else if (vacio) {
+    $('#conHist').innerHTML = '<div class="body-sm" style="color: var(--on-surface-variant);">Sin conciliaciones registradas.</div>';
+  } else {
+    $('#conHist').innerHTML = `<div data-con-hist-list style="display: flex; flex-direction: column; gap: var(--s-2);">${htmlRows}</div>`;
+  }
+  $('#conHistMas').style.display = masVisible ? 'block' : 'none';
+}
+
+async function conHistCargarMas() {
+  if (Estado.conHist.cargandoMas) return;
+  Estado.conHist.cargandoMas = true;
+  Estado.conHist.offset += Estado.conHist.limit;
+  try { await renderConHist(true); } finally { Estado.conHist.cargandoMas = false; }
+}
+
+async function abrirEditarConciliacion(id) {
+  let rows = [];
+  try { rows = (await call('obtenerConciliaciones', { limit: 0 })).rows || []; } catch (e) {}
+  const r = rows.find(x => x.id === id);
+  if (!r) { toast('Conciliación no encontrada'); return; }
+  $('#conEditMeta').textContent = `${r.fecha || '—'} · sistema ${fmtMoneda(Number(r.saldo_sistema || 0))}`;
+  $('#conEditBanco').value = Number(r.saldo_banco || 0);
+  $('#conEditNotas').value = r.notas || '';
+  $('#conEditForm').dataset.id = id;
+  $('#conEditDialog').showModal();
+}
+
+async function guardarEditarConciliacion(e) {
+  e.preventDefault();
+  const id = $('#conEditForm').dataset.id;
+  if (!id) return;
+  try {
+    await call('editarConciliacion', id, {
+      saldo_banco: Number($('#conEditBanco').value),
+      notas: $('#conEditNotas').value
+    });
+    $('#conEditDialog').close();
+    toast('Conciliación actualizada');
+    await renderConHist();
+  } catch (err) { toast('Error: ' + err.message); }
+}
+
+async function eliminarConciliacionUI(id) {
+  if (!confirm('¿Eliminar esta conciliación del historial? Las transacciones ya marcadas como conciliadas no se modifican.')) return;
+  try {
+    await call('eliminarConciliacion', id);
+    toast('Conciliación eliminada');
+    await renderConHist();
+  } catch (err) { toast('Error: ' + err.message); }
 }
 
 async function doConciliar() {
@@ -5421,6 +5551,24 @@ $('#btnConciliarTop').addEventListener('click', () => go('conciliar'));
 $('#cfgHojaSelect').addEventListener('change', (e) => cambiarHojaActivaUI(e.target.value));
 $('#dashConciliar').addEventListener('click', () => go('conciliar'));
 $('#conOk').addEventListener('click', doConciliar);
+$('#conHistCuenta').addEventListener('change', () => renderConHist());
+$('#conHistVerMas').addEventListener('click', conHistCargarMas);
+$('#conHistDesde').addEventListener('change', () => { Estado.conHist.filtroFecha.desde = $('#conHistDesde').value; renderConHist(); });
+$('#conHistHasta').addEventListener('change', () => { Estado.conHist.filtroFecha.hasta = $('#conHistHasta').value; renderConHist(); });
+$('#conHistLimpiarFechas').addEventListener('click', () => {
+  Estado.conHist.filtroFecha = { desde: '', hasta: '' };
+  $('#conHistDesde').value = '';
+  $('#conHistHasta').value = '';
+  renderConHist();
+});
+$('#conHist').addEventListener('click', (e) => {
+  const eBtn = e.target.closest('[data-con-edit]');
+  const dBtn = e.target.closest('[data-con-del]');
+  if (eBtn) abrirEditarConciliacion(eBtn.dataset.conEdit);
+  else if (dBtn) eliminarConciliacionUI(dBtn.dataset.conDel);
+});
+$('#conEditCancel').addEventListener('click', () => $('#conEditDialog').close());
+$('#conEditForm').addEventListener('submit', guardarEditarConciliacion);
 
 $('#authForm').addEventListener('submit', async (e) => {
   e.preventDefault();
