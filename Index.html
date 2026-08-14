@@ -1708,7 +1708,9 @@ function faviconImgEst_(est, size) {
   const host = faviconHostEst_(est);
   if (!host) return '';
   const px = size || 32;
-  return `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=${px}" alt="" width="${px}" height="${px}" style="border-radius: 4px; object-fit: contain;" onerror="this.replaceWith(document.createTextNode(''))">`;
+  // ponytail: pide siempre el máximo (64) y deja al navegador encajar al px
+  // de display con object-fit:contain. Cubre retina/HiDPI sin caché por tamaño.
+  return `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64" alt="" width="${px}" height="${px}" style="border-radius: 4px; object-fit: contain;" onerror="this.replaceWith(document.createTextNode(''))">`;
 }
 function _assert_(cond, msg) { if (!cond) { try { console.error('[assert]', msg); } catch (_) {} } }
 // ponytail: prioriza el favicon del establecimiento sobre el icono de categoría.
