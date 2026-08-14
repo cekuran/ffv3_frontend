@@ -2236,6 +2236,40 @@ function refrescarResumenDashboardLocal_() {
   Estado.bootstrap.resumen = calcularResumenLocal_(now.getFullYear(), now.getMonth() + 1);
 }
 
+// ponytail: outflows futuros del mes en curso desde plantillas activas.
+// Solo gasto y transferencia activo→pasivo con dia_mes > hoy. Comparte
+// reglas con la lógica del backend (tipoTransferenciaPresupuestoUI_) pero
+// resuelve en cliente sin round-trip.
+function totalProximosRecurrentesOutflowLocal_() {
+  const hoy = new Date().getDate();
+  const cuentas = cuentasByIdLocal_();
+  return (Estado.bootstrap.recurrentes || []).filter(r => r.activa).reduce((s, r) => {
+    try {
+      const p = JSON.parse(r.plantilla || '{}');
+      if (Number(p.dia_mes) <= hoy) return s;
+      const isGasto = p.tipo === 'gasto';
+      const isTransGasto = p.tipo === 'transferencia'
+        && cuentas[p.cuenta_id] && cuentas[p.cuenta_id].tipo === 'activo'
+        && cuentas[p.cuenta_destino_id] && cuentas[p.cuenta_destino_id].tipo === 'pasivo';
+      return (isGasto || isTransGasto) ? s + Number(p.importe || 0) : s;
+    } catch (_) { return s; }
+  }, 0);
+}
+
+// ponytail: única reacción del cliente ante cambios en recurrentes.
+// Recalcula el resumen (que alimenta Próximos pagos del dashboard), repinta
+// el resumen por frecuencia y refresca la vista activa si es dashboard,
+// presupuesto o recurrentes. No genera tx nuevas: eso queda para el
+// próximo bootstrap.
+function refrescarDependientesRecurrentes_() {
+  refrescarResumenDashboardLocal_();
+  renderResumenRecurrentes_(Estado.bootstrap.recurrentes);
+  const route = (location.hash || '').replace('#/', '');
+  if (route === 'dashboard') renderDashboard();
+  else if (route === 'presupuesto') renderPresupuesto();
+  else if (route === 'recurrentes') renderRecurrentes();
+}
+
 // Aplica el efecto de una tx sobre el array de cuentas (mutación in-place).
 // factor = +1 para aplicar, -1 para revertir (edición: -vieja +nueva).
 function aplicarDeltaTxSobreCuentas_(cuentas, tx, factor) {
@@ -3458,7 +3492,7 @@ async function borrarTx(id) {
     Estado.bootstrap.transacciones = (Estado.bootstrap.transacciones || []).filter(t => t.id !== id);
     cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
     if (txAnterior) actualizarSaldosLocalesTrasTx_(txAnterior, null);
-    refrescarResumenDashboardLocal_();
+    refrescarDependientesRecurrentes_();
     if (location.hash.startsWith('#/')) go(location.hash.slice(2));
     else renderDashboard();
   toast('Movimiento eliminado');
@@ -3605,13 +3639,15 @@ function renderRecurrentes() {
       sw.title = r.activa ? 'Activa' : 'Inactiva';
     }
     await call('guardarRecurrente', { id, plantilla: r.plantilla, activa: r.activa, ultima_generacion: r.ultima_generacion });
-    renderResumenRecurrentes_(Estado.bootstrap.recurrentes);
+    refrescarDependientesRecurrentes_();
   }));
   $$('[data-rec-edit]').forEach(b => b.addEventListener('click', () => openRec(b.dataset.recEdit)));
   $$('[data-rec-del]').forEach(b => b.addEventListener('click', async () => {
     if (!confirm('¿Eliminar plantilla?')) return;
-    await call('eliminarRecurrente', b.dataset.recDel);
-    await recargar(); toast('Plantilla eliminada');
+    const recs = await call('eliminarRecurrente', b.dataset.recDel);
+    if (Array.isArray(recs)) Estado.bootstrap.recurrentes = recs;
+    refrescarDependientesRecurrentes_();
+    toast('Plantilla eliminada');
   }));
 }
 
@@ -3768,24 +3804,10 @@ async function renderPresupuesto() {
   const ahVal = Number(resumen.ingresosPresupuesto != null ? resumen.ingresosPresupuesto : resumen.ingresos || 0) - totalGastos;
   $('#presAhorro').textContent = fmtMoneda(ahVal);
   $('#presAhorro').style.color = ahVal >= 0 ? 'var(--primary)' : 'var(--error)';
-  // ponytail: total de "próximos recurrentes" filtrado en cliente con datos ya
-  // cacheados en bootstrap (recurrentes + cuentas). Sin round-trip nuevo.
-  // Solo cuenta gastos y transferencias activo→pasivo cuyo dia_mes sea
-  // estrictamente mayor que hoy (los que disparan este mes).
-  const _hoyDom = new Date().getDate();
-  const _cuentasById = {};
-  (Estado.bootstrap.cuentas || []).forEach(c => { _cuentasById[c.id] = c; });
-  const recVal = (Estado.bootstrap.recurrentes || []).filter(r => r.activa).reduce((s, r) => {
-    try {
-      const p = JSON.parse(r.plantilla || '{}');
-      if (Number(p.dia_mes) <= _hoyDom) return s;
-      const isGasto = p.tipo === 'gasto';
-      const isTransGasto = p.tipo === 'transferencia'
-        && _cuentasById[p.cuenta_id] && _cuentasById[p.cuenta_id].tipo === 'activo'
-        && _cuentasById[p.cuenta_destino_id] && _cuentasById[p.cuenta_destino_id].tipo === 'pasivo';
-      return (isGasto || isTransGasto) ? s + Number(p.importe || 0) : s;
-    } catch (e) { return s; }
-  }, 0);
+  // ponytail: outflows futuros del mes desde recurrentes activas. Helper
+  // compartido con refrescarDependientesRecurrentes_; vive en cliente sin
+  // round-trip porque recurrentes + cuentas ya están en bootstrap.
+  const recVal = totalProximosRecurrentesOutflowLocal_();
   // ponytail: recVal trae outflows (gastos + transf activo→pasivo), se muestran
   // como negativos en rojo. Verde solo si el neto llegara a ser positivo
   // (recVal < 0), p.ej. si más adelante se suman ingresos recurrentes.
@@ -4324,7 +4346,9 @@ $('#formTx').addEventListener('submit', async (e) => {
   try {
     const result = await call('guardarTransaccion', tx);
     if (Estado.recPlantillaId && !recurrenteOn) {
-      await call('eliminarRecurrente', Estado.recPlantillaId);
+      const recs = await call('eliminarRecurrente', Estado.recPlantillaId);
+      if (Array.isArray(recs)) Estado.bootstrap.recurrentes = recs;
+      refrescarDependientesRecurrentes_();
     }
     // Refresco ligero: usa el payload del backend y/o actualiza saldos en local.
     aplicarResultadoGuardadoTx_(result, txAnterior);
@@ -5139,9 +5163,9 @@ $('#formRec').addEventListener('submit', async (e) => {
       Estado.bootstrap.recurrentes = recurrentes;
     }
     closeAllSheets();
-    // Solo re-render de la vista actual; no hace falta bootstrap completo.
-    if (location.hash.startsWith('#/')) go(location.hash.slice(2));
-    else renderDashboard();
+    // Reacción unificada: dashboard, presupuesto y recurrentes repintan
+    // desde memoria sin round-trip.
+    refrescarDependientesRecurrentes_();
     toast(recDraft.id ? 'Plantilla actualizada' : 'Plantilla creada');
   } catch (err) { toast('Error: ' + err.message); }
   finally {
@@ -5347,9 +5371,9 @@ function aplicarResultadoGuardadoTx_(result, txAnterior) {
   if (Array.isArray(result.recurrentes)) {
     Estado.bootstrap.recurrentes = result.recurrentes;
   }
-  // Dashboard y presupuesto leen resumen/cats desde memoria: actualizar
-  // sin round-trip tras cada alta/edición de movimiento.
-  refrescarResumenDashboardLocal_();
+  // Dashboard, presupuesto y recurrentes leen resumen/cats desde memoria:
+  // actualizar sin round-trip tras cada alta/edición de movimiento.
+  refrescarDependientesRecurrentes_();
   limpiarFiltrosInvalidos();
   poblarFiltros();
   if (location.hash.startsWith('#/')) go(location.hash.slice(2));
