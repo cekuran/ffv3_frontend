@@ -222,6 +222,8 @@
   .card-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s-4); }
   .card-h h2 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0; }
   .card-sub { color: var(--on-surface-variant); font-size: 14px; }
+  .card-clickable { cursor: pointer; transition: box-shadow 0.15s, transform 0.15s; }
+  .card-clickable:hover { box-shadow: var(--shadow-pop); transform: translateY(-1px); }
 
   /* === Balance card === */
   .balance-card {
@@ -431,6 +433,9 @@
     .tx-ico { grid-column: 1; grid-row: 2; width: 36px; height: 36px; justify-self: start; }
     .tx-row > div:last-child { grid-column: 2; grid-row: 2; justify-self: end; display: flex; gap: 2px; }
   }
+  /* ponytail: tx-row simplificada (sin acciones) — el último hijo (.tx-amount)
+     no debe tomar el layout de celda de acciones en móvil. */
+  .tx-row-simple > div:last-child { display: block; }
 
   /* === Account card === */
   .acct { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4); background: var(--surface-container-low); border: 1px solid var(--outline-variant); border-radius: var(--r-xl); transition: background 0.15s; }
@@ -1473,6 +1478,17 @@
       <button type="submit" class="btn btn-primary" style="flex: 2;">Guardar</button>
     </div>
   </form>
+</div>
+
+<!-- Sheet: transacciones por establecimiento (mes seleccionado) -->
+<div class="sheet bottom" id="sheetEstTxList" role="dialog" aria-modal="true" aria-labelledby="sheetEstTxListTitle">
+  <div class="sheet-handle"></div>
+  <h3 id="sheetEstTxListTitle">Transacciones</h3>
+  <div class="card-sub" id="sheetEstTxListSub" style="margin-bottom: var(--s-3);"></div>
+  <div id="estTxList" style="border-top: 1px solid var(--surface-container); margin-left: calc(var(--s-4) * -1); margin-right: calc(var(--s-4) * -1);"></div>
+  <div style="display: flex; gap: var(--s-2); margin-top: var(--s-4);">
+    <button type="button" class="btn btn-secondary" id="estTxListClose" style="flex: 1;">Cerrar</button>
+  </div>
 </div>
 
 <!-- Sheet: nuevo recurrente -->
@@ -3974,7 +3990,7 @@ async function renderEstablecimientos() {
           <button class="icon-btn" type="button" data-est-edit="${f.id}" title="Editar establecimiento" aria-label="Editar ${escape(f.nombre)}">${ICONOS.edit}</button>
           <button class="icon-btn" type="button" data-est-del="${f.id}" title="Eliminar establecimiento" aria-label="Eliminar ${escape(f.nombre)}">${ICONOS.delete}</button>
         </div>` : '';
-      return `<div class="card col-4 card-pad-md" data-search-text="${escape(String(f.nombre || '').toLowerCase())}">
+      return `<div class="card col-4 card-pad-md card-clickable" data-est-open="${f.id}" data-est-name="${escape(f.nombre)}" data-search-text="${escape(String(f.nombre || '').toLowerCase())}">
         <div class="card-h" style="align-items: center;">
           <div style="display: flex; align-items: center; gap: var(--s-3); min-width: 0;">
             <div class="tx-ico" style="background: var(--primary-container); color: var(--on-primary-container);">${icoEst}</div>
@@ -3989,8 +4005,9 @@ async function renderEstablecimientos() {
         </div>
       </div>`;
     }).join('');
-    $$('[data-est-edit]', $('#estList')).forEach(b => b.addEventListener('click', () => openEstablecimiento(b.dataset.estEdit)));
-    $$('[data-est-del]', $('#estList')).forEach(b => b.addEventListener('click', () => borrarEstablecimiento(b.dataset.estDel)));
+    $$('[data-est-open]', $('#estList')).forEach(b => b.addEventListener('click', () => openEstablecimientoTxList(b.dataset.estOpen, b.dataset.estName)));
+    $$('[data-est-edit]', $('#estList')).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); openEstablecimiento(b.dataset.estEdit); }));
+    $$('[data-est-del]', $('#estList')).forEach(b => b.addEventListener('click', (e) => { e.stopPropagation(); borrarEstablecimiento(b.dataset.estDel); }));
     aplicarFiltroLista_($('#estSearch'), $('#estList'));
 }
 
@@ -4003,6 +4020,55 @@ async function borrarEstablecimiento(id) {
     toast('Establecimiento eliminado');
   } catch (e) { toast('Error: ' + e.message); }
 }
+
+function txRowSimple(t) {
+  const cat = Estado.bootstrap.categorias.find(c => c.id === t.categoria_id);
+  const cta = Estado.bootstrap.cuentas.find(c => c.id === t.cuenta_id);
+  const sub = (cta && t.subcuenta_id) ? (cta.subcuentas || []).find(s => s.id === t.subcuenta_id) : null;
+  const isTransfer = t.tipo === 'transferencia';
+  const tipoVisual = isTransfer ? tipoTransferenciaPresupuestoUI_(t.cuenta_id, t.cuenta_destino_id) : t.tipo;
+  const sign = tipoVisual === 'ingreso' ? '+' : (tipoVisual === 'gasto' ? '-' : '');
+  const cls = tipoVisual === 'ingreso' ? 'pos' : (tipoVisual === 'gasto' ? 'neg' : 'neutral');
+  const origen = escape(cta ? cta.nombre : '—') + (sub ? ' · ' + escape(sub.nombre) : '');
+  const detalle = isTransfer
+    ? origen + ' → transferencia'
+    : origen + ' · ' + escape(cat ? cat.nombre : '—');
+  return `<div class="tx-row tx-row-simple">
+    <div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoCat(cat)}</div>
+    <div class="tx-main">
+      <div class="tx-title">${escape(t.descripcion || (cat ? cat.nombre : 'Sin descripción'))}</div>
+      <div class="tx-sub">${escape(t.fecha || '')} · ${detalle}</div>
+    </div>
+    <div class="tx-amount ${cls}">${sign}${fmtMoneda(t.importe, t.moneda || (cta ? cta.moneda : 'EUR'))}</div>
+  </div>`;
+}
+
+async function openEstablecimientoTxList(id, nombre) {
+  const { anio, mes } = Estado.estMes;
+  $('#sheetEstTxListTitle').textContent = nombre || 'Sin establecimiento';
+  $('#sheetEstTxListSub').textContent = '';
+  $('#estTxList').innerHTML = loadingBlockHtml('Cargando transacciones...');
+  openSheet('sheetEstTxList');
+  if (!transaccionesCompletasEnMemoria_()) {
+    const ok = await sincronizarTransacciones({ render: false, toastOnError: true });
+    if (!ok) {
+      $('#estTxList').innerHTML = emptyHtml('No se pudo cargar', 'Reintenta cuando tengas conexión.');
+      return;
+    }
+  }
+  const periodo = anio + '-' + String(mes).padStart(2, '0');
+  const target = String(id || '');
+  const lista = (Estado.bootstrap.transacciones || [])
+    .filter(t => String(t.establecimiento_id || '') === target && String(t.fecha).slice(0, 7) === periodo)
+    .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  const mesLabel = new Date(anio, mes - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  $('#sheetEstTxListSub').textContent = lista.length + ' transaccion' + (lista.length === 1 ? '' : 'es') + ' · ' + mesLabel;
+  $('#estTxList').innerHTML = lista.length
+    ? lista.map(txRowSimple).join('')
+    : '<div class="body-sm" style="padding: var(--s-4); color: var(--on-surface-variant);">Sin transacciones en este período.</div>';
+}
+
+$('#estTxListClose').addEventListener('click', closeAllSheets);
 
 $$('[data-est-nav]').forEach(b => b.addEventListener('click', () => {
   let { anio, mes } = Estado.estMes;
