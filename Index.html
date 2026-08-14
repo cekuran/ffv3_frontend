@@ -1710,7 +1710,6 @@ function faviconImgEst_(est, size) {
   return `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=${px}" alt="" width="${px}" height="${px}" style="border-radius: 4px; object-fit: contain;" onerror="this.replaceWith(document.createTextNode(''))">`;
 }
 function _assert_(cond, msg) { if (!cond) { try { console.error('[assert]', msg); } catch (_) {} } }
-}
 
 const CAT_ICON_GROUPS = [
   ['General', ['category']],
