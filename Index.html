@@ -1060,9 +1060,12 @@
         </div>
       </div>
 
+      <div style="margin-bottom: var(--s-3);">
+        <h2 style="font-size: 20px; line-height: 28px; font-weight: 600; margin: 0 0 var(--s-3) 0;">Gastos por categoría</h2>
+        <input class="input" type="search" id="presCatsSearch" placeholder="Buscar categoría…">
+      </div>
       <div class="bento">
         <div class="card col-12">
-          <div class="card-h"><h2>Gastos por categoría</h2></div>
           <div id="presCats" style="display: flex; flex-direction: column; gap: var(--s-4);"></div>
         </div>
       </div>
@@ -1757,6 +1760,9 @@ function faviconImgEst_(est, size) {
 // pero las vistas siempre las muestran alfabéticas.
 function subsAlfabetico_(subs) {
   return (subs || []).slice().sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
+}
+function catsAlfabetico_(cats) {
+  return (cats || []).slice().sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
 }
 function _assert_(cond, msg) { if (!cond) { try { console.error('[assert]', msg); } catch (_) {} } }
 // ponytail: prioriza el favicon del establecimiento sobre el icono de categoría.
@@ -3422,9 +3428,9 @@ function tipoTransferenciaPresupuestoUI_(cuentaOrigenId, cuentaDestinoId) {
 function categoriasTransferenciaSegunDireccion_(cuentaOrigenId, cuentaDestinoId) {
   const tipo = tipoTransferenciaPresupuestoUI_(cuentaOrigenId, cuentaDestinoId);
   if (tipo === 'gasto' || tipo === 'ingreso') {
-    return Estado.bootstrap.categorias.filter(c => c.tipo === tipo);
+    return catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === tipo));
   }
-  return Estado.bootstrap.categorias.slice();
+  return catsAlfabetico_(Estado.bootstrap.categorias);
 }
 
 function syncCategoriasTransferenciaTx_(categoriaPreferida) {
@@ -4003,7 +4009,8 @@ async function doConciliar() {
 }
 
 function renderCategorias() {
-  const cats = Estado.bootstrap.categorias;
+  // ponytail: vista alfabética; el backend guarda orden manual via drag-reorder.
+  const cats = [...Estado.bootstrap.categorias].sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
   $('#catList').innerHTML = cats.length ? cats.map(c => `
     <div class="card col-4 card-pad-md cat-card" draggable="true" data-cat-id="${c.id}">
       <div class="tx-ico" style="${tintCat(c.color)}">${icoCat(c)}</div>
@@ -4108,9 +4115,9 @@ function txRowSimple(t) {
   </div>`;
 }
 
-async function openEstablecimientoTxList(id, nombre) {
-  const { anio, mes } = Estado.estMes;
-  $('#sheetEstTxListTitle').textContent = nombre || 'Sin establecimiento';
+async function openMonthTxList_(mesState, titulo, matchFn, mutateRow) {
+  const { anio, mes } = mesState;
+  $('#sheetEstTxListTitle').textContent = titulo;
   $('#sheetEstTxListSub').textContent = '';
   $('#estTxList').innerHTML = loadingBlockHtml('Cargando transacciones...');
   openSheet('sheetEstTxList');
@@ -4122,15 +4129,54 @@ async function openEstablecimientoTxList(id, nombre) {
     }
   }
   const periodo = anio + '-' + String(mes).padStart(2, '0');
-  const target = String(id || '');
   const lista = (Estado.bootstrap.transacciones || [])
-    .filter(t => String(t.establecimiento_id || '') === target && String(t.fecha).slice(0, 7) === periodo)
+    .filter(t => String(t.fecha).slice(0, 7) === periodo && matchFn(t))
     .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  const display = mutateRow ? lista.map(mutateRow) : lista;
   const mesLabel = new Date(anio, mes - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
   $('#sheetEstTxListSub').textContent = lista.length + ' transaccion' + (lista.length === 1 ? '' : 'es') + ' · ' + mesLabel;
   $('#estTxList').innerHTML = lista.length
-    ? lista.map(txRowSimple).join('')
+    ? display.map(txRowSimple).join('')
     : '<div class="body-sm" style="padding: var(--s-4); color: var(--on-surface-variant);">Sin transacciones en este período.</div>';
+}
+
+function openEstablecimientoTxList(id, nombre) {
+  const target = String(id || '');
+  return openMonthTxList_(Estado.estMes, nombre || 'Sin establecimiento',
+    t => String(t.establecimiento_id || '') === target);
+}
+
+function openCategoriaTxList(id, nombre, tipo) {
+  const target = String(id || '');
+  // ponytail: una transferencia puede repartir su importe a varias categorías
+  // destino vía reparto_destino[].categoria_id (mismo criterio que
+  // calcularCategoriasResumenLocal_), así que también incluimos las que tocan
+  // esta categoría por reparto y cuya dirección de presupuesto coincide con
+  // el tipo (gasto/ingreso). "neutro" (activo↔activo o pasivo↔pasivo) no
+  // cuenta en el real del presupuesto y queda fuera.
+  // Para cada transfer matched vía reparto, mostramos el parcial asignado a
+  // esta categoría (no el importe total) y etiquetamos "(parcial)" en la
+  // descripción para que sea evidente.
+  return openMonthTxList_(Estado.pres, nombre, t => {
+    if (String(t.categoria_id || '') === target && t.tipo === tipo) return true;
+    if (t.tipo !== 'transferencia') return false;
+    if (tipoTransferenciaPresupuestoUI_(t.cuenta_id, t.cuenta_destino_id) !== tipo) return false;
+    const rep = parseRepartoFromTx_(t) || [];
+    return rep.some(r => r.categoria_id === id);
+  }, t => {
+    if (t.tipo !== 'transferencia') return t;
+    const rep = parseRepartoFromTx_(t) || [];
+    // ponytail: una transferencia puede repartir a varias subcuentas con la
+    // MISMA categoria_id. calcularCategoriasResumenLocal_ suma todos los
+    // parciales para esa categoria, así que el modal debe sumar también para
+    // que el importe de la fila coincida con lo que aporta al "real" del
+    // presupuesto. Mostramos UNA sola fila por transferencia.
+    const parcial = rep.filter(x => x.categoria_id === id)
+      .reduce((s, x) => s + Number(x.importe || 0), 0);
+    if (!(parcial > 0)) return t;
+    const desc = t.descripcion ? `${t.descripcion} (parcial)` : 'Transferencia (parcial)';
+    return Object.assign({}, t, { importe: parcial, descripcion: desc });
+  });
 }
 
 $('#estTxListClose').addEventListener('click', closeAllSheets);
@@ -4200,13 +4246,13 @@ async function renderPresupuesto() {
   $('#presRec').textContent = fmtMoneda(-recVal);
   $('#presRec').style.color = recVal > 0 ? 'var(--error)' : (recVal < 0 ? 'var(--primary)' : 'var(--on-surface)');
 
-  const cats = Estado.bootstrap.categorias.filter(c => c.tipo === 'gasto');
+  const cats = catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === 'gasto'));
   $('#presCats').innerHTML = cats.map(c => {
     const r = resumenCats.find(x => x.id === c.id) || { esperado: 0, real: 0, diferencia: 0 };
     const presupuesto = Estado.bootstrap.presupuestos.find(x => x.categoria_id === c.id);
     const p = r.esperado > 0 ? Math.min(100, Math.round((r.real / r.esperado) * 100)) : 0;
     const cls = p >= 100 ? 'danger' : (p >= 80 ? 'warn' : '');
-    return `<div>
+    return `<div class="card-clickable" data-cat-open="${c.id}" data-cat-name="${escape(c.nombre)}" data-cat-tipo="gasto" data-search-text="${escape(String(c.nombre || '').toLowerCase())}">
       <div class="ppto-row">
         <div class="ppto-row-l">
           <div class="tx-ico" style="${tintCat(c.color)}; width: 32px; height: 32px;">${icoCat(c)}</div>
@@ -4223,7 +4269,7 @@ async function renderPresupuesto() {
     </div>`;
   }).join('');
 
-  const catsIng = Estado.bootstrap.categorias.filter(c => c.tipo === 'ingreso');
+  const catsIng = catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === 'ingreso'));
   const PALETA_BAR = ['#00613e', '#0050af', '#d27b1b', '#b13c68', '#7c4dff', '#00838f', '#e53935', '#6a1b9a'];
   const realIngPorCat = catsIng
     .map(c => {
@@ -4244,7 +4290,7 @@ async function renderPresupuesto() {
     <div style="display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-3);">
       ${realIngPorCat.map(({ cat: c, real, barColor }) => {
         const pct = totalIng > 0 ? Math.round((real / totalIng) * 100) : 0;
-        return `<div style="display: flex; align-items: center; gap: var(--s-3);">
+        return `<div class="card-clickable" data-cat-open="${c.id}" data-cat-name="${escape(c.nombre)}" data-cat-tipo="ingreso" style="display: flex; align-items: center; gap: var(--s-3); padding: 4px 6px; border-radius: var(--r-md);">
           <span style="width: 12px; height: 12px; border-radius: 3px; background: ${barColor}; flex-shrink: 0;"></span>
           <span class="body-sm" style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escape(c.nombre)}</span>
           <span class="body-sm data-tabular" style="color: var(--on-surface-variant); white-space: nowrap;">${pct}% · ${fmtMoneda(real)}</span>
@@ -4252,6 +4298,10 @@ async function renderPresupuesto() {
       }).join('')}
     </div>
   `;
+
+  $$('[data-cat-open]', $('#presCats')).forEach(b => b.addEventListener('click', () => openCategoriaTxList(b.dataset.catOpen, b.dataset.catName, b.dataset.catTipo)));
+  $$('[data-cat-open]', $('#presIngresos')).forEach(b => b.addEventListener('click', () => openCategoriaTxList(b.dataset.catOpen, b.dataset.catName, b.dataset.catTipo)));
+  $$('[data-ppto-cat]').forEach(i => i.addEventListener('click', e => e.stopPropagation()));
 }
 
 $$('[data-nav]').forEach(b => b.addEventListener('click', () => {
@@ -4313,7 +4363,7 @@ function openTx(id) {
   poblarSelect('#txCuenta', Estado.bootstrap.cuentas, f.cuenta_id, c => c.nombre + ' (' + c.moneda + ')');
   poblarSelect('#txCuentaDest', Estado.bootstrap.cuentas, f.cuenta_destino_id, c => c.nombre + ' (' + c.moneda + ')');
   if ((f.tipo || 'gasto') !== 'transferencia') {
-    const cats = Estado.bootstrap.categorias.filter(c => c.tipo === (f.tipo || 'gasto'));
+    const cats = catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === (f.tipo || 'gasto')));
     poblarSelect('#txCategoria', cats, f.categoria_id, c => c.nombre);
   }
   poblarSelect('#txEstablecimiento', Estado.bootstrap.establecimientos, Estado.txTipo === 'transferencia' ? '' : (f.establecimiento_id || ''), e => e.nombre);
@@ -4364,7 +4414,7 @@ function setTipoTx(tipo) {
   if (tipo === 'transferencia') {
     syncCategoriasTransferenciaTx_('');
   } else {
-    const cats = Estado.bootstrap.categorias.filter(c => c.tipo === tipo);
+    const cats = catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === tipo));
     poblarSelect('#txCategoria', cats, '', c => c.nombre);
   }
   const lblCat = $('#wrapCategoria label');
@@ -5328,7 +5378,7 @@ function hasRepartoDestino_(preferred) {
 function poblarCategoriasRecurrente(tipo, categoriaId, cuentaOrigenId, cuentaDestinoId) {
   const cats = tipo === 'transferencia'
     ? categoriasTransferenciaSegunDireccion_(cuentaOrigenId || $('#recCuenta').value, cuentaDestinoId || $('#recCuentaDest').value)
-    : Estado.bootstrap.categorias.filter(c => c.tipo === tipo);
+    : catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === tipo));
   poblarSelect('#recCat', cats, categoriaId || '', c => c.nombre);
 }
 
@@ -5571,7 +5621,7 @@ function poblarFiltros() {
   if (usuarioSinHojas_() && ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') !== 'admin') return;
   poblarSelect('#filtroCuenta', Estado.bootstrap.cuentas, Estado.filtros.cuenta_id, c => c.nombre);
   $('#filtroTipo').value = Estado.filtros.tipo;
-  $('#filtroCategoria').innerHTML = '<option value="">Todas</option>' + Estado.bootstrap.categorias.map(c =>
+  $('#filtroCategoria').innerHTML = '<option value="">Todas</option>' + catsAlfabetico_(Estado.bootstrap.categorias).map(c =>
     `<option value="${c.id}" ${c.id === Estado.filtros.categoria_id ? 'selected' : ''}>${escape(c.nombre)}</option>`
   ).join('');
   $('#filtroDesde').value = Estado.filtros.desde;
@@ -5630,7 +5680,7 @@ const DASH_FILTRO_KEY = {
 function poblarDashFiltros_() {
   $('#dashFiltroTipo').value = Estado.filtros.tipo;
   poblarSelect('#dashFiltroCuenta', Estado.bootstrap.cuentas, Estado.filtros.cuenta_id, c => c.nombre);
-  $('#dashFiltroCategoria').innerHTML = '<option value="">Todas</option>' + Estado.bootstrap.categorias.map(c =>
+  $('#dashFiltroCategoria').innerHTML = '<option value="">Todas</option>' + catsAlfabetico_(Estado.bootstrap.categorias).map(c =>
     `<option value="${c.id}" ${c.id === Estado.filtros.categoria_id ? 'selected' : ''}>${escape(c.nombre)}</option>`
   ).join('');
   $('#dashFiltroQ').value = Estado.filtros.q;
@@ -5807,13 +5857,14 @@ $('#btnNuevoEst').addEventListener('click', () => openEstablecimiento());
 function aplicarFiltroLista_(input, list) {
   if (!input || !list) return;
   const q = (input.value || '').trim().toLowerCase();
-  $$('#' + list.id + ' > .card').forEach(el => {
+  $$('#' + list.id + ' > *').forEach(el => {
     const text = el.dataset.searchText || (el.querySelector('.title-sm') ? el.querySelector('.title-sm').textContent.toLowerCase() : '');
     el.style.display = !q || text.indexOf(q) >= 0 ? '' : 'none';
   });
 }
 $('#catSearch').addEventListener('input', () => aplicarFiltroLista_($('#catSearch'), $('#catList')));
 $('#estSearch').addEventListener('input', () => aplicarFiltroLista_($('#estSearch'), $('#estList')));
+$('#presCatsSearch').addEventListener('input', () => aplicarFiltroLista_($('#presCatsSearch'), $('#presCats')));
 $('#btnNuevoRec').addEventListener('click', () => openRec());
 $('#btnConciliarTop').addEventListener('click', () => go('conciliar'));
 $('#cfgHojaSelect').addEventListener('change', (e) => cambiarHojaActivaUI(e.target.value));
