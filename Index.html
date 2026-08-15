@@ -3477,7 +3477,7 @@ function renderCuentas() {
             <div class="subcta-name">${escape(s.nombre)}</div>
           </div>
           <div class="subcta-bottom">
-            <div class="subcta-balance">${fmtMoneda(s.saldo, c.moneda)}</div>
+            <div class="subcta-balance" style="color: ${Number(s.saldo || 0) < 0 ? 'var(--error)' : 'inherit'};">${fmtMoneda(s.saldo, c.moneda)}</div>
             <div class="subcta-actions">
               <button class="icon-btn" data-sub-edit="${s.id}" data-sub-parent="${c.id}" title="Editar subcuenta">${ICONOS.edit}</button>
               <button class="icon-btn" data-sub-del="${s.id}" data-sub-parent="${c.id}" title="Eliminar subcuenta">${ICONOS.delete}</button>
@@ -3519,7 +3519,7 @@ function openCuentasDetalle(cuentaId) {
         <div class="subcta-name">${escape(s.nombre)}</div>
       </div>
       <div class="subcta-bottom">
-        <div class="subcta-balance">${fmtMoneda(s.saldo, c.moneda)}</div>
+        <div class="subcta-balance" style="color: ${Number(s.saldo || 0) < 0 ? 'var(--error)' : 'inherit'};">${fmtMoneda(s.saldo, c.moneda)}</div>
         <div class="subcta-actions">
           <button class="icon-btn" data-detalle-sub-edit="${s.id}" data-detalle-parent="${c.id}" title="Editar subcuenta">${ICONOS.edit}</button>
           <button class="icon-btn" data-detalle-sub-del="${s.id}" data-detalle-parent="${c.id}" title="Eliminar subcuenta">${ICONOS.delete}</button>
