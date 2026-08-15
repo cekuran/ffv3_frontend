@@ -1753,6 +1753,11 @@ function faviconImgEst_(est, size) {
   // de display con object-fit:contain. Cubre retina/HiDPI sin caché por tamaño.
   return `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64" alt="" width="${px}" height="${px}" style="border-radius: 4px; object-fit: contain;" onerror="this.replaceWith(document.createTextNode(''))">`;
 }
+// ponytail: el backend guarda un `orden` por subcuenta (drag-reorder),
+// pero las vistas siempre las muestran alfabéticas.
+function subsAlfabetico_(subs) {
+  return (subs || []).slice().sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
+}
 function _assert_(cond, msg) { if (!cond) { try { console.error('[assert]', msg); } catch (_) {} } }
 // ponytail: prioriza el favicon del establecimiento sobre el icono de categoría.
 function icoMov_(cat, establecimiento, size) {
@@ -3445,7 +3450,7 @@ function renderCuentas() {
   $('#cuentasList').innerHTML = cuentas.length ? cuentas.map(c => {
     const estCta = Estado.bootstrap.establecimientos.find(e => e.id === c.establecimiento_id);
     const icoCta = faviconHostEst_(estCta) ? faviconImgEst_(estCta, 36) : (ICONOS[c.icono] || ICONOS.account_balance_wallet);
-    const subs = c.subcuentas || [];
+    const subs = subsAlfabetico_(c.subcuentas);
     const expanded = Estado.cuentasExpandidas.has(c.id);
     const visSubs = (subs.length > 5 && !expanded) ? subs.slice(0, 5) : subs;
     const oculto = subs.length - visSubs.length;
@@ -3505,7 +3510,7 @@ function renderCuentas() {
 function openCuentasDetalle(cuentaId) {
   const c = Estado.bootstrap.cuentas.find(x => x.id === cuentaId);
   if (!c) return;
-  const subs = c.subcuentas || [];
+  const subs = subsAlfabetico_(c.subcuentas);
   $('#sheetCuentasDetalleTitle').textContent = c.nombre + ' — Subcuentas';
   $('#sheetCuentasDetalleSub').textContent = `${subs.length} subcuenta${subs.length === 1 ? '' : 's'} · ${fmtMoneda(c.saldo, c.moneda)}`;
   $('#sheetCuentasDetalleList').innerHTML = subs.map(s => `
@@ -4377,7 +4382,7 @@ function actualizarSubcuentasTx(preferred) {
 
   // Subcuenta de origen: visible siempre que la cuenta de origen tenga subcuentas.
   const cta = Estado.bootstrap.cuentas.find(c => c.id === $('#txCuenta').value);
-  const subs = (cta && cta.subcuentas) || [];
+  const subs = subsAlfabetico_(cta && cta.subcuentas);
   const visOrigen = subs.length > 0;
   $('#wrapSubcuenta').style.display = visOrigen ? '' : 'none';
   const lblO = $('#wrapSubcuenta label');
@@ -4405,7 +4410,7 @@ function actualizarSubcuentasTx(preferred) {
   // Reparto destino: solo transferencias; si la cuenta destino tiene subcuentas,
   // se muestra la lista dinámica para repartir el importe entre varias.
   const ctaD = Estado.bootstrap.cuentas.find(c => c.id === $('#txCuentaDest').value);
-  const subsD = (ctaD && ctaD.subcuentas) || [];
+  const subsD = subsAlfabetico_(ctaD && ctaD.subcuentas);
   // ponytail: misma cuenta → la subcuenta de origen no puede ser destino.
   const subOrigenId = $('#txSubcuenta').value;
   const sameParent = !!sourceId && sourceId === (ctaD && ctaD.id);
@@ -4592,7 +4597,7 @@ function buildRepartoRow(subsD, row, idx) {
 
 function addRepartoRow() {
   const ctaD = Estado.bootstrap.cuentas.find(c => c.id === $('#txCuentaDest').value);
-  const subsD = (ctaD && ctaD.subcuentas) || [];
+  const subsD = subsAlfabetico_(ctaD && ctaD.subcuentas);
   if (!subsD.length) { toast('La cuenta destino no tiene subcuentas'); return; }
   Estado.txRepartoDest.push({ subcuenta_id: '', importe: 0, categoria_id: '', periodo_uso: Number($('#txRecPeriodoMeses').value || 1), monto_a_usar: 0 });
   renderRepartoRows(subsD, Estado.txRepartoDest);
@@ -4660,7 +4665,7 @@ $('#txRecurrenteSwitch').addEventListener('change', e => {
 $('#txRecPeriodoMeses').addEventListener('input', () => {
   if (!isTransferenciaRecurrenteTx_()) return;
   const ctaD = Estado.bootstrap.cuentas.find(c => c.id === $('#txCuentaDest').value);
-  const subsD = (ctaD && ctaD.subcuentas) || [];
+  const subsD = subsAlfabetico_(ctaD && ctaD.subcuentas);
   syncImporteTxDesdeRepartoRecurrente_();
   renderRepartoRows(subsD, Estado.txRepartoDest);
   actualizarTotalReparto();
@@ -5263,7 +5268,7 @@ function buildRepartoRowRec(subsD, row, idx) {
 }
 function addRepartoRowRec() {
   const ctaD = Estado.bootstrap.cuentas.find(c => c.id === $('#recCuentaDest').value);
-  const subsD = (ctaD && ctaD.subcuentas) || [];
+  const subsD = subsAlfabetico_(ctaD && ctaD.subcuentas);
   if (!subsD.length) { toast('La cuenta destino no tiene subcuentas'); return; }
   Estado.repRecDest.push({ subcuenta_id: '', importe: 0, categoria_id: '', periodo_uso: Number($('#recPer').value || 1), monto_a_usar: 0 });
   renderRepartoRowsRec(subsD, Estado.repRecDest);
@@ -5338,7 +5343,7 @@ function actualizarDestinoRecurrente(preferred) {
   const cuentaOrigenId = $('#recCuenta').value || '';
   // ponytail: subcuenta origen visible en gasto/ingreso cuando la cuenta tiene.
   const ctaO = Estado.bootstrap.cuentas.find(c => c.id === cuentaOrigenId);
-  const subsO = (ctaO && ctaO.subcuentas) || [];
+  const subsO = subsAlfabetico_(ctaO && ctaO.subcuentas);
   const wrapRecSubcuenta = $('#wrapRecSubcuenta');
   const recSubcuentaSel = $('#recSubcuenta');
   const visSubOrigen = tipo !== 'transferencia' && subsO.length > 0;
@@ -5376,7 +5381,7 @@ function actualizarDestinoRecurrente(preferred) {
   ).join('');
 
   const ctaD = Estado.bootstrap.cuentas.find(c => c.id === cuentaDestinoValida);
-  const subsD = (ctaD && ctaD.subcuentas) || [];
+  const subsD = subsAlfabetico_(ctaD && ctaD.subcuentas);
   // ponytail: misma cuenta → la subcuenta de origen no puede ser destino. El
   // rec sheet no expone un dropdown de subcuenta origen; solo viene en la
   // plantilla al editar.
@@ -5477,7 +5482,7 @@ $('#recCuentaDest').addEventListener('change', () => {
 $('#recPer').addEventListener('input', () => {
   if ($('#recTipo').value !== 'transferencia') return;
   const ctaD = Estado.bootstrap.cuentas.find(c => c.id === $('#recCuentaDest').value);
-  const subsD = (ctaD && ctaD.subcuentas) || [];
+  const subsD = subsAlfabetico_(ctaD && ctaD.subcuentas);
   syncImporteRecDesdeReparto_();
   renderRepartoRowsRec(subsD, Estado.repRecDest);
   actualizarTotalRepartoRec();
@@ -5586,7 +5591,7 @@ const FILTRO_KEY = {
 function actualizarFiltroSubcuenta() {
   const ctaId = $('#filtroCuenta').value;
   const cta = Estado.bootstrap.cuentas.find(c => c.id === ctaId);
-  const subs = (cta && cta.subcuentas) || [];
+  const subs = subsAlfabetico_(cta && cta.subcuentas);
   const visible = subs.length > 0;
   $('#wrapFiltroSubcuenta').style.display = visible ? '' : 'none';
   const sel = $('#filtroSubcuenta');
