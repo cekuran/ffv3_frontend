@@ -2320,7 +2320,10 @@ function calcularCategoriasResumenLocal_(anio, mes) {
       if (t.tipo === 'transferencia') return false;
       if (t.categoria_id !== c.id) return false;
       return txEnMes_(t, a, m);
-    }).reduce((s, t) => s + Number(t.importe || 0), 0) + (porCatRep[c.id] || 0);
+    }).reduce((s, t) => {
+      const imp = Number(t.importe || 0);
+      return s + (t.tipo === 'devolucion' ? -imp : imp);
+    }, 0) + (porCatRep[c.id] || 0);
     return { id: c.id, nombre: c.nombre, color: c.color, esperado, real, diferencia: real - esperado };
   });
 }
@@ -4185,13 +4188,6 @@ function openCategoriaTxList(id, nombre, tipo) {
     const rep = parseRepartoFromTx_(t) || [];
     return rep.some(r => r.categoria_id === id);
   }, t => {
-    if (t.tipo === 'devolucion') {
-      // ponytail: en el modal de categoría la devolución resta del real; la
-      // pintamos como un gasto (−, rojo) y prefijamos la descripción para
-      // distinguirla de un gasto normal.
-      const base = t.descripcion || 'Devolución';
-      return Object.assign({}, t, { tipo: 'gasto', descripcion: '(devolución) ' + base });
-    }
     if (t.tipo !== 'transferencia') return t;
     const rep = parseRepartoFromTx_(t) || [];
     // ponytail: una transferencia puede repartir a varias subcuentas con la
