@@ -316,8 +316,9 @@
   .input:focus, .select:focus, .textarea:focus { border-color: var(--primary); background: var(--surface-container-lowest); }
   .textarea { min-height: 80px; resize: vertical; }
 
-  .seg { display: inline-flex; padding: 4px; background: var(--surface-container-low); border-radius: var(--r-md); }
-  .seg button { padding: 8px 16px; border-radius: var(--r-sm); font-weight: 600; color: var(--on-surface-variant); }
+  .seg { display: flex; flex-wrap: wrap; padding: 4px; gap: 8px; background: var(--surface-container-low); border-radius: var(--r-md); }
+  .seg button { padding: 6px 8px; border-radius: var(--r-sm); font-weight: 600; font-size: 13px; white-space: nowrap; color: var(--on-surface-variant); flex: 1 1 0; min-width: 0; }
+  @media (max-width: 600px) { .seg { display: grid; grid-template-columns: 1fr 1fr; } }
   .seg button.is-on { background: var(--primary); color: var(--on-primary); }
 
   .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
@@ -1344,10 +1345,10 @@
   <div class="sheet-handle"></div>
   <h3 id="sheetTxTitle">Nueva transacción</h3>
   <div class="seg" style="width: 100%; margin-bottom: var(--s-4);">
-    <button class="is-on" data-tx-tipo="gasto" style="flex:1;">Gasto</button>
-    <button data-tx-tipo="ingreso" style="flex:1;">Ingreso</button>
-    <button data-tx-tipo="transferencia" style="flex:1;">Transferencia</button>
-    <button data-tx-tipo="devolucion" style="flex:1;">Devolución</button>
+    <button class="is-on" data-tx-tipo="gasto" style="flex:1;min-width:0;">Gasto</button>
+    <button data-tx-tipo="ingreso" style="flex:1;min-width:0;">Ingreso</button>
+    <button data-tx-tipo="transferencia" style="flex:1;min-width:0;">Transferencia</button>
+    <button data-tx-tipo="devolucion" style="flex:1;min-width:0;">Devolución</button>
   </div>
   <form id="formTx" style="display: flex; flex-direction: column; gap: var(--s-2);">
     <input type="hidden" name="id" id="txId">
