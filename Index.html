@@ -4115,6 +4115,7 @@ async function borrarEstablecimiento(id) {
 
 function txRowSimple(t) {
   const cat = Estado.bootstrap.categorias.find(c => c.id === t.categoria_id);
+  const establecimiento = Estado.bootstrap.establecimientos.find(e => e.id === t.establecimiento_id);
   const cta = Estado.bootstrap.cuentas.find(c => c.id === t.cuenta_id);
   const sub = (cta && t.subcuenta_id) ? (cta.subcuentas || []).find(s => s.id === t.subcuenta_id) : null;
   const isTransfer = t.tipo === 'transferencia';
@@ -4129,7 +4130,7 @@ function txRowSimple(t) {
     ? origen + ' → transferencia'
     : origen + ' · ' + escape(cat ? cat.nombre : '—');
   return `<div class="tx-row tx-row-simple">
-    <div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoCat(cat)}</div>
+    <div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoMov_(cat, establecimiento)}</div>
     <div class="tx-main">
       <div class="tx-title">${escape(t.descripcion || (cat ? cat.nombre : 'Sin descripción'))}</div>
       <div class="tx-sub">${escape(t.fecha || '')} · ${detalle}</div>
