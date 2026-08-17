@@ -925,7 +925,7 @@
                     <span class="title-sm">Filtrar</span>
                     <button class="btn btn-ghost btn-sm" id="dashFilterClear" type="button">Limpiar</button>
                   </div>
-                  <div class="field"><label>Tipo</label><select class="select" id="dashFiltroTipo"><option value="">Todos</option><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option><option value="transferencia">Transferencia</option></select></div>
+                  <div class="field"><label>Tipo</label><select class="select" id="dashFiltroTipo"><option value="">Todos</option><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option><option value="transferencia">Transferencia</option><option value="devolucion">Devolución</option></select></div>
                   <div class="field"><label>Cuenta</label><select class="select" id="dashFiltroCuenta"><option value="">Todas</option></select></div>
                   <div class="field"><label>Categoría</label><select class="select" id="dashFiltroCategoria"><option value="">Todas</option></select></div>
                   <div class="field"><label>Búsqueda</label><input class="input" type="text" id="dashFiltroQ" placeholder="Buscar…"></div>
@@ -967,7 +967,7 @@
       <div class="card card-pad-md" style="margin-bottom: var(--s-4);">
         <div class="field-row" style="margin-bottom: var(--s-3);">
           <div class="field"><label>Cuenta</label><select class="select" id="filtroCuenta"><option value="">Todas</option></select></div>
-          <div class="field"><label>Tipo</label><select class="select" id="filtroTipo"><option value="">Todos</option><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option><option value="transferencia">Transferencia</option></select></div>
+          <div class="field"><label>Tipo</label><select class="select" id="filtroTipo"><option value="">Todos</option><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option><option value="transferencia">Transferencia</option><option value="devolucion">Devolución</option></select></div>
           <div class="field"><label>Categoría</label><select class="select" id="filtroCategoria"><option value="">Todas</option></select></div>
         </div>
         <div class="field-row" id="wrapFiltroSubcuenta" style="display: none; margin-bottom: var(--s-3);">
@@ -1347,6 +1347,7 @@
     <button class="is-on" data-tx-tipo="gasto" style="flex:1;">Gasto</button>
     <button data-tx-tipo="ingreso" style="flex:1;">Ingreso</button>
     <button data-tx-tipo="transferencia" style="flex:1;">Transferencia</button>
+    <button data-tx-tipo="devolucion" style="flex:1;">Devolución</button>
   </div>
   <form id="formTx" style="display: flex; flex-direction: column; gap: var(--s-2);">
     <input type="hidden" name="id" id="txId">
@@ -1518,6 +1519,7 @@
           <option value="gasto">Gasto</option>
           <option value="ingreso">Ingreso</option>
           <option value="transferencia">Transferencia</option>
+          <option value="devolucion">Devolución</option>
         </select>
       </div>
       <div class="field"><label>Cada (meses)</label><input class="input" type="number" min="1" max="12" name="periodo_meses" id="recPer" value="1" required></div>
@@ -2249,6 +2251,8 @@ function calcularResumenLocal_(anio, mes) {
   const enMes = txs.filter(t => txEnMes_(t, a, m));
   const ingresos = enMes.filter(t => t.tipo === 'ingreso').reduce((s, t) => s + Number(t.importe || 0), 0);
   const gastos = enMes.filter(t => t.tipo === 'gasto').reduce((s, t) => s + Number(t.importe || 0), 0);
+  // ponytail: devoluciones restan del total de gastos del mes (revierte gastos).
+  const devoluciones = enMes.filter(t => t.tipo === 'devolucion').reduce((s, t) => s + Number(t.importe || 0), 0);
   const transferenciasGasto = enMes
     .filter(t => t.tipo === 'transferencia' && tipoTransferenciaPresupuestoLocal_(t, cuentasById) === 'gasto')
     .reduce((s, t) => s + Number(t.importe || 0), 0);
@@ -2266,6 +2270,7 @@ function calcularResumenLocal_(anio, mes) {
       mes: k,
       ingresos: en.filter(t => t.tipo === 'ingreso').reduce((s, t) => s + Number(t.importe || 0), 0),
       gastos: en.filter(t => t.tipo === 'gasto').reduce((s, t) => s + Number(t.importe || 0), 0)
+              - en.filter(t => t.tipo === 'devolucion').reduce((s, t) => s + Number(t.importe || 0), 0)
     });
   }
   return {
@@ -2273,9 +2278,9 @@ function calcularResumenLocal_(anio, mes) {
     mes: m,
     ingresos,
     ingresosPresupuesto: ingresos + transferenciasIngreso,
-    gastos,
-    gastosPresupuesto: gastos + transferenciasGasto,
-    neto: ingresos - gastos,
+    gastos: gastos - devoluciones,
+    gastosPresupuesto: (gastos - devoluciones) + transferenciasGasto,
+    neto: ingresos - (gastos - devoluciones),
     pendiente,
     vencido,
     evol,
@@ -2286,7 +2291,7 @@ function calcularResumenLocal_(anio, mes) {
 function calcularCategoriasResumenLocal_(anio, mes) {
   const a = Number(anio || new Date().getFullYear());
   const m = Number(mes || (new Date().getMonth() + 1));
-  const txs = (Estado.bootstrap.transacciones || []).filter(t => ['gasto', 'ingreso', 'transferencia'].includes(t.tipo));
+  const txs = (Estado.bootstrap.transacciones || []).filter(t => ['gasto', 'ingreso', 'transferencia', 'devolucion'].includes(t.tipo));
   const ps = Estado.bootstrap.presupuestos || [];
   const cats = Estado.bootstrap.categorias || [];
   const catsById = {};
@@ -2335,11 +2340,13 @@ function calcularResumenEstablecimientosLocal_(anio, mes) {
   filas.forEach(f => { porId[f.id] = f; });
   const periodo = a + '-' + String(m).padStart(2, '0');
   (Estado.bootstrap.transacciones || [])
-    .filter(t => String(t.fecha).slice(0, 7) === periodo && (t.tipo === 'gasto' || t.tipo === 'ingreso'))
+    .filter(t => String(t.fecha).slice(0, 7) === periodo && (t.tipo === 'gasto' || t.tipo === 'ingreso' || t.tipo === 'devolucion'))
     .forEach(t => {
       const fila = porId[String(t.establecimiento_id || '')] || porId[''];
       if (!fila) return;
-      fila[t.tipo === 'ingreso' ? 'ingresos' : 'gastos'] += Number(t.importe || 0);
+      if (t.tipo === 'ingreso') fila.ingresos += Number(t.importe || 0);
+      else if (t.tipo === 'gasto') fila.gastos += Number(t.importe || 0);
+      else if (t.tipo === 'devolucion') fila.gastos -= Number(t.importe || 0); // ponytail: revierten gasto
     });
   filas.forEach(f => { f.neto = f.ingresos - f.gastos; });
   return { anio: a, mes: m, filas: filas };
@@ -2428,7 +2435,7 @@ function aplicarDeltaTxSobreCuentas_(cuentas, tx, factor) {
   const ctaOrigen = findCta(tx.cuenta_id);
   if (ctaOrigen) {
     let deltaOrigen = 0;
-    if (tipo === 'ingreso') deltaOrigen = importe;
+    if (tipo === 'ingreso' || tipo === 'devolucion') deltaOrigen = importe;
     else if (tipo === 'gasto' || tipo === 'transferencia') deltaOrigen = -importe;
 
     const subOrigen = findSub(ctaOrigen, tx.subcuenta_id);
@@ -3383,8 +3390,11 @@ function txRow(t) {
     ? (ctaD.subcuentas || []).find(s => s.id === t.subcuenta_destino_id)
     : null;
   const tipoVisual = isTransfer ? tipoTransferenciaPresupuestoUI_(t.cuenta_id, t.cuenta_destino_id) : t.tipo;
-  const sign = tipoVisual === 'ingreso' ? '+' : (tipoVisual === 'gasto' ? '-' : '');
-  const cls = tipoVisual === 'ingreso' ? 'pos' : (tipoVisual === 'gasto' ? 'neg' : 'neutral');
+  // ponytail: la devolución suma al saldo de la cuenta; la mostramos como +
+  // (verde) para que sea visualmente coherente con el efecto en cuenta.
+  const esIngresoVisual = tipoVisual === 'ingreso' || t.tipo === 'devolucion';
+  const sign = esIngresoVisual ? '+' : (tipoVisual === 'gasto' ? '-' : '');
+  const cls = esIngresoVisual ? 'pos' : (tipoVisual === 'gasto' ? 'neg' : 'neutral');
   const origen = escape(cta ? cta.nombre : '—') + (sub ? ' · ' + escape(sub.nombre) : '');
   const detalleDest = isTransfer
     ? (() => {
@@ -3625,8 +3635,11 @@ function renderMovimientos() {
       ? (ctaD.subcuentas || []).find(s => s.id === t.subcuenta_destino_id)
       : null;
     const tipoVisual = isTransfer ? tipoTransferenciaPresupuestoUI_(t.cuenta_id, t.cuenta_destino_id) : t.tipo;
-    const sign = tipoVisual === 'ingreso' ? '+' : (tipoVisual === 'gasto' ? '-' : '');
-    const color = tipoVisual === 'ingreso' ? 'var(--primary)' : (tipoVisual === 'gasto' ? 'var(--error)' : 'var(--on-surface-variant)');
+    // ponytail: la devolución se pinta como positivo (mismo color que un ingreso)
+    // porque devuelve dinero a la cuenta; el efecto en la categoría va aparte.
+    const esIngresoVisual = tipoVisual === 'ingreso' || t.tipo === 'devolucion';
+    const sign = esIngresoVisual ? '+' : (tipoVisual === 'gasto' ? '-' : '');
+    const color = esIngresoVisual ? 'var(--primary)' : (tipoVisual === 'gasto' ? 'var(--error)' : 'var(--on-surface-variant)');
     let destinoHtml;
     if (isTransfer && reparto.length) {
       destinoHtml = '<div class="body-sm" style="color: var(--on-surface-variant);">→ ' + escape(ctaD ? ctaD.nombre : '—') + '</div>'
@@ -3711,7 +3724,7 @@ function resumenRecurrentesPorFrecuencia_(recs) {
     const importe = Number(p.importe || 0);
     if (!(importe > 0)) return;
     if (!grupos[periodo]) {
-      grupos[periodo] = { periodo, gastos: 0, ingresos: 0, transferencias: 0, nGastos: 0, nIngresos: 0, nTransferencias: 0 };
+      grupos[periodo] = { periodo, gastos: 0, ingresos: 0, transferencias: 0, devoluciones: 0, nGastos: 0, nIngresos: 0, nTransferencias: 0, nDevoluciones: 0 };
     }
     const g = grupos[periodo];
     if (tipo === 'ingreso') { g.ingresos += importe; g.nIngresos++; }
@@ -3722,6 +3735,7 @@ function resumenRecurrentesPorFrecuencia_(recs) {
       else if (dir === 'ingreso') { g.ingresos += importe; g.nIngresos++; }
       else { g.transferencias += importe; g.nTransferencias++; }
     }
+    else if (tipo === 'devolucion') { g.devoluciones += importe; g.nDevoluciones++; } // ponytail: rune en su propio bucket
     else { g.gastos += importe; g.nGastos++; }
   });
   return Object.keys(grupos)
@@ -3794,8 +3808,10 @@ function renderRecurrentes() {
       return sd ? escape(sd.nombre) : '—';
     });
     const tipoVisual = isTransfer ? tipoTransferenciaPresupuestoUI_(p.cuenta_id, p.cuenta_destino_id) : p.tipo;
-    const sign = tipoVisual === 'ingreso' ? '+' : (tipoVisual === 'gasto' ? '-' : '');
-    const color = tipoVisual === 'ingreso' ? 'var(--primary)' : (tipoVisual === 'gasto' ? 'var(--error)' : 'var(--on-surface-variant)');
+    // ponytail: la devolución se pinta como positivo (mismo color que un ingreso).
+    const esIngresoVisual = tipoVisual === 'ingreso' || p.tipo === 'devolucion';
+    const sign = esIngresoVisual ? '+' : (tipoVisual === 'gasto' ? '-' : '');
+    const color = esIngresoVisual ? 'var(--primary)' : (tipoVisual === 'gasto' ? 'var(--error)' : 'var(--on-surface-variant)');
     const origenTxt = `${escape(cta ? cta.nombre : '—')}${sub ? ' · ' + escape(sub.nombre) : ''}`;
     const detalleCuenta = isTransfer
       ? `${origenTxt} → ${escape(ctaD ? ctaD.nombre : '—')}${subsDNombres.length ? ' (' + subsDNombres.join(', ') + ')' : ''}`
@@ -4099,8 +4115,11 @@ function txRowSimple(t) {
   const sub = (cta && t.subcuenta_id) ? (cta.subcuentas || []).find(s => s.id === t.subcuenta_id) : null;
   const isTransfer = t.tipo === 'transferencia';
   const tipoVisual = isTransfer ? tipoTransferenciaPresupuestoUI_(t.cuenta_id, t.cuenta_destino_id) : t.tipo;
-  const sign = tipoVisual === 'ingreso' ? '+' : (tipoVisual === 'gasto' ? '-' : '');
-  const cls = tipoVisual === 'ingreso' ? 'pos' : (tipoVisual === 'gasto' ? 'neg' : 'neutral');
+  // ponytail: la devolución suma al saldo de la cuenta; la mostramos como +
+  // (verde) para que sea visualmente coherente con el efecto en cuenta.
+  const esIngresoVisual = tipoVisual === 'ingreso' || t.tipo === 'devolucion';
+  const sign = esIngresoVisual ? '+' : (tipoVisual === 'gasto' ? '-' : '');
+  const cls = esIngresoVisual ? 'pos' : (tipoVisual === 'gasto' ? 'neg' : 'neutral');
   const origen = escape(cta ? cta.nombre : '—') + (sub ? ' · ' + escape(sub.nombre) : '');
   const detalle = isTransfer
     ? origen + ' → transferencia'
@@ -4363,7 +4382,9 @@ function openTx(id) {
   poblarSelect('#txCuenta', Estado.bootstrap.cuentas, f.cuenta_id, c => c.nombre + ' (' + c.moneda + ')');
   poblarSelect('#txCuentaDest', Estado.bootstrap.cuentas, f.cuenta_destino_id, c => c.nombre + ' (' + c.moneda + ')');
   if ((f.tipo || 'gasto') !== 'transferencia') {
-    const cats = catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === (f.tipo || 'gasto')));
+    // ponytail: la devolución debe elegir una categoría de gasto.
+    const catTipo = f.tipo === 'devolucion' ? 'gasto' : (f.tipo || 'gasto');
+    const cats = catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === catTipo));
     poblarSelect('#txCategoria', cats, f.categoria_id, c => c.nombre);
   }
   poblarSelect('#txEstablecimiento', Estado.bootstrap.establecimientos, Estado.txTipo === 'transferencia' ? '' : (f.establecimiento_id || ''), e => e.nombre);
@@ -4413,6 +4434,11 @@ function setTipoTx(tipo) {
   if (tipo === 'transferencia') $('#txEstablecimiento').value = '';
   if (tipo === 'transferencia') {
     syncCategoriasTransferenciaTx_('');
+  } else if (tipo === 'devolucion') {
+    // ponytail: la devolución debe ir contra una categoría de gasto
+    // (revierte un gasto); el backend lo valida igual si el usuario lo burla.
+    const cats = catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === 'gasto'));
+    poblarSelect('#txCategoria', cats, '', c => c.nombre);
   } else {
     const cats = catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === tipo));
     poblarSelect('#txCategoria', cats, '', c => c.nombre);
@@ -5378,7 +5404,7 @@ function hasRepartoDestino_(preferred) {
 function poblarCategoriasRecurrente(tipo, categoriaId, cuentaOrigenId, cuentaDestinoId) {
   const cats = tipo === 'transferencia'
     ? categoriasTransferenciaSegunDireccion_(cuentaOrigenId || $('#recCuenta').value, cuentaDestinoId || $('#recCuentaDest').value)
-    : catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === tipo));
+    : catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === (tipo === 'devolucion' ? 'gasto' : tipo)));
   poblarSelect('#recCat', cats, categoriaId || '', c => c.nombre);
 }
 
