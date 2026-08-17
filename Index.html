@@ -4177,12 +4177,21 @@ function openCategoriaTxList(id, nombre, tipo) {
   // esta categoría (no el importe total) y etiquetamos "(parcial)" en la
   // descripción para que sea evidente.
   return openMonthTxList_(Estado.pres, nombre, t => {
-    if (String(t.categoria_id || '') === target && t.tipo === tipo) return true;
+    // ponytail: la devolución reduce el real de la categoría de gasto; la
+    // mostramos también aquí para que la suma de filas cuadre con el real.
+    if (String(t.categoria_id || '') === target && (t.tipo === tipo || t.tipo === 'devolucion')) return true;
     if (t.tipo !== 'transferencia') return false;
     if (tipoTransferenciaPresupuestoUI_(t.cuenta_id, t.cuenta_destino_id) !== tipo) return false;
     const rep = parseRepartoFromTx_(t) || [];
     return rep.some(r => r.categoria_id === id);
   }, t => {
+    if (t.tipo === 'devolucion') {
+      // ponytail: en el modal de categoría la devolución resta del real; la
+      // pintamos como un gasto (−, rojo) y prefijamos la descripción para
+      // distinguirla de un gasto normal.
+      const base = t.descripcion || 'Devolución';
+      return Object.assign({}, t, { tipo: 'gasto', descripcion: '(devolución) ' + base });
+    }
     if (t.tipo !== 'transferencia') return t;
     const rep = parseRepartoFromTx_(t) || [];
     // ponytail: una transferencia puede repartir a varias subcuentas con la
