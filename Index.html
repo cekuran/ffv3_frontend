@@ -6479,7 +6479,7 @@ _assert_(faviconHostEst_({web: 'https://www.ejemplo.com/p'}) === 'www.ejemplo.co
 _assert_(faviconHostEst_({web: 'https://carrefour.es'}) === 'carrefour.es', 'faviconHostEst_ limpio');
 _assert_(faviconImgEst_({web: ''}, 32) === '', 'faviconImgEst_ vacío');
 _assert_(faviconImgEst_({web: 'https://x.com'}, 32).includes('google.com/s2/favicons'), 'faviconImgEst_ URL');
-_assert_(icoMov_({}, null).includes('category'), 'icoMov_ sin cat');
+_assert_(icoMov_({}, null).includes('<svg'), 'icoMov_ sin cat');
 // ponytail: el frontend NO normaliza (el backend lo hace). Si nos llega sin
 // esquema al front, devolvemos string vacío; el backend añadirá https://.
 </script>
