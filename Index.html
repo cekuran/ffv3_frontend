@@ -4113,7 +4113,7 @@ async function borrarEstablecimiento(id) {
   } catch (e) { toast('Error: ' + e.message); }
 }
 
-function txRowSimple(t) {
+function txRowSimple(t, opts) {
   const cat = Estado.bootstrap.categorias.find(c => c.id === t.categoria_id);
   const establecimiento = Estado.bootstrap.establecimientos.find(e => e.id === t.establecimiento_id);
   const cta = Estado.bootstrap.cuentas.find(c => c.id === t.cuenta_id);
@@ -4126,9 +4126,10 @@ function txRowSimple(t) {
   const sign = esIngresoVisual ? '+' : (tipoVisual === 'gasto' ? '-' : '');
   const cls = esIngresoVisual ? 'pos' : (tipoVisual === 'gasto' ? 'neg' : 'neutral');
   const origen = escape(cta ? cta.nombre : '—') + (sub ? ' · ' + escape(sub.nombre) : '');
+  const showEst = !!(opts && opts.showEstablecimiento) && !isTransfer && establecimiento;
   const detalle = isTransfer
     ? origen + ' → transferencia'
-    : origen + ' · ' + escape(cat ? cat.nombre : '—');
+    : origen + (showEst ? ' · ' + escape(establecimiento.nombre) : '') + ' · ' + escape(cat ? cat.nombre : '—');
   return `<div class="tx-row tx-row-simple">
     <div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoMov_(cat, establecimiento)}</div>
     <div class="tx-main">
@@ -4139,7 +4140,7 @@ function txRowSimple(t) {
   </div>`;
 }
 
-async function openMonthTxList_(mesState, titulo, matchFn, mutateRow) {
+async function openMonthTxList_(mesState, titulo, matchFn, mutateRow, opts) {
   const { anio, mes } = mesState;
   $('#sheetEstTxListTitle').textContent = titulo;
   $('#sheetEstTxListSub').textContent = '';
@@ -4160,7 +4161,7 @@ async function openMonthTxList_(mesState, titulo, matchFn, mutateRow) {
   const mesLabel = new Date(anio, mes - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
   $('#sheetEstTxListSub').textContent = lista.length + ' transaccion' + (lista.length === 1 ? '' : 'es') + ' · ' + mesLabel;
   $('#estTxList').innerHTML = lista.length
-    ? display.map(txRowSimple).join('')
+    ? display.map(t => txRowSimple(t, opts)).join('')
     : '<div class="body-sm" style="padding: var(--s-4); color: var(--on-surface-variant);">Sin transacciones en este período.</div>';
 }
 
@@ -4202,7 +4203,7 @@ function openCategoriaTxList(id, nombre, tipo) {
     if (!(parcial > 0)) return t;
     const desc = t.descripcion ? `${t.descripcion} (parcial)` : 'Transferencia (parcial)';
     return Object.assign({}, t, { importe: parcial, descripcion: desc });
-  });
+  }, { showEstablecimiento: true });
 }
 
 $('#estTxListClose').addEventListener('click', closeAllSheets);
