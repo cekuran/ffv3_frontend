@@ -4480,7 +4480,9 @@ function setTipoTx(tipo) {
   const lblCat = $('#wrapCategoria label');
   if (lblCat && tipo !== 'transferencia') lblCat.textContent = 'Categoría';
   if (tipo !== 'transferencia') Estado.txRepartoDest = [];
-  if (tipo === 'transferencia' && !$('#txRatio').value) $('#txRatio').value = '1';
+  // ponytail: devolucion con destino también usa ratio 1 por defecto (1:1) para
+  // que el campo importe_destino se autorrellene como en una transferencia.
+  if ((tipo === 'transferencia' || tipo === 'devolucion') && !$('#txRatio').value) $('#txRatio').value = '1';
   actualizarSubcuentasTx();
   syncDestino();
   actualizarTotalReparto();
@@ -4545,8 +4547,9 @@ function actualizarSubcuentasTx(preferred) {
     const selD = $('#txSubcuentaDest');
     const prevSubD = preferred ? preferred.subcuenta_destino_id : selD.value;
     const subDVal = subsD.some(s => s.id === prevSubD) ? prevSubD : '';
+    const subDFinal = subDVal || (preferred ? '' : subsD[0].id); // ponytail: primera subcuenta por defecto
     selD.innerHTML = '<option value="">— Ninguna —</option>' + subsD.map(s =>
-      `<option value="${s.id}" ${s.id === subDVal ? 'selected' : ''}>${escape(s.nombre)}</option>`
+      `<option value="${s.id}" ${s.id === subDFinal ? 'selected' : ''}>${escape(s.nombre)}</option>`
     ).join('');
   } else {
     $('#txSubcuentaDest').value = '';
@@ -4748,7 +4751,7 @@ function destinoTotalTx_() {
 
 function syncDestino() {
   updateConversionHint();
-  if (Estado.txTipo !== 'transferencia') return;
+  if (Estado.txTipo !== 'transferencia' && Estado.txTipo !== 'devolucion') return;
   const src = Number($('#txImporte').value || 0);
   const ratio = Number($('#txRatio').value || 0);
   if (ratio > 0) $('#txImporteDest').value = (src * ratio).toFixed(2);
@@ -4757,7 +4760,7 @@ function syncDestino() {
 function updateConversionHint() {
   const hint = $('#conversionHint');
   if (!hint) return;
-  if (Estado.txTipo !== 'transferencia') { hint.textContent = ''; return; }
+  if (Estado.txTipo !== 'transferencia' && Estado.txTipo !== 'devolucion') { hint.textContent = ''; return; }
   const src = Number($('#txImporte').value || 0);
   const ratio = Number($('#txRatio').value || 0);
   hint.textContent = fmtDec(src) + ' × ' + fmtRatio(ratio) + ' = ' + fmtDec(src * ratio);
