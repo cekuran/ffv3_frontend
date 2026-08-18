@@ -1365,6 +1365,7 @@
       <button type="button" class="btn btn-sm btn-outline" id="btnAddRepartoDest" style="margin-top: 6px; align-self: flex-start;">+ Añadir destino</button>
       <div id="repartoDestTotal" class="body-sm" style="margin-top: 6px; color: var(--on-surface-variant);">Total: 0,00 / 0,00 €</div>
     </div>
+    <div class="field" id="wrapSubcuentaDest" style="display: none;"><label>Subcuenta destino</label><select class="select" name="subcuenta_destino_id" id="txSubcuentaDest"><option value="">— Ninguna —</option></select></div>
     <div class="field" id="wrapCategoria"><label>Categoría</label><select class="select" name="categoria_id" id="txCategoria"></select></div>
     <div class="field" id="wrapEstablecimiento"><label>Establecimiento (opcional)</label><select class="select" name="establecimiento_id" id="txEstablecimiento"><option value="">— Ninguno —</option></select></div>
     <div class="field"><label>Descripción</label><input class="input" type="text" name="descripcion" id="txDesc" placeholder="Ej. Compra semanal"></div>
@@ -2437,9 +2438,11 @@ function aplicarDeltaTxSobreCuentas_(cuentas, tx, factor) {
 
   // Origen
   const ctaOrigen = findCta(tx.cuenta_id);
+  const devolConDestino = tipo === 'devolucion' && tx.cuenta_destino_id;
   if (ctaOrigen) {
     let deltaOrigen = 0;
-    if (tipo === 'ingreso' || tipo === 'devolucion') deltaOrigen = importe;
+    if (devolConDestino) deltaOrigen = -importe;
+    else if (tipo === 'ingreso' || tipo === 'devolucion') deltaOrigen = importe;
     else if (tipo === 'gasto' || tipo === 'transferencia') deltaOrigen = -importe;
 
     const subOrigen = findSub(ctaOrigen, tx.subcuenta_id);
@@ -2454,8 +2457,8 @@ function aplicarDeltaTxSobreCuentas_(cuentas, tx, factor) {
     }
   }
 
-  // Destino (solo transferencias)
-  if (tipo === 'transferencia' && tx.cuenta_destino_id) {
+  // Destino (transferencias y devoluciones con destino)
+  if ((tipo === 'transferencia' || tipo === 'devolucion') && tx.cuenta_destino_id) {
     const ctaDest = findCta(tx.cuenta_destino_id);
     if (ctaDest) {
       const reparto = parseRepartoDestinoLocal_(tx.reparto_destino);
@@ -4404,9 +4407,9 @@ function openTx(id) {
   $('#txFecha').value = f.fecha || new Date().toISOString().slice(0, 10);
   Estado.txRepartoDest = [];
   Estado._lastCtaDestinoId = '';
-  setTipoTx(f.tipo || 'gasto');
   poblarSelect('#txCuenta', Estado.bootstrap.cuentas, f.cuenta_id, c => c.nombre + ' (' + c.moneda + ')');
   poblarSelect('#txCuentaDest', Estado.bootstrap.cuentas, f.cuenta_destino_id, c => c.nombre + ' (' + c.moneda + ')');
+  setTipoTx(f.tipo || 'gasto');
   if ((f.tipo || 'gasto') !== 'transferencia') {
     // ponytail: la devolución debe elegir una categoría de gasto.
     const catTipo = f.tipo === 'devolucion' ? 'gasto' : (f.tipo || 'gasto');
@@ -4453,8 +4456,13 @@ function openTx(id) {
 function setTipoTx(tipo) {
   Estado.txTipo = tipo;
   $$('[data-tx-tipo]').forEach(b => b.classList.toggle('is-on', b.dataset.txTipo === tipo));
-  $('#wrapCuentaDest').style.display = tipo === 'transferencia' ? '' : 'none';
-  $('#wrapConversion').style.display = tipo === 'transferencia' ? '' : 'none';
+  const ctaOrigen = Estado.bootstrap.cuentas.find(c => c.id === $('#txCuenta').value);
+  const esPasivo = ctaOrigen && ctaOrigen.tipo === 'pasivo';
+  // ponytail: devolucion permite destino cuando el origen es pasivo (p.ej.
+  // reembolso de tarjeta de crédito que devuelve dinero a la cuenta de banco).
+  const muestraDestino = tipo === 'transferencia' || (tipo === 'devolucion' && esPasivo);
+  $('#wrapCuentaDest').style.display = muestraDestino ? '' : 'none';
+  $('#wrapConversion').style.display = muestraDestino ? '' : 'none';
   $('#wrapCategoria').style.display = tipo === 'transferencia' ? 'none' : '';
   $('#wrapEstablecimiento').style.display = tipo === 'transferencia' ? 'none' : '';
   if (tipo === 'transferencia') $('#txEstablecimiento').value = '';
@@ -4481,9 +4489,17 @@ $$('[data-tx-tipo]').forEach(b => b.addEventListener('click', () => setTipoTx(b.
 
 function actualizarSubcuentasTx(preferred) {
   const isTransfer = Estado.txTipo === 'transferencia';
+  const isDevol = Estado.txTipo === 'devolucion';
 
   // Subcuenta de origen: visible siempre que la cuenta de origen tenga subcuentas.
   const cta = Estado.bootstrap.cuentas.find(c => c.id === $('#txCuenta').value);
+  // ponytail: devolucion muestra destino si la cuenta origen es pasivo; se
+  // reevalúa al cambiar la cuenta porque el flag depende del origen.
+  if (isDevol) {
+    const muestraDestino = !!(cta && cta.tipo === 'pasivo');
+    $('#wrapCuentaDest').style.display = muestraDestino ? '' : 'none';
+    $('#wrapConversion').style.display = muestraDestino ? '' : 'none';
+  }
   const subs = subsAlfabetico_(cta && cta.subcuentas);
   const visOrigen = subs.length > 0;
   $('#wrapSubcuenta').style.display = visOrigen ? '' : 'none';
@@ -4519,6 +4535,23 @@ function actualizarSubcuentasTx(preferred) {
   const subsDOpts = (sameParent && subOrigenId) ? subsD.filter(s => s.id !== subOrigenId) : subsD;
   const visDest = isTransfer && !!$('#txCuentaDest').value;
   $('#wrapRepartoDest').style.display = visDest ? '' : 'none';
+
+  // ponytail: devolucion con destino expone la subcuenta destino simple (1:1,
+  // sin reparto). Solo se muestra si la cuenta destino tiene subcuentas y
+  // difiere de la cuenta origen.
+  const visSubDest = isDevol && !!$('#txCuentaDest').value && !!ctaD && subsD.length > 0 && !sameParent;
+  $('#wrapSubcuentaDest').style.display = visSubDest ? '' : 'none';
+  if (visSubDest) {
+    const selD = $('#txSubcuentaDest');
+    const prevSubD = preferred ? preferred.subcuenta_destino_id : selD.value;
+    const subDVal = subsD.some(s => s.id === prevSubD) ? prevSubD : '';
+    selD.innerHTML = '<option value="">— Ninguna —</option>' + subsD.map(s =>
+      `<option value="${s.id}" ${s.id === subDVal ? 'selected' : ''}>${escape(s.nombre)}</option>`
+    ).join('');
+  } else {
+    $('#txSubcuentaDest').value = '';
+  }
+
   if (!visDest) {
     Estado.txRepartoDest = [];
     renderRepartoRows(subsDOpts, []);
@@ -4800,6 +4833,7 @@ $('#formTx').addEventListener('submit', async (e) => {
     fecha: f.get('fecha'),
     cuenta_id: f.get('cuenta_id'),
     subcuenta_id: f.get('subcuenta_id') || '',
+    subcuenta_destino_id: f.get('subcuenta_destino_id') || '',
     cuenta_destino_id: f.get('cuenta_destino_id') || '',
     importe_destino: f.get('importe_destino') || '',
     ratio_conversion: f.get('ratio_conversion') || '',
