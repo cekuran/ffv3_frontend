@@ -3364,6 +3364,8 @@ function renderDashTx_() {
     const q = f.q.toLowerCase();
     lista = lista.filter(t => String(t.descripcion || '').toLowerCase().includes(q) || String(t.notas || '').toLowerCase().includes(q));
   }
+  // ponytail: mismo criterio de orden que la vista de movimientos (fecha desc, fecha_creacion desempata)
+  ordenarMovimientosLista_(lista);
   const txs = lista.slice(0, 5);
   const total = lista.length;
   const subtitulo = total > txs.length
@@ -3559,6 +3561,22 @@ async function borrarCuenta(id) {
   catch (e) { toast('Error: ' + e.message); }
 }
 
+function ordenarMovimientosLista_(lista) {
+  const { campo, direccion } = Estado.movOrden;
+  lista.sort((a, b) => {
+    const va = valorOrdenMovimiento(a, campo);
+    const vb = valorOrdenMovimiento(b, campo);
+    const cmp = typeof va === 'number'
+      ? va - vb
+      : String(va).localeCompare(String(vb), 'es', { numeric: true, sensitivity: 'base' });
+    if (cmp !== 0 || campo !== 'fecha') return direccion === 'asc' ? cmp : -cmp;
+    // ponytail: en mismo día, fecha_creacion desempata para que la recién
+    // agregada quede arriba y no debajo de las ya existentes ese día.
+    const fc = String(b.fecha_creacion || '').localeCompare(String(a.fecha_creacion || ''));
+    return direccion === 'asc' ? -fc : fc;
+  });
+}
+
 function valorOrdenMovimiento(t, campo) {
   if (campo === 'importe') {
     const importe = Number(t.importe || 0);
@@ -3617,14 +3635,9 @@ function renderMovimientos() {
     lista = lista.filter(t => String(t.descripcion || '').toLowerCase().includes(q) || String(t.notas || '').toLowerCase().includes(q));
   }
   const { campo, direccion } = Estado.movOrden;
-  lista.sort((a, b) => {
-    const va = valorOrdenMovimiento(a, campo);
-    const vb = valorOrdenMovimiento(b, campo);
-    const cmp = typeof va === 'number'
-      ? va - vb
-      : String(va).localeCompare(String(vb), 'es', { numeric: true, sensitivity: 'base' });
-    return direccion === 'asc' ? cmp : -cmp;
-  });
+  // ponytail: en mismo día, desempatar por fecha_creacion (las más recientes arriba)
+  // — los gastos recién agregados quedan arriba y no debajo de los ya existentes.
+  ordenarMovimientosLista_(lista);
   actualizarOrdenMovimientos();
   $('#movCount').textContent = lista.length;
   $('#movBody').innerHTML = lista.length ? lista.map(t => {
@@ -4156,7 +4169,12 @@ async function openMonthTxList_(mesState, titulo, matchFn, mutateRow, opts) {
   const periodo = anio + '-' + String(mes).padStart(2, '0');
   const lista = (Estado.bootstrap.transacciones || [])
     .filter(t => String(t.fecha).slice(0, 7) === periodo && matchFn(t))
-    .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    // ponytail: en mismo día, las más recientes arriba por fecha_creacion
+    .sort((a, b) => {
+      const cmp = String(b.fecha).localeCompare(String(a.fecha));
+      if (cmp !== 0) return cmp;
+      return String(b.fecha_creacion || '').localeCompare(String(a.fecha_creacion || ''));
+    });
   const display = mutateRow ? lista.map(mutateRow) : lista;
   const mesLabel = new Date(anio, mes - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
   $('#sheetEstTxListSub').textContent = lista.length + ' transaccion' + (lista.length === 1 ? '' : 'es') + ' · ' + mesLabel;
