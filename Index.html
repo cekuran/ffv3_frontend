@@ -4143,9 +4143,27 @@ function txRowSimple(t, opts) {
   const cls = esIngresoVisual ? 'pos' : (tipoVisual === 'gasto' ? 'neg' : 'neutral');
   const origen = escape(cta ? cta.nombre : '—') + (sub ? ' · ' + escape(sub.nombre) : '');
   const showEst = !!(opts && opts.showEstablecimiento) && !isTransfer && establecimiento;
-  const detalle = isTransfer
-    ? origen + ' → transferencia'
-    : origen + (showEst ? ' · ' + escape(establecimiento.nombre) : '') + ' · ' + escape(cat ? cat.nombre : '—');
+  let detalle;
+  if (isTransfer) {
+    const ctaD = Estado.bootstrap.cuentas.find(c => c.id === t.cuenta_destino_id);
+    const reparto = parseRepartoFromTx_(t) || [];
+    const catFilter = opts && opts.categoriaId;
+    let destino;
+    if (reparto.length) {
+      const filtrado = catFilter ? reparto.filter(r => r.categoria_id === catFilter) : reparto;
+      const subs = filtrado.map(r => {
+        const sd = ctaD ? (ctaD.subcuentas || []).find(s => s.id === r.subcuenta_id) : null;
+        return escape(sd ? sd.nombre : '—');
+      }).join(', ');
+      destino = escape(ctaD ? ctaD.nombre : '—') + (subs ? ' (' + subs + ')' : '');
+    } else {
+      const subD = (ctaD && t.subcuenta_destino_id) ? (ctaD.subcuentas || []).find(s => s.id === t.subcuenta_destino_id) : null;
+      destino = escape(ctaD ? ctaD.nombre : '—') + (subD ? ' · ' + escape(subD.nombre) : '');
+    }
+    detalle = origen + ' → ' + destino;
+  } else {
+    detalle = origen + (showEst ? ' · ' + escape(establecimiento.nombre) : '') + ' · ' + escape(cat ? cat.nombre : '—');
+  }
   return `<div class="tx-row tx-row-simple">
     <div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoMov_(cat, establecimiento)}</div>
     <div class="tx-main">
@@ -4224,7 +4242,7 @@ function openCategoriaTxList(id, nombre, tipo) {
     if (!(parcial > 0)) return t;
     const desc = t.descripcion ? `${t.descripcion} (parcial)` : 'Transferencia (parcial)';
     return Object.assign({}, t, { importe: parcial, descripcion: desc });
-  }, { showEstablecimiento: true });
+  }, { showEstablecimiento: true, categoriaId: id });
 }
 
 $('#estTxListClose').addEventListener('click', closeAllSheets);
