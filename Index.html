@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#00613e">
 <title id="docTitle">Finanzas Familia</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%2300613e'/><circle cx='32' cy='32' r='24' fill='none' stroke='%2397f6c2' stroke-width='2.5'/><text x='32' y='44' font-family='Arial Black,Helvetica,sans-serif' font-size='34' font-weight='900' text-anchor='middle' fill='%2397f6c2'>$</text></svg>">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
   /* === Sistema de diseño Finanzas Familia === */
   :root {
@@ -16,6 +17,7 @@
     --on-primary-container: #b8ffd5;
     --primary-fixed: #97f6c2;
     --primary-fixed-dim: #7bd9a7;
+    --primary-rgb: 0, 97, 62;
     --surface: #f8f9ff;
     --surface-container-lowest: #ffffff;
     --surface-container-low: #eff4ff;
@@ -594,9 +596,6 @@
   .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
   @media (max-width: 480px) { .field-row { grid-template-columns: 1fr; } }
 
-  .admin-sheet-form { display: grid; grid-template-columns: 2fr 1fr auto; gap: var(--s-2); margin-bottom: var(--s-3); }
-  @media (max-width: 640px) { .admin-sheet-form { grid-template-columns: 1fr; } }
-
   .toast { position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%) translateY(8px); background: var(--on-surface); color: var(--surface); padding: 10px 18px; border-radius: var(--r-full); box-shadow: var(--shadow-pop); display: flex; align-items: center; gap: 8px; opacity: 0; pointer-events: none; transition: opacity 0.3s, transform 0.3s; z-index: 200; font-size: 14px; font-weight: 500; }
   .toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast .ico { color: var(--primary-fixed); width: 18px; height: 18px; }
@@ -659,22 +658,6 @@
   .loading-table-row { padding: 0 !important; }
   .loading-table-row .loading-block { min-height: 160px; }
 
-  .user-row { padding: 10px 0; border-top: 1px solid var(--surface-container); display: flex; flex-direction: column; gap: 6px; }
-  .user-row-main { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .user-row-name { flex: 1 1 120px; min-width: 120px; font-weight: 600; }
-  .user-row-rol { width: auto; min-width: 110px; padding: 6px 10px; font-size: 14px; }
-  .user-row-reset { display: none; flex-wrap: wrap; gap: 6px; }
-  .user-row-reset.is-open { display: flex; }
-  .user-row-reset .input { flex: 1 1 180px; min-width: 180px; padding: 10px 12px; font-size: 14px; }
-  .user-row-hojas { display: flex; flex-direction: column; gap: 4px; padding-left: 12px; border-left: 2px solid var(--surface-container); }
-  .user-row-hojas-add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .user-row-hojas-add .select { flex: 1 1 160px; min-width: 160px; padding: 6px 10px; font-size: 14px; }
-
-  .hoja-row { padding: 12px 0; border-top: 1px solid var(--surface-container); display: flex; flex-direction: column; gap: 6px; }
-  .hoja-row-main { display: flex; gap: 8px; align-items: flex-start; }
-  .hoja-row-info { flex: 1; min-width: 0; }
-  .hoja-row-name { font-weight: 600; font-size: 15px; }
-  .hoja-row-id { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 11px; color: var(--on-surface-variant); word-break: break-all; }
   .reset-section { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-3); border-radius: var(--r-md); background: var(--surface-container-lowest); border: 1px solid var(--surface-container); }
   .reset-list { display: flex; flex-direction: column; gap: var(--s-2); }
   .reset-cta, .reset-cat { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-2); border-radius: var(--r-sm); background: var(--surface); border: 1px solid var(--surface-container); }
@@ -686,16 +669,6 @@
   .reset-sub-row { display: flex; gap: 6px; align-items: center; }
   .reset-sub-row .input { flex: 1 1 120px; min-width: 120px; }
   .reset-cat-head .input { flex: 1 1 140px; min-width: 140px; }
-  .hoja-row-desc { font-size: 13px; color: var(--on-surface-variant); margin-top: 2px; }
-  .hoja-row-users { font-size: 13px; margin-top: 4px; }
-  .hoja-row-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
-  .hoja-row-rename { display: none; flex-wrap: wrap; gap: 6px; align-items: center; padding-top: 4px; }
-  .hoja-row-rename.is-open { display: flex; }
-  .hoja-row-rename .input { flex: 1 1 180px; min-width: 180px; padding: 8px 10px; font-size: 14px; }
-
-  .vincula-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; padding-left: 12px; }
-  .vincula-nombre { flex: 1; font-size: 14px; }
-  .vincula-defecto { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--on-surface-variant); }
   // ponytail: loader visible por defecto para que la pagina nunca quede en
   // blanco mientras corre bootstrapBase (Apps Script cold start ~2-5s). El
   // skeleton imita el dashboard (la unica vista visible durante el cold
@@ -754,6 +727,381 @@
   .auth-sub { margin: 0 0 var(--s-4); color: var(--on-surface-variant); }
   .auth-error { display: none; margin-bottom: var(--s-3); color: var(--error); font-size: 13px; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ==== Admin: tabs + data tables estilo timeTrackerV4 ==== */
+  .ac-tabs {
+    display: flex; gap: 0;
+    border-bottom: 1px solid var(--outline-variant);
+    margin-bottom: 24px;
+    overflow-x: auto;
+    background: transparent;
+  }
+  .ac-tab {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 16px;
+    background: none; border: 0;
+    font: 500 14px/1 var(--font);
+    color: var(--on-surface-variant);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color .15s, border-color .15s, background .15s;
+    font-family: inherit;
+  }
+  .ac-tab:hover { color: var(--on-surface); background: rgba(var(--primary-rgb), 0.04); }
+  .ac-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+  .ac-tab .material-icons { font-size: 18px; line-height: 1; }
+
+  .ac-panel { display: none; }
+  .ac-panel.active { display: block; }
+
+  .ac-header {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .ac-header h2 {
+    font: 700 22px/28px var(--font);
+    margin: 0 0 4px;
+    color: var(--on-surface);
+    letter-spacing: -0.01em;
+  }
+  .ac-header p { color: var(--on-surface-variant); font-size: 14px; margin: 0; }
+
+  .ac-btn-primary {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--primary); color: var(--on-primary);
+    border: 0; padding: 0 16px; border-radius: var(--r-sm);
+    height: 36px;
+    font: 500 14px/1 var(--font); cursor: pointer;
+    box-shadow: 0 1px 2px rgba(var(--primary-rgb), 0.20);
+    transition: background .15s;
+    font-family: inherit;
+  }
+  .ac-btn-primary:hover { background: var(--primary-container); }
+  .ac-btn-primary .material-icons { font-size: 18px; line-height: 1; }
+
+  .ac-toolbar {
+    background: var(--surface-container-lowest);
+    border: 1px solid var(--outline-variant);
+    border-radius: var(--r-md);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    display: flex; gap: 12px; align-items: center;
+    flex-wrap: wrap;
+  }
+  .ac-search { flex: 1; min-width: 200px; position: relative; }
+  .ac-search .material-icons {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--on-surface-variant); font-size: 18px; line-height: 1;
+    pointer-events: none;
+  }
+  .ac-search input {
+    width: 100%; padding-left: 36px;
+    background: var(--surface-container-low); border: 1px solid var(--outline-variant);
+    border-radius: var(--r-sm); height: 36px;
+    font-size: 14px;
+  }
+  .ac-search input:focus { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); outline: none; }
+
+  .ac-card {
+    background: var(--surface-container-lowest);
+    border: 1px solid var(--outline-variant);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+  .ac-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .ac-table thead th {
+    background: var(--surface-container-low);
+    font: 600 11px/14px var(--font);
+    color: var(--on-surface-variant);
+    text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 12px 16px; text-align: left;
+    border-bottom: 1px solid var(--outline-variant);
+    height: 40px; vertical-align: middle;
+  }
+  .ac-table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--outline-variant);
+    height: 40px; vertical-align: middle;
+  }
+  .ac-table tbody tr:last-child td { border-bottom: 0; }
+  .ac-table tbody tr { transition: background .15s; }
+  .ac-table tbody tr:hover { background: rgba(var(--primary-rgb), 0.04); }
+
+  .ac-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-container));
+    color: var(--on-primary);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 12px;
+    flex-shrink: 0;
+  }
+  .ac-user-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .ac-user-name { font-weight: 500; color: var(--on-surface); }
+  .ac-user-meta { font-size: 12px; color: var(--on-surface-variant); margin-top: 2px; }
+
+  .ac-role {
+    display: inline-flex; align-items: center;
+    padding: 2px 10px; border-radius: 9999px;
+    font: 500 11px/16px var(--font);
+    background: rgba(var(--primary-rgb), 0.10); color: var(--primary);
+    text-transform: lowercase;
+  }
+  .ac-role.basico { background: var(--surface-container); color: var(--on-surface-variant); }
+  .ac-role.inactive { background: rgba(186, 26, 26, 0.10); color: var(--error); }
+
+  .ac-actions {
+    display: flex; justify-content: flex-end; gap: 4px;
+    opacity: 0; transition: opacity .15s;
+  }
+  .ac-table tbody tr:hover .ac-actions,
+  .ac-table tbody tr:focus-within .ac-actions { opacity: 1; }
+  .ac-icon-btn {
+    width: 32px; height: 32px; padding: 0;
+    background: transparent; border: 0; border-radius: 6px;
+    color: var(--on-surface-variant);
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .ac-icon-btn:hover { background: var(--surface-container-low); color: var(--primary); }
+  .ac-icon-btn.danger:hover { background: rgba(186, 26, 26, 0.08); color: var(--error); }
+  .ac-icon-btn .material-icons { font-size: 18px; line-height: 1; }
+  .ac-icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .ac-empty {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--on-surface-variant);
+    font-size: 14px;
+  }
+
+  /* Filas expandibles (vinculaciones + self-test) */
+  .ac-expand-row td {
+    background: var(--surface-container-low);
+    padding: 16px 24px !important;
+    height: auto;
+    border-bottom: 1px solid var(--outline-variant);
+  }
+  .ac-link-header {
+    font: 600 11px/14px var(--font);
+    color: var(--on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 10px;
+  }
+  .ac-link-list { display: flex; flex-direction: column; gap: 6px; }
+  .ac-link-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px 4px 12px; border-radius: 9999px;
+    background: var(--surface-container-lowest); color: var(--on-surface);
+    font-size: 12px; font-weight: 500;
+    border: 1px solid var(--outline-variant);
+    width: fit-content;
+  }
+  .ac-link-pill.default { background: rgba(var(--primary-rgb), 0.08); border-color: rgba(var(--primary-rgb), 0.20); color: var(--primary); }
+  .ac-link-pill a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; }
+  .ac-link-pill a:hover { color: var(--primary); }
+  .ac-link-pill a.del:hover { color: var(--error); }
+  .ac-link-pill .material-icons { font-size: 14px; line-height: 1; }
+  .ac-link-pill .ac-pill-defecto { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; }
+  .ac-link-pill .ac-pill-defecto input { margin: 0; }
+  .ac-link-pill .ac-pill-del { background: transparent; border: 0; color: inherit; cursor: pointer; padding: 2px; border-radius: 4px; display: inline-flex; align-items: center; }
+  .ac-link-pill .ac-pill-del:hover { color: var(--error); }
+
+  .ac-add-link {
+    display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap;
+  }
+  .ac-add-link select {
+    flex: 1; min-width: 160px;
+    height: 32px; padding: 0 10px;
+    border: 1px solid var(--outline-variant); border-radius: var(--r-sm);
+    background: var(--surface-container-lowest); font-size: 13px;
+    color: var(--on-surface);
+  }
+  .ac-add-link button {
+    height: 32px; padding: 0 12px;
+    background: var(--primary); color: var(--on-primary);
+    border: 0; border-radius: var(--r-sm);
+    font: 500 13px/1 var(--font); cursor: pointer;
+    font-family: inherit;
+  }
+  .ac-add-link button:hover { background: var(--primary-container); }
+
+  .ac-rename-box {
+    display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap;
+  }
+  .ac-rename-box input {
+    flex: 1; min-width: 180px;
+    height: 32px; padding: 0 10px;
+    border: 1px solid var(--outline-variant); border-radius: var(--r-sm);
+    background: var(--surface-container-lowest); font-size: 13px;
+    color: var(--on-surface);
+  }
+  .ac-rename-box button {
+    height: 32px; padding: 0 12px;
+    border-radius: var(--r-sm);
+    font: 500 13px/1 var(--font); cursor: pointer;
+    font-family: inherit;
+    border: 1px solid var(--outline-variant);
+    background: var(--surface-container-lowest); color: var(--on-surface);
+  }
+  .ac-rename-box button.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+  .ac-rename-box button.primary:hover { background: var(--primary-container); }
+
+  .ac-selftest {
+    margin-top: 12px;
+    background: var(--surface-container-lowest);
+    border: 1px solid var(--outline-variant);
+    border-radius: var(--r-sm);
+    padding: 12px;
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 240px;
+    overflow: auto;
+    color: var(--on-surface-variant);
+  }
+
+  /* Modales estilo Stitch */
+  .ac-modal {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  .ac-modal[hidden] { display: none !important; }
+  .ac-modal-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+  .ac-modal-card {
+    position: relative;
+    width: 100%; max-width: 480px;
+    background: var(--surface-container-lowest);
+    border-radius: var(--r-md);
+    border: 1px solid var(--outline-variant);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    max-height: 90vh; overflow-y: auto;
+  }
+  .ac-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--outline-variant);
+  }
+  .ac-modal-header h2 {
+    margin: 0;
+    font: 600 18px/24px var(--font);
+    color: var(--on-surface);
+  }
+  .ac-modal-close {
+    background: transparent; border: 0; padding: 6px;
+    color: var(--on-surface-variant); cursor: pointer;
+    border-radius: 4px;
+    display: inline-flex; align-items: center;
+  }
+  .ac-modal-close:hover { background: var(--surface-container-low); color: var(--primary); }
+  .ac-modal-close .material-icons { font-size: 20px; line-height: 1; }
+  .ac-modal-body {
+    padding: 20px 24px;
+    display: flex; flex-direction: column;
+    gap: 16px;
+  }
+  .ac-modal-body label {
+    font: 500 12px/16px var(--font);
+    color: var(--on-surface-variant);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+  }
+  .ac-modal-body select,
+  .ac-modal-body input {
+    width: 100%; height: 36px; padding: 0 12px;
+    border: 1px solid var(--outline-variant);
+    border-radius: var(--r-sm);
+    font-size: 14px;
+    background: var(--surface-container-lowest);
+    color: var(--on-surface);
+  }
+  .ac-modal-body select:focus,
+  .ac-modal-body input:focus {
+    outline: none; border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+  .ac-modal-hint {
+    font-size: 11px; color: var(--outline); margin-top: 4px;
+  }
+  .ac-modal-actions {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 24px;
+    border-top: 1px solid var(--outline-variant);
+    background: var(--surface-container-low);
+    border-bottom-left-radius: var(--r-md);
+    border-bottom-right-radius: var(--r-md);
+  }
+  .ac-modal-spacer { flex: 1; }
+  .ac-btn-danger {
+    background: var(--error); color: var(--on-primary);
+    border: 0; padding: 0 16px; border-radius: var(--r-sm);
+    height: 36px;
+    font: 500 14px/1 var(--font);
+    cursor: pointer; font-family: inherit;
+    transition: background .15s;
+  }
+  .ac-btn-danger:hover { background: #93000a; }
+  .ac-btn-secondary {
+    background: var(--surface-container-lowest); color: var(--on-surface);
+    border: 1px solid var(--outline-variant);
+    padding: 0 16px; border-radius: var(--r-sm);
+    height: 36px;
+    font: 500 14px/1 var(--font);
+    cursor: pointer; font-family: inherit;
+  }
+  .ac-btn-secondary:hover { background: var(--surface-container-low); border-color: var(--primary); }
+
+  /* Responsive admin */
+  @media (max-width: 720px) {
+    .ac-tabs { margin-bottom: 16px; }
+    .ac-tab { padding: 10px 12px; font-size: 13px; }
+    .ac-tab .material-icons { font-size: 16px; }
+    .ac-header h2 { font-size: 20px; line-height: 26px; }
+    .ac-card { overflow-x: visible; }
+    .ac-table { min-width: 0; }
+    .ac-table thead th,
+    .ac-table tbody td { padding: 8px 10px; }
+    .ac-table thead th { font-size: 10px; }
+    .ac-table tbody td { font-size: 13px; height: 36px; }
+    .ac-table .ac-user-cell { gap: 8px; }
+    .ac-table .ac-avatar { width: 28px; height: 28px; font-size: 11px; }
+    .ac-table .ac-user-name { font-size: 13px; }
+    .ac-table .ac-user-meta { font-size: 11px; }
+    .ac-table .ac-role { font-size: 10px; padding: 2px 8px; }
+    .ac-table .ac-icon-btn { width: 28px; height: 28px; }
+    .ac-table .ac-icon-btn .material-icons { font-size: 16px; }
+    .ac-actions { opacity: 1; }
+    .ac-toolbar { padding: 10px 12px; }
+    /* ponytail: ocultar ID largo en mobile, mostrar info button */
+    .ac-table-sheets { table-layout: fixed; }
+    .ac-table-sheets thead th:nth-child(1),
+    .ac-table-sheets tbody td:nth-child(1) { width: 70%; }
+    .ac-table-sheets thead th:nth-child(2),
+    .ac-table-sheets tbody td.ac-sheet-id-cell { display: none; }
+    .ac-table-sheets thead th:nth-child(3),
+    .ac-table-sheets tbody td:nth-child(3) { width: 30%; }
+    .ac-sheet-info-btn { display: inline-flex !important; }
+  }
+  @media (min-width: 721px) {
+    .ac-table-sheets { table-layout: fixed; }
+    .ac-table-sheets thead th:nth-child(1),
+    .ac-table-sheets tbody td:nth-child(1) { width: 40%; }
+    .ac-table-sheets thead th:nth-child(2),
+    .ac-table-sheets tbody td:nth-child(2) { width: 42%; word-break: break-all; }
+    .ac-table-sheets thead th:nth-child(3),
+    .ac-table-sheets tbody td:nth-child(3) { width: 18%; }
+    .ac-sheet-info-btn { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -1232,36 +1580,61 @@
           <div class="card-sub">Configuración técnica del entorno de datos.</div>
         </div>
       </div>
-      <div class="bento" style="margin-top: var(--s-4);">
-        <div class="card col-12">
-          <div class="card-h"><h2>Usuarios</h2></div>
-          <div class="body-sm" style="color: var(--on-surface-variant); margin-bottom: var(--s-3);">Solo admin puede crear usuarios nuevos. Rol <strong>admin</strong> da acceso a esta vista; <strong>basico</strong> solo ve el resto.</div>
-          <form id="adminUserForm" style="display: grid; gap: var(--s-2); margin-bottom: var(--s-3);">
-            <input class="input" id="adminNewUser" placeholder="Usuario (ej. maria)" autocomplete="off">
-            <input class="input" id="adminNewPass" type="password" placeholder="Contraseña (mínimo 8)" autocomplete="new-password">
-            <select class="select" id="adminNewRol" aria-label="Rol del usuario">
-              <option value="basico">Básico (sin acceso a admin)</option>
-              <option value="admin">Admin (acceso completo)</option>
-            </select>
-            <select class="select" id="adminNewHoja" aria-label="Hoja inicial (opcional)">
-              <option value="">Sin hoja inicial</option>
-            </select>
-            <button class="btn btn-primary btn-sm" id="adminUserCreate" type="submit">Crear usuario</button>
-          </form>
-          <div id="adminUsersList" class="body-sm" style="color: var(--on-surface-variant);"></div>
+
+      <nav class="ac-tabs" role="tablist" id="ac-tabs">
+        <button class="ac-tab active" data-tab="usuarios" role="tab" aria-selected="true" type="button">
+          <span class="material-icons">group</span>Usuarios
+        </button>
+        <button class="ac-tab" data-tab="hojas" role="tab" aria-selected="false" type="button">
+          <span class="material-icons">folder_special</span>Hojas
+        </button>
+      </nav>
+
+      <!-- Panel Usuarios -->
+      <div class="ac-panel active" data-tab-panel="usuarios" role="tabpanel">
+        <div class="ac-header">
+          <div>
+            <h2>Usuarios</h2>
+            <p>Administra los accesos, roles y hojas vinculadas.</p>
+          </div>
+          <button class="ac-btn-primary" id="usuarios-new-btn" type="button">
+            <span class="material-icons">add</span>Crear usuario
+          </button>
+        </div>
+        <div class="ac-toolbar">
+          <div class="ac-search">
+            <span class="material-icons">search</span>
+            <input type="text" id="usuarios-search" placeholder="Buscar por nombre..." autocomplete="off">
+          </div>
+        </div>
+        <div class="ac-card">
+          <table class="ac-table ac-table-users">
+            <thead>
+              <tr><th>Usuario</th><th>Rol</th><th style="text-align:right;">Editar</th></tr>
+            </thead>
+            <tbody id="users-list"></tbody>
+          </table>
         </div>
       </div>
 
-      <div class="bento" style="margin-top: var(--s-4);">
-        <div class="card col-12">
-          <div class="card-h"><h2>Hojas de datos</h2></div>
-          <div class="body-sm" style="color: var(--on-surface-variant); margin-bottom: var(--s-3);">Cada hoja es un Google Sheet con la estructura Cuentas/Categorías/Transacciones. Los usuarios ven solo las hojas a las que están vinculados.</div>
-          <form id="adminSheetForm" class="admin-sheet-form">
-            <input class="input" id="adminSheetId" placeholder="ID del spreadsheet (https://docs.google.com/spreadsheets/d/.../edit)" autocomplete="off">
-            <input class="input" id="adminSheetNombre" placeholder="Nombre identificativo" autocomplete="off">
-            <button class="btn btn-primary btn-sm" id="adminSheetCreate" type="submit">Añadir hoja</button>
-          </form>
-          <div id="adminSheetsList" class="body-sm" style="color: var(--on-surface-variant);"></div>
+      <!-- Panel Hojas -->
+      <div class="ac-panel" data-tab-panel="hojas" role="tabpanel" hidden>
+        <div class="ac-header">
+          <div>
+            <h2>Hojas de cálculo</h2>
+            <p>Directorio de hojas vinculadas a los usuarios.</p>
+          </div>
+          <button class="ac-btn-primary" id="sheets-new-btn" type="button">
+            <span class="material-icons">add</span>Añadir hoja
+          </button>
+        </div>
+        <div class="ac-card">
+          <table class="ac-table ac-table-sheets">
+            <thead>
+              <tr><th>Nombre</th><th>Spreadsheet ID</th><th style="text-align:right;">Editar</th></tr>
+            </thead>
+            <tbody id="sheets-list"></tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -1607,6 +1980,79 @@
       <button type="submit" class="btn btn-danger" id="resetSubmit" style="flex: 2;">Resetear</button>
     </div>
   </form>
+</div>
+
+<!-- Modal: crear usuario -->
+<div class="ac-modal" id="new-user-modal" role="dialog" aria-modal="true" aria-labelledby="new-user-modal-title" hidden>
+  <div class="ac-modal-overlay" data-modal-close></div>
+  <div class="ac-modal-card">
+    <div class="ac-modal-header">
+      <h2 id="new-user-modal-title">Crear usuario</h2>
+      <button class="ac-modal-close" type="button" data-modal-close aria-label="Cerrar">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+    <form id="new-user-form">
+      <div class="ac-modal-body">
+        <div>
+          <label for="newUserUsername">Usuario</label>
+          <input type="text" id="newUserUsername" required autocomplete="off" placeholder="ej. maria">
+        </div>
+        <div>
+          <label for="newUserPassword">Contraseña</label>
+          <input type="password" id="newUserPassword" required autocomplete="new-password" placeholder="mínimo 8 caracteres">
+        </div>
+        <div>
+          <label for="newUserRol">Rol</label>
+          <select id="newUserRol">
+            <option value="basico">Básico (sin acceso a admin)</option>
+            <option value="admin">Admin (acceso completo)</option>
+          </select>
+        </div>
+        <div>
+          <label for="newUserHoja">Hoja inicial (opcional)</label>
+          <select id="newUserHoja">
+            <option value="">Sin hoja inicial</option>
+          </select>
+          <div class="ac-modal-hint">Si eliges una hoja, se vinculará como "por defecto".</div>
+        </div>
+      </div>
+      <div class="ac-modal-actions">
+        <button type="button" class="ac-btn-secondary" data-modal-close>Cancelar</button>
+        <button type="submit" class="ac-btn-primary">Crear usuario</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: crear hoja -->
+<div class="ac-modal" id="new-sheet-modal" role="dialog" aria-modal="true" aria-labelledby="new-sheet-modal-title" hidden>
+  <div class="ac-modal-overlay" data-modal-close></div>
+  <div class="ac-modal-card">
+    <div class="ac-modal-header">
+      <h2 id="new-sheet-modal-title">Añadir hoja</h2>
+      <button class="ac-modal-close" type="button" data-modal-close aria-label="Cerrar">
+        <span class="material-icons">close</span>
+      </button>
+    </div>
+    <form id="new-sheet-form">
+      <div class="ac-modal-body">
+        <div>
+          <label for="newSheetId">Spreadsheet ID</label>
+          <input type="text" id="newSheetId" required autocomplete="off" placeholder="ID o enlace completo">
+          <div class="ac-modal-hint">Acepta URL completa o ID puro (entre /d/ y /edit).</div>
+        </div>
+        <div>
+          <label for="newSheetNombre">Nombre identificativo</label>
+          <input type="text" id="newSheetNombre" required autocomplete="off" placeholder="ej. Familia 2026">
+        </div>
+      </div>
+      <div class="ac-modal-actions">
+        <button type="button" class="ac-btn-secondary" data-modal-close>Cancelar</button>
+        <button type="submit" class="ac-btn-primary">Añadir hoja</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <div class="toast" id="toast"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg><span id="toastMsg">Listo</span></div>
@@ -2557,8 +3003,22 @@ function mostrarSetupSheet() {
   });
 }
 
+// === Estado de la vista admin (cache para búsqueda y refrescos) ===
+let adminUsersData = [];
+let adminSheetsData = [];
+let adminVincsData = [];
+let adminAllSheets = [];
+let adminUsersQuery = '';
+let adminSheetsQuery = '';
+let adminExpandedUsers = {};
+let adminExpandedSheets = {};
+
+function acAvatar(name) {
+  return (String(name || '?').trim().charAt(0) || '?').toUpperCase();
+}
+
 async function cargarUsuariosAdminUI() {
-  const listEl = $('#adminUsersList');
+  const listEl = $('#users-list');
   if (!listEl) return;
   try {
     const [users, sheets, vincs] = await Promise.all([
@@ -2566,109 +3026,205 @@ async function cargarUsuariosAdminUI() {
       call('listarSpreadsheetsAdmin'),
       call('listarVinculacionesAdmin')
     ]);
-    if (!Array.isArray(users) || !users.length) {
-      listEl.textContent = 'Sin usuarios.';
-      return;
-    }
-    const yo = (Estado.bootstrap.sesion && Estado.bootstrap.sesion.user) || '';
-    const vincsByUser = {};
-    (vincs || []).forEach(v => {
-      vincsByUser[String(v.username || '').trim().toLowerCase()] = v;
-    });
-    const optsHtml = (sheets || []).map(s => `<option value="${escape(s.spreadsheet_id)}">${escape(s.nombre)}</option>`).join('');
-    listEl.innerHTML = users.map(u => {
-      const rol = String(u.rol || 'basico').toLowerCase() === 'admin' ? 'admin' : 'basico';
-      const esYo = String(u.username || '').toLowerCase() === String(yo || '').toLowerCase();
-      const labelYo = esYo ? ' (tú)' : '';
-      const delAttr = esYo ? ' disabled title="No puedes eliminarte a ti mismo"' : '';
-      const v = vincsByUser[String(u.username || '').trim().toLowerCase()] || { hojas: [] };
-      const hojasHtml = (v.hojas || []).map(h => `
-        <div class="vincula-row" data-sheet-id="${escape(h.spreadsheet_id)}">
-          <span class="vincula-nombre">${escape(h.nombre)}</span>
-          <label class="vincula-defecto">
-            <input type="radio" name="vinculo-defecto-${escape(u.username)}" data-vincula-action="set-defecto"${h.por_defecto ? ' checked' : ''}>
-            Por defecto
-          </label>
-          <a class="btn btn-sm btn-outline" href="https://docs.google.com/spreadsheets/d/${escape(h.spreadsheet_id)}/edit" target="_blank" rel="noopener noreferrer">Abrir</a>
-          <button class="btn btn-sm btn-danger" type="button" data-vincula-action="desvincular">Quitar</button>
-        </div>`).join('');
-      const sinHojas = hojasHtml ? '' : '<div class="body-sm" style="color:var(--on-surface-variant); padding: 4px 0;">Sin hojas vinculadas.</div>';
-      const addHoja = optsHtml ? `
-        <div class="user-row-hojas-add">
-          <select class="select" data-vincula-add="${escape(u.username)}" aria-label="Hoja a vincular">
-            <option value="">Añadir hoja…</option>${optsHtml}
-          </select>
-          <button class="btn btn-sm btn-outline" type="button" data-vincula-action="vincular">Vincular</button>
-        </div>` : '';
-      return `<div class="user-row" data-username="${escape(u.username)}">`
-        + `<div class="user-row-main">`
-        +   `<span class="user-row-name">${escape(u.username)}${escape(labelYo)}</span>`
-        +   `<select class="select user-row-rol" data-user-action="rol" aria-label="Rol de ${escape(u.username)}">`
-        +     `<option value="basico"${rol === 'basico' ? ' selected' : ''}>Básico</option>`
-        +     `<option value="admin"${rol === 'admin' ? ' selected' : ''}>Admin</option>`
-        +   `</select>`
-        +   `<button class="btn btn-sm btn-outline" type="button" data-user-action="reset">Reset pass</button>`
-        +   `<button class="btn btn-sm btn-danger" type="button" data-user-action="delete"${delAttr}>Eliminar</button>`
-        + `</div>`
-        + `<div class="user-row-reset">`
-        +   `<input class="input" type="password" placeholder="Nueva contraseña (mín 8)" autocomplete="new-password">`
-        +   `<button class="btn btn-sm btn-primary" type="button" data-user-action="save-pass">Guardar</button>`
-        +   `<button class="btn btn-sm btn-secondary" type="button" data-user-action="cancel-reset">Cancelar</button>`
-        + `</div>`
-        + `<div class="user-row-hojas">`
-        +   `<div class="body-sm" style="color:var(--on-surface-variant); padding: 4px 0;">Hojas vinculadas</div>`
-        +   sinHojas + hojasHtml
-        +   addHoja
-        + `</div>`
-        + `</div>`;
-    }).join('');
+    adminUsersData = Array.isArray(users) ? users : [];
+    adminAllSheets = Array.isArray(sheets) ? sheets : [];
+    adminVincsData = Array.isArray(vincs) ? vincs : [];
+    poblarHojasNuevoUsuarioUI();
+    paintUsers();
   } catch (e) {
-    listEl.textContent = 'No disponible para este usuario.';
+    listEl.innerHTML = `<tr><td colspan="3" class="ac-empty">No disponible: ${escape(e.message || '')}</td></tr>`;
   }
 }
 
+function paintUsers() {
+  const listEl = $('#users-list');
+  if (!listEl) return;
+  if (!adminUsersData.length) {
+    listEl.innerHTML = '<tr><td colspan="3" class="ac-empty">Sin usuarios.</td></tr>';
+    return;
+  }
+  const q = (adminUsersQuery || '').trim().toLowerCase();
+  const yo = (Estado.bootstrap.sesion && Estado.bootstrap.sesion.user) || '';
+  const vincsByUser = {};
+  (adminVincsData || []).forEach(v => {
+    vincsByUser[String(v.username || '').trim().toLowerCase()] = v;
+  });
+  const filtered = q
+    ? adminUsersData.filter(u => String(u.username || '').toLowerCase().includes(q))
+    : adminUsersData;
+  if (!filtered.length) {
+    listEl.innerHTML = `<tr><td colspan="3" class="ac-empty">Sin coincidencias para "${escape(q)}".</td></tr>`;
+    return;
+  }
+  const sheetOptsHtml = adminAllSheets
+    .map(s => `<option value="${escape(s.spreadsheet_id)}">${escape(s.nombre)}</option>`)
+    .join('');
+  listEl.innerHTML = filtered.map(u => {
+    const rol = String(u.rol || 'basico').toLowerCase() === 'admin' ? 'admin' : 'basico';
+    const esYo = String(u.username || '').toLowerCase() === String(yo || '').toLowerCase();
+    const labelYo = esYo ? ' (tú)' : '';
+    const delAttr = esYo ? ' disabled title="No puedes eliminarte a ti mismo"' : '';
+    const v = vincsByUser[String(u.username || '').trim().toLowerCase()] || { hojas: [] };
+    const hojasHtml = (v.hojas || []).map(h => `
+      <span class="ac-link-pill${h.por_defecto ? ' default' : ''}" data-sheet-id="${escape(h.spreadsheet_id)}">
+        <span class="material-icons">description</span>
+        ${escape(h.nombre)}
+        <label class="ac-pill-defecto" title="Por defecto">
+          <input type="radio" name="vinculo-defecto-${escape(u.username)}" data-vincula-action="set-defecto"${h.por_defecto ? ' checked' : ''}>
+        </label>
+        <a href="https://docs.google.com/spreadsheets/d/${escape(h.spreadsheet_id)}/edit" target="_blank" rel="noopener noreferrer" title="Abrir">
+          <span class="material-icons">open_in_new</span>
+        </a>
+        <button class="ac-pill-del" type="button" data-vincula-action="desvincular" title="Quitar">
+          <span class="material-icons">close</span>
+        </button>
+      </span>`).join('');
+    const sinHojas = hojasHtml ? '' : '<div style="color: var(--on-surface-variant); font-size: 12px;">Sin hojas vinculadas.</div>';
+    const addHoja = sheetOptsHtml ? `
+      <div class="ac-add-link">
+        <select data-vincula-add="${escape(u.username)}" aria-label="Hoja a vincular">
+          <option value="">Añadir hoja…</option>${sheetOptsHtml}
+        </select>
+        <button type="button" data-vincula-action="vincular">Vincular</button>
+      </div>` : '';
+    const expanded = !!adminExpandedUsers[u.username];
+    return `<tr class="ac-data-row${expanded ? ' expanded' : ''}" data-username="${escape(u.username)}">
+        <td>
+          <div class="ac-user-cell">
+            <button class="ac-toggle" type="button" data-user-toggle title="Ver detalle" aria-label="Expandir">
+              <span class="material-icons">${expanded ? 'expand_less' : 'expand_more'}</span>
+            </button>
+            <span class="ac-avatar">${escape(acAvatar(u.username))}</span>
+            <div style="min-width:0; flex:1;">
+              <div class="ac-user-name">${escape(u.username)}${escape(labelYo)}</div>
+              <div class="ac-user-meta">${(v.hojas || []).length} hoja(s) vinculada(s)</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <select class="ac-role-select" data-user-action="rol" aria-label="Rol de ${escape(u.username)}" style="border:0; background:transparent; color:var(--primary); font-weight:500; font-size:13px; padding:4px 6px; border-radius:9999px; cursor:pointer;">
+            <option value="basico"${rol === 'basico' ? ' selected' : ''}>básico</option>
+            <option value="admin"${rol === 'admin' ? ' selected' : ''}>admin</option>
+          </select>
+        </td>
+        <td style="text-align:right;">
+          <div class="ac-actions">
+            <button class="ac-icon-btn" type="button" data-user-action="reset" title="Resetear contraseña">
+              <span class="material-icons">lock_reset</span>
+            </button>
+            <button class="ac-icon-btn danger" type="button" data-user-action="delete" title="Eliminar usuario"${delAttr}>
+              <span class="material-icons">delete</span>
+            </button>
+          </div>
+        </td>
+      </tr>
+      ${expanded ? `
+      <tr class="ac-expand-row">
+        <td colspan="3">
+          <div class="ac-link-header">Hojas vinculadas</div>
+          <div class="ac-link-list">
+            ${sinHojas}${hojasHtml}
+            ${addHoja}
+          </div>
+          <div class="ac-link-header" style="margin-top: 16px;">Resetear contraseña</div>
+          <div class="ac-rename-box">
+            <input type="password" placeholder="Nueva contraseña (mín 8)" autocomplete="new-password" data-reset-input="${escape(u.username)}">
+            <button class="primary" type="button" data-user-action="save-pass">Guardar</button>
+            <button type="button" data-user-action="cancel-reset">Cancelar</button>
+          </div>
+        </td>
+      </tr>` : ''}`;
+  }).join('');
+}
+
 async function cargarHojasAdminUI() {
-  const listEl = $('#adminSheetsList');
+  const listEl = $('#sheets-list');
   if (!listEl) return;
   try {
     const sheets = await call('listarSpreadsheetsAdmin');
-    if (!Array.isArray(sheets) || !sheets.length) {
-      listEl.textContent = 'No hay hojas registradas. Añade una con su ID de Google Sheets.';
-      return;
-    }
-    listEl.innerHTML = sheets.map(s => {
-      const usuariosTxt = s.usuarios && s.usuarios.length
-        ? s.usuarios.map(escape).join(', ')
-        : '<span style="color:var(--on-surface-variant);">(sin usuarios vinculados)</span>';
-      return `<div class="hoja-row" data-sheet-id="${escape(s.spreadsheet_id)}">
-        <div class="hoja-row-main">
-          <div class="hoja-row-info">
-            <div class="hoja-row-name">${escape(s.nombre)}</div>
-            <div class="hoja-row-id">${escape(s.spreadsheet_id)}</div>
-            ${s.descripcion ? `<div class="hoja-row-desc">${escape(s.descripcion)}</div>` : ''}
-            <div class="hoja-row-users">Usuarios: ${usuariosTxt}</div>
-          </div>
-          <div class="hoja-row-actions">
-            <a class="btn btn-sm btn-outline" href="https://docs.google.com/spreadsheets/d/${escape(s.spreadsheet_id)}/edit" target="_blank" rel="noopener noreferrer">Abrir</a>
-            <button class="btn btn-sm btn-outline" type="button" data-sheet-action="rename">Renombrar</button>
-            <button class="btn btn-sm btn-danger" type="button" data-sheet-action="reset">Resetear datos</button>
-            <button class="btn btn-sm btn-danger" type="button" data-sheet-action="delete">Eliminar hoja</button>
-          </div>
-        </div>
-        <div class="hoja-row-rename">
-          <input class="input" type="text" value="${escape(s.nombre)}" data-sheet-rename-input aria-label="Nuevo nombre">
-          <button class="btn btn-sm btn-primary" type="button" data-sheet-action="rename-save">Guardar</button>
-          <button class="btn btn-sm btn-secondary" type="button" data-sheet-action="rename-cancel">Cancelar</button>
-        </div>
-        <div class="hoja-row-actions" style="flex-direction: row; flex-wrap: wrap;">
-          <button class="btn btn-sm btn-outline" type="button" data-sheet-action="selftest">Ejecutar self-test</button>
-          <pre class="hoja-row-selftest" data-sheet-selftest role="status" aria-live="polite" style="flex: 1 1 100%; margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 12px; min-height: 0;"></pre>
-        </div>
-      </div>`;
-    }).join('');
+    adminSheetsData = Array.isArray(sheets) ? sheets : [];
+    paintSheets();
   } catch (e) {
-    listEl.textContent = 'No disponible: ' + (e.message || '');
+    listEl.innerHTML = `<tr><td colspan="3" class="ac-empty">No disponible: ${escape(e.message || '')}</td></tr>`;
   }
+}
+
+function paintSheets() {
+  const listEl = $('#sheets-list');
+  if (!listEl) return;
+  if (!adminSheetsData.length) {
+    listEl.innerHTML = '<tr><td colspan="3" class="ac-empty">No hay hojas registradas. Añade una con su ID de Google Sheets.</td></tr>';
+    return;
+  }
+  const q = (adminSheetsQuery || '').trim().toLowerCase();
+  const filtered = q
+    ? adminSheetsData.filter(s => String(s.nombre || '').toLowerCase().includes(q) || String(s.spreadsheet_id || '').toLowerCase().includes(q))
+    : adminSheetsData;
+  if (!filtered.length) {
+    listEl.innerHTML = `<tr><td colspan="3" class="ac-empty">Sin coincidencias para "${escape(q)}".</td></tr>`;
+    return;
+  }
+  listEl.innerHTML = filtered.map(s => {
+    const expanded = !!adminExpandedSheets[s.spreadsheet_id];
+    const usuariosTxt = s.usuarios && s.usuarios.length
+      ? s.usuarios.map(escape).join(', ')
+      : '<span style="color:var(--on-surface-variant);">(sin usuarios vinculados)</span>';
+    return `<tr class="ac-data-row${expanded ? ' expanded' : ''}" data-sheet-id="${escape(s.spreadsheet_id)}">
+        <td>
+          <div class="ac-user-cell">
+            <button class="ac-toggle" type="button" data-sheet-toggle title="Ver detalle" aria-label="Expandir">
+              <span class="material-icons">${expanded ? 'expand_less' : 'expand_more'}</span>
+            </button>
+            <span class="ac-avatar">${escape(acAvatar(s.nombre))}</span>
+            <div style="min-width:0; flex:1;">
+              <div class="ac-user-name">${escape(s.nombre)}</div>
+              <div class="ac-user-meta">${(s.usuarios || []).length} usuario(s)</div>
+            </div>
+          </div>
+        </td>
+        <td class="ac-sheet-id-cell">
+          <code style="font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 11px; color: var(--on-surface-variant); word-break: break-all;">${escape(s.spreadsheet_id)}</code>
+          <button class="ac-icon-btn ac-sheet-info-btn" type="button" data-sheet-info="${escape(s.spreadsheet_id)}" title="Ver ID completo" style="display:none;">
+            <span class="material-icons">info</span>
+          </button>
+        </td>
+        <td style="text-align:right;">
+          <div class="ac-actions">
+            <a class="ac-icon-btn" href="https://docs.google.com/spreadsheets/d/${escape(s.spreadsheet_id)}/edit" target="_blank" rel="noopener noreferrer" title="Abrir">
+              <span class="material-icons">open_in_new</span>
+            </a>
+            <button class="ac-icon-btn" type="button" data-sheet-action="rename" title="Renombrar">
+              <span class="material-icons">edit</span>
+            </button>
+            <button class="ac-icon-btn danger" type="button" data-sheet-action="reset" title="Resetear datos">
+              <span class="material-icons">restart_alt</span>
+            </button>
+            <button class="ac-icon-btn danger" type="button" data-sheet-action="delete" title="Eliminar hoja">
+              <span class="material-icons">delete</span>
+            </button>
+          </div>
+        </td>
+      </tr>
+      ${expanded ? `
+      <tr class="ac-expand-row">
+        <td colspan="3">
+          ${s.descripcion ? `<div class="ac-link-header">Descripción</div><div style="font-size:13px; margin-bottom:12px;">${escape(s.descripcion)}</div>` : ''}
+          <div class="ac-link-header">Usuarios vinculados</div>
+          <div style="font-size:13px; margin-bottom:12px;">${usuariosTxt}</div>
+          <div class="ac-link-header">Renombrar</div>
+          <div class="ac-rename-box">
+            <input type="text" value="${escape(s.nombre)}" data-sheet-rename-input="${escape(s.spreadsheet_id)}" aria-label="Nuevo nombre">
+            <button class="primary" type="button" data-sheet-action="rename-save">Guardar</button>
+            <button type="button" data-sheet-action="rename-cancel">Cancelar</button>
+          </div>
+          <div class="ac-link-header" style="margin-top:16px;">Diagnóstico</div>
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+            <button class="ac-btn-secondary" type="button" data-sheet-action="selftest" style="height:32px; font-size:13px;">Ejecutar self-test</button>
+          </div>
+          <pre class="ac-selftest" data-sheet-selftest="${escape(s.spreadsheet_id)}" role="status" aria-live="polite"></pre>
+        </td>
+      </tr>` : ''}`;
+  }).join('');
 }
 
 function actualizarNombreHojaUI() {
@@ -2962,35 +3518,174 @@ function normalizarBootstrap(b) {
 
 function renderAdmin() {
   const isAdmin = ((Estado.bootstrap.sesion && Estado.bootstrap.sesion.rol) || '') === 'admin';
-  $('#adminUserForm').style.display = isAdmin ? 'grid' : 'none';
   if (!isAdmin) {
-    $('#adminUsersList').textContent = 'Solo admin puede gestionar usuarios.';
+    const list = $('#users-list');
+    if (list) list.innerHTML = '<tr><td colspan="3" class="ac-empty">Solo admin puede gestionar usuarios.</td></tr>';
     return;
   }
+  bindAdminOnce();
   cargarUsuariosAdminUI();
   cargarHojasAdminUI();
-  poblarHojasNuevoUsuarioUI();
 }
 
 async function poblarHojasNuevoUsuarioUI() {
-  const sel = $('#adminNewHoja');
+  const sel = $('#newUserHoja');
   if (!sel) return;
   try {
-    const sheets = await call('listarSpreadsheetsAdmin');
+    const sheets = adminAllSheets.length ? adminAllSheets : await call('listarSpreadsheetsAdmin');
+    adminAllSheets = Array.isArray(sheets) ? sheets : [];
     const opts = ['<option value="">Sin hoja inicial</option>']
-      .concat((sheets || []).map(s => `<option value="${escape(s.spreadsheet_id)}">${escape(s.nombre)}</option>`));
+      .concat(adminAllSheets.map(s => `<option value="${escape(s.spreadsheet_id)}">${escape(s.nombre)}</option>`));
     sel.innerHTML = opts.join('');
-    if (!sheets || !sheets.length) {
-      sel.disabled = true;
-      sel.title = 'Añade primero una hoja en "Hojas de datos"';
-    } else {
-      sel.disabled = false;
-      sel.title = '';
-    }
+    sel.disabled = !adminAllSheets.length;
+    sel.title = adminAllSheets.length ? '' : 'Añade primero una hoja';
   } catch (e) {
     sel.innerHTML = '<option value="">Sin hoja inicial</option>';
     sel.disabled = true;
     sel.title = 'No se pudo cargar el directorio de hojas';
+  }
+}
+
+// === Admin: bind de UI (idempotente) ===
+let _adminBound = false;
+function bindAdminOnce() {
+  if (_adminBound) return;
+  _adminBound = true;
+
+  // Tabs
+  $$('#ac-tabs .ac-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      $$('#ac-tabs .ac-tab').forEach(b => {
+        const active = b === btn;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      $$('.ac-panel').forEach(p => {
+        const active = p.dataset.tabPanel === tab;
+        p.classList.toggle('active', active);
+        if (active) p.removeAttribute('hidden'); else p.setAttribute('hidden', '');
+      });
+    });
+  });
+
+  // Search usuarios
+  const userSearch = $('#usuarios-search');
+  if (userSearch) {
+    userSearch.addEventListener('input', () => {
+      adminUsersQuery = userSearch.value || '';
+      paintUsers();
+    });
+  }
+
+  // Botones "Crear" / "Añadir" — abren modales
+  const newUserBtn = $('#usuarios-new-btn');
+  if (newUserBtn) newUserBtn.addEventListener('click', openNewUserModal);
+  const newSheetBtn = $('#sheets-new-btn');
+  if (newSheetBtn) newSheetBtn.addEventListener('click', openNewSheetModal);
+
+  // Forms de los modales
+  const newUserForm = $('#new-user-form');
+  if (newUserForm) newUserForm.addEventListener('submit', onNewUserSubmit);
+  const newSheetForm = $('#new-sheet-form');
+  if (newSheetForm) newSheetForm.addEventListener('submit', onNewSheetSubmit);
+
+  // Click en [data-modal-close] cierra cualquier modal
+  document.addEventListener('click', (e) => {
+    const closer = e.target.closest('[data-modal-close]');
+    if (!closer) return;
+    const modal = closer.closest('.ac-modal');
+    if (modal) modal.setAttribute('hidden', '');
+  });
+
+  // Click fuera del card cierra el modal
+  $$('.ac-modal').forEach(modal => {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.setAttribute('hidden', '');
+    });
+  });
+
+  // ESC cierra cualquier modal abierto
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      $$('.ac-modal:not([hidden])').forEach(m => m.setAttribute('hidden', ''));
+    }
+  });
+}
+
+function openNewUserModal() {
+  const modal = $('#new-user-modal');
+  if (!modal) return;
+  poblarHojasNuevoUsuarioUI();
+  modal.removeAttribute('hidden');
+  const u = $('#newUserUsername');
+  if (u) { u.value = ''; setTimeout(() => u.focus(), 30); }
+  const p = $('#newUserPassword');
+  if (p) p.value = '';
+  const r = $('#newUserRol');
+  if (r) r.value = 'basico';
+  const h = $('#newUserHoja');
+  if (h) h.value = '';
+}
+async function onNewUserSubmit(e) {
+  e.preventDefault();
+  const user = ($('#newUserUsername').value || '').trim();
+  const pass = $('#newUserPassword').value || '';
+  const rol = ($('#newUserRol').value || 'basico').trim();
+  const hojaId = ($('#newUserHoja').value || '').trim();
+  if (!user || !pass) { toast('Completa usuario y contraseña'); return; }
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const label = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Creando...';
+  try {
+    await call('crearUsuarioAdmin', user, pass, rol);
+    if (hojaId) {
+      try { await call('vincularHojaUsuarioAdmin', user, hojaId, true); }
+      catch (linkErr) { toast('Usuario creado, pero no se pudo vincular la hoja: ' + linkErr.message); }
+    }
+    toast('Usuario creado');
+    $('#new-user-modal').setAttribute('hidden', '');
+    cargarUsuariosAdminUI();
+  } catch (err) {
+    toast('Error: ' + err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = label;
+  }
+}
+
+function openNewSheetModal() {
+  const modal = $('#new-sheet-modal');
+  if (!modal) return;
+  modal.removeAttribute('hidden');
+  const id = $('#newSheetId');
+  if (id) { id.value = ''; setTimeout(() => id.focus(), 30); }
+  const n = $('#newSheetNombre');
+  if (n) n.value = '';
+}
+async function onNewSheetSubmit(e) {
+  e.preventDefault();
+  const rawId = ($('#newSheetId').value || '').trim();
+  const nombre = ($('#newSheetNombre').value || '').trim();
+  const m = rawId.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  const id = m ? m[1] : rawId;
+  if (!id || !nombre) { toast('Pega el enlace o ID y un nombre'); return; }
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const label = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Añadiendo...';
+  try {
+    await call('altaSpreadsheetAdmin', id, nombre, '');
+    toast('Hoja añadida');
+    $('#new-sheet-modal').setAttribute('hidden', '');
+    cargarHojasAdminUI();
+    cargarUsuariosAdminUI();
+  } catch (err) {
+    toast('Error: ' + err.message);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = label;
   }
 }
 
@@ -6116,131 +6811,68 @@ $('#cfgPassForm').addEventListener('submit', async (e) => {
   }
 });
 
-$('#adminUserForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const user = ($('#adminNewUser').value || '').trim();
-  const pass = $('#adminNewPass').value || '';
-  const rol = ($('#adminNewRol').value || 'basico').trim();
-  const hojaId = ($('#adminNewHoja').value || '').trim();
-  if (!user || !pass) {
-    toast('Completa usuario y contraseña');
-    return;
-  }
-  const btn = $('#adminUserCreate');
-  const btnLabel = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = 'Creando...';
-  $('#adminNewUser').disabled = true;
-  $('#adminNewPass').disabled = true;
-  $('#adminNewRol').disabled = true;
-  $('#adminNewHoja').disabled = true;
-  try {
-    await call('crearUsuarioAdmin', user, pass, rol);
-    if (hojaId) {
-      // Si es la primera/única vinculación, vincularHojaUsuarioAdmin la marca
-      // como defecto automáticamente. Pasamos true explícito para que sea
-      // explícito incluso si el usuario ya tuviera otras hojas previas.
-      try {
-        await call('vincularHojaUsuarioAdmin', user, hojaId, true);
-      } catch (linkErr) {
-        toast('Usuario creado, pero no se pudo vincular la hoja: ' + linkErr.message);
+const sheetsListEl = $('#sheets-list');
+if (sheetsListEl) {
+  sheetsListEl.addEventListener('click', async (e) => {
+    // Toggle expand/collapse de fila
+    const toggle = e.target.closest('[data-sheet-toggle]');
+    if (toggle && sheetsListEl.contains(toggle)) {
+      const row = toggle.closest('.ac-data-row');
+      if (!row) return;
+      const sheetId = row.dataset.sheetId || '';
+      adminExpandedSheets[sheetId] = !adminExpandedSheets[sheetId];
+      paintSheets();
+      if (adminExpandedSheets[sheetId]) {
+        setTimeout(() => {
+          const inp = sheetsListEl.querySelector('[data-sheet-rename-input="' + CSS.escape(sheetId) + '"]');
+          if (inp) { inp.focus(); inp.select(); }
+        }, 30);
       }
+      return;
     }
-    $('#adminNewUser').value = '';
-    $('#adminNewPass').value = '';
-    $('#adminNewRol').value = 'basico';
-    $('#adminNewHoja').value = '';
-    toast('Usuario creado');
-    cargarUsuariosAdminUI();
-  } catch (err) {
-    toast('Error: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = btnLabel;
-    $('#adminNewUser').disabled = false;
-    $('#adminNewPass').disabled = false;
-    $('#adminNewRol').disabled = false;
-    $('#adminNewHoja').disabled = false;
-  }
-});
 
-// === Admin: hojas de datos (directorio + vinculaciones) ===
-
-$('#adminSheetForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const rawId = ($('#adminSheetId').value || '').trim();
-  const nombre = ($('#adminSheetNombre').value || '').trim();
-  // Acepta URL completa o ID puro (entre /d/ y /edit).
-  const m = rawId.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-  const id = m ? m[1] : rawId;
-  if (!id || !nombre) { toast('Pega el enlace o ID y un nombre'); return; }
-  const btn = $('#adminSheetCreate');
-  const label = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = 'Añadiendo...';
-  $('#adminSheetId').disabled = true;
-  $('#adminSheetNombre').disabled = true;
-  try {
-    await call('altaSpreadsheetAdmin', id, nombre, '');
-    $('#adminSheetId').value = '';
-    $('#adminSheetNombre').value = '';
-    toast('Hoja añadida');
-    cargarHojasAdminUI();
-    cargarUsuariosAdminUI();
-    poblarHojasNuevoUsuarioUI();
-  } catch (err) {
-    toast('Error: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = label;
-    $('#adminSheetId').disabled = false;
-    $('#adminSheetNombre').disabled = false;
-  }
-});
-
-const adminSheetsList = $('#adminSheetsList');
-if (adminSheetsList) {
-  adminSheetsList.addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-sheet-action]');
-    if (!btn || !adminSheetsList.contains(btn)) return;
-    const row = btn.closest('.hoja-row');
+    if (!btn || !sheetsListEl.contains(btn)) return;
+    const row = btn.closest('.ac-data-row');
     if (!row) return;
     const sheetId = row.dataset.sheetId || '';
     const action = btn.dataset.sheetAction;
-    const renameBox = row.querySelector('.hoja-row-rename');
-    const renameInput = row.querySelector('[data-sheet-rename-input]');
 
     if (action === 'rename') {
-      renameBox.classList.add('is-open');
-      if (renameInput) { renameInput.focus(); renameInput.select(); }
+      adminExpandedSheets[sheetId] = !adminExpandedSheets[sheetId];
+      paintSheets();
+      if (adminExpandedSheets[sheetId]) {
+        setTimeout(() => {
+          const inp = sheetsListEl.querySelector('[data-sheet-rename-input="' + CSS.escape(sheetId) + '"]');
+          if (inp) { inp.focus(); inp.select(); }
+        }, 30);
+      }
       return;
     }
     if (action === 'rename-cancel') {
-      renameBox.classList.remove('is-open');
+      adminExpandedSheets[sheetId] = false;
+      paintSheets();
       return;
     }
     if (action === 'rename-save') {
-      const nuevoNombre = (renameInput && renameInput.value || '').trim();
+      const inp = sheetsListEl.querySelector('[data-sheet-rename-input="' + CSS.escape(sheetId) + '"]');
+      const nuevoNombre = (inp && inp.value || '').trim();
       if (!nuevoNombre) { toast('Indica un nombre'); return; }
       btn.disabled = true;
-      const label = btn.textContent;
-      btn.textContent = 'Guardando...';
       try {
         await call('renombrarSpreadsheetAdmin', sheetId, nuevoNombre);
         toast('Hoja renombrada');
         cargarHojasAdminUI();
         cargarUsuariosAdminUI();
-        poblarHojasNuevoUsuarioUI();
       } catch (err) {
         toast('Error: ' + err.message);
         btn.disabled = false;
-        btn.textContent = label;
       }
       return;
     }
     if (action === 'reset') {
-      const nameEl = row.querySelector('.hoja-row-name');
-      const sheetName = nameEl ? nameEl.textContent.trim() : sheetId;
+      const s = adminSheetsData.find(x => x.spreadsheet_id === sheetId);
+      const sheetName = s ? s.nombre : sheetId;
       openResetConfig(sheetId, sheetName);
       return;
     }
@@ -6251,31 +6883,27 @@ if (adminSheetsList) {
         danger: true,
         confirmLabel: 'Eliminar',
         onConfirm: async () => {
-          const label = btn.textContent;
           btn.disabled = true;
-          btn.textContent = 'Eliminando...';
           try {
             await call('bajaSpreadsheetAdmin', sheetId);
             toast('Hoja eliminada');
+            delete adminExpandedSheets[sheetId];
             cargarHojasAdminUI();
             cargarUsuariosAdminUI();
-            poblarHojasNuevoUsuarioUI();
           } catch (err) {
             toast('Error: ' + err.message);
             btn.disabled = false;
-            btn.textContent = label;
           }
         }
       });
       return;
     }
     if (action === 'selftest') {
-      const out = row.querySelector('[data-sheet-selftest]');
-      const label = btn.textContent;
+      adminExpandedSheets[sheetId] = true;
+      paintSheets();
+      const out = sheetsListEl.querySelector('[data-sheet-selftest="' + CSS.escape(sheetId) + '"]');
       btn.disabled = true;
-      btn.textContent = 'Ejecutando...';
-      out.textContent = 'Ejecutando pruebas...';
-      out.style.color = 'var(--on-surface-variant)';
+      if (out) { out.textContent = 'Ejecutando pruebas...'; out.style.color = 'var(--on-surface-variant)'; }
       try {
         const r = await call('ejecutarSelfTestAdmin', sheetId);
         const lines = [(r.ok ? 'OK' : 'FALLO') + ' sobre ' + sheetId];
@@ -6283,41 +6911,66 @@ if (adminSheetsList) {
           lines.push(nombre + ': ' + (resultado.ok ? 'OK' : 'FALLO') + ' (' + resultado.ms + ' ms)' + (resultado.mensaje ? ' - ' + resultado.mensaje : ''));
         });
         (r.errores || []).forEach(error => lines.push('Error en ' + error.prueba + ': ' + error.mensaje));
-        out.textContent = lines.join('\n');
-        out.style.color = r.ok ? 'var(--primary)' : 'var(--error)';
+        if (out) {
+          out.textContent = lines.join('\n');
+          out.style.color = r.ok ? 'var(--primary)' : 'var(--error)';
+        }
         toast(r.ok ? 'Self-test correcto' : 'Self-test con errores');
       } catch (err) {
         const mensaje = err && err.message ? err.message : String(err);
-        out.textContent = 'Error: ' + mensaje;
-        out.style.color = 'var(--error)';
+        if (out) {
+          out.textContent = 'Error: ' + mensaje;
+          out.style.color = 'var(--error)';
+        }
         toast('Error: ' + mensaje);
       } finally {
         btn.disabled = false;
-        btn.textContent = label;
       }
       return;
     }
   });
 }
 
-const adminUsersList = $('#adminUsersList');
-if (adminUsersList) {
-  adminUsersList.addEventListener('click', async (e) => {
+const usersListEl = $('#users-list');
+if (usersListEl) {
+  usersListEl.addEventListener('click', async (e) => {
+    // Toggle expand/collapse de fila (chevron o nombre)
+    const toggle = e.target.closest('[data-user-toggle]');
+    if (toggle && usersListEl.contains(toggle)) {
+      const row = toggle.closest('.ac-data-row');
+      if (!row) return;
+      const username = row.dataset.username || '';
+      adminExpandedUsers[username] = !adminExpandedUsers[username];
+      paintUsers();
+      // Si acabamos de expandir, foco en el input de reset pass si existe
+      if (adminExpandedUsers[username]) {
+        setTimeout(() => {
+          const inp = usersListEl.querySelector('[data-reset-input="' + CSS.escape(username) + '"]');
+          if (inp) inp.focus();
+        }, 30);
+      }
+      return;
+    }
+
+    // Acciones de vinculación (vincular / desvincular)
     const vincBtn = e.target.closest('[data-vincula-action]');
-    if (vincBtn && adminUsersList.contains(vincBtn)) {
+    if (vincBtn && usersListEl.contains(vincBtn)) {
       const action = vincBtn.dataset.vinculaAction;
-      const row = vincBtn.closest('.user-row');
+      // El botón vive en la fila expandida (.ac-expand-row); la fila con
+      // data-username es el <tr> hermano anterior (.ac-data-row).
+      const row = vincBtn.closest('.ac-data-row') ||
+                  (vincBtn.closest('.ac-expand-row') || {}).previousElementSibling;
       if (!row) return;
       const username = row.dataset.username || '';
 
       if (action === 'vincular') {
-        const sel = row.querySelector(`[data-vincula-add="${CSS.escape(username)}"]`);
+        // El select vive en la misma fila expandida que el botón Vincular.
+        const expandRow = vincBtn.closest('.ac-expand-row');
+        const sel = (expandRow || row).querySelector(`[data-vincula-add="${CSS.escape(username)}"]`);
         if (!sel) return;
         const sheetId = sel.value;
         if (!sheetId) { toast('Selecciona una hoja'); return; }
-        const label = vincBtn.textContent;
         vincBtn.disabled = true;
-        vincBtn.textContent = 'Vinculando...';
         try {
           await call('vincularHojaUsuarioAdmin', username, sheetId, false);
           toast('Vinculado');
@@ -6326,17 +6979,14 @@ if (adminUsersList) {
         } catch (err) {
           toast('Error: ' + err.message);
           vincBtn.disabled = false;
-          vincBtn.textContent = label;
         }
         return;
       }
       if (action === 'desvincular') {
-        const vincRow = vincBtn.closest('.vincula-row');
-        if (!vincRow) return;
-        const sheetId = vincRow.dataset.sheetId || '';
-        const label = vincBtn.textContent;
+        const pill = vincBtn.closest('.ac-link-pill');
+        if (!pill) return;
+        const sheetId = pill.dataset.sheetId || '';
         vincBtn.disabled = true;
-        vincBtn.textContent = 'Quitando...';
         try {
           await call('desvincularHojaUsuarioAdmin', username, sheetId);
           toast('Vinculación eliminada');
@@ -6345,62 +6995,54 @@ if (adminUsersList) {
         } catch (err) {
           toast('Error: ' + err.message);
           vincBtn.disabled = false;
-          vincBtn.textContent = label;
         }
         return;
       }
     }
+
+    // Acciones de usuario (reset, save-pass, cancel-reset, delete)
     const btn = e.target.closest('[data-user-action]');
-    if (!btn || !adminUsersList.contains(btn)) return;
+    if (!btn || !usersListEl.contains(btn)) return;
     const action = btn.dataset.userAction;
-    const row = btn.closest('.user-row');
+    // save-pass / cancel-reset viven en la fila expandida; el resto en la fila de datos.
+    const row = btn.closest('.ac-data-row') ||
+                (btn.closest('.ac-expand-row') || {}).previousElementSibling;
     if (!row) return;
     const username = row.dataset.username || '';
 
     if (action === 'reset') {
-      const reset = row.querySelector('.user-row-reset');
-      if (!reset) return;
-      const abierto = reset.classList.toggle('is-open');
-      if (abierto) {
-        const input = reset.querySelector('input');
-        if (input) { input.value = ''; input.focus(); }
+      adminExpandedUsers[username] = !adminExpandedUsers[username];
+      paintUsers();
+      if (adminExpandedUsers[username]) {
+        setTimeout(() => {
+          const inp = usersListEl.querySelector('[data-reset-input="' + CSS.escape(username) + '"]');
+          if (inp) inp.focus();
+        }, 30);
       }
       return;
     }
     if (action === 'cancel-reset') {
-      const reset = row.querySelector('.user-row-reset');
-      if (reset) {
-        reset.classList.remove('is-open');
-        const input = reset.querySelector('input');
-        if (input) input.value = '';
-      }
+      adminExpandedUsers[username] = false;
+      paintUsers();
       return;
     }
     if (action === 'save-pass') {
-      const input = row.querySelector('.user-row-reset input');
-      const nueva = (input && input.value) || '';
+      const inp = usersListEl.querySelector('[data-reset-input="' + CSS.escape(username) + '"]');
+      const nueva = (inp && inp.value) || '';
       if (nueva.length < 8) { toast('La contraseña debe tener mínimo 8 caracteres'); return; }
-      const label = btn.textContent;
       btn.disabled = true;
-      btn.textContent = 'Guardando...';
       try {
         await call('resetearContrasenaAdmin', username, nueva);
         toast('Contraseña actualizada');
-        const reset = row.querySelector('.user-row-reset');
-        if (reset) {
-          reset.classList.remove('is-open');
-          if (input) input.value = '';
-        }
+        adminExpandedUsers[username] = false;
+        paintUsers();
       } catch (err) {
         toast('Error: ' + err.message);
-      } finally {
         btn.disabled = false;
-        btn.textContent = label;
       }
       return;
     }
     if (action === 'delete') {
-      const label = btn.textContent;
       await openConfirm({
         title: 'Eliminar usuario',
         message: '¿Eliminar al usuario "' + username + '"? Sus datos (cuentas, transacciones) no se borrarán.',
@@ -6408,15 +7050,14 @@ if (adminUsersList) {
         confirmLabel: 'Eliminar',
         onConfirm: async () => {
           btn.disabled = true;
-          btn.textContent = 'Eliminando...';
           try {
             await call('eliminarUsuarioAdmin', username);
             toast('Usuario eliminado');
+            delete adminExpandedUsers[username];
             cargarUsuariosAdminUI();
           } catch (err) {
             toast('Error: ' + err.message);
             btn.disabled = false;
-            btn.textContent = label;
           }
         }
       });
@@ -6424,13 +7065,16 @@ if (adminUsersList) {
     }
   });
 
-  adminUsersList.addEventListener('change', async (e) => {
+  usersListEl.addEventListener('change', async (e) => {
     const radio = e.target.closest('[data-vincula-action="set-defecto"]');
-    if (radio && radio.checked && adminUsersList.contains(radio)) {
-      const vincRow = radio.closest('.vincula-row');
-      const row = vincRow && vincRow.closest('.user-row');
-      const username = (row && row.dataset.username) || (vincRow && vincRow.dataset.username) || '';
-      const sheetId = vincRow && vincRow.dataset.sheetId || '';
+    if (radio && radio.checked && usersListEl.contains(radio)) {
+      const pill = radio.closest('.ac-link-pill');
+      // La pill está en la fila expandida (.ac-expand-row); la fila con
+      // data-username es el <tr> hermano anterior.
+      const row = pill && (pill.closest('.ac-data-row') ||
+                           (pill.closest('.ac-expand-row') || {}).previousElementSibling);
+      const username = (row && row.dataset.username) || '';
+      const sheetId = pill && pill.dataset.sheetId || '';
       if (!username || !sheetId) return;
       try {
         await call('setHojaPorDefectoAdmin', username, sheetId);
@@ -6443,8 +7087,8 @@ if (adminUsersList) {
       return;
     }
     const sel = e.target.closest('[data-user-action="rol"]');
-    if (!sel || !adminUsersList.contains(sel)) return;
-    const row = sel.closest('.user-row');
+    if (!sel || !usersListEl.contains(sel)) return;
+    const row = sel.closest('.ac-data-row');
     if (!row) return;
     const username = row.dataset.username || '';
     const rol = sel.value;
