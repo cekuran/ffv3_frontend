@@ -1181,6 +1181,7 @@
     <div class="nav-item" data-route="conciliar"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg> Conciliar</div>
     <div class="nav-item" data-route="categorias"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4v6h6zm10 0h-6v6h6zM10 14H4v6h6zm10 0h-6v6h6z"/></svg> Categorías</div>
     <div class="nav-item" data-route="establecimientos"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16l-1 5h-3v2h-2V9h-4v2H8V9H5zm1 7h14v10H5z"/></svg> Establecimientos</div>
+    <div class="nav-item" data-route="divisas"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h13l-3-3 1-1 5 5-5 5-1-1 3-3H4zm16 12H7l3 3-1 1-5-5 5-5 1 1-3 3h13z"/></svg> Divisas</div>
     <div class="nav-item" data-route="admin" data-rol-required="admin"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4-2.1-.6a6.9 6.9 0 0 0-.5-1.2l1.2-1.8-1.4-1.4-1.8 1.2c-.4-.2-.8-.4-1.2-.5L14 3h-2l-.6 2.1c-.4.1-.8.3-1.2.5L8.4 4.4 7 5.8l1.2 1.8c-.2.4-.4.8-.5 1.2L5.6 9v2l2.1.6c.1.4.3.8.5 1.2L7 14.6l1.4 1.4 1.8-1.2c.4.2.8.4 1.2.5L12 17h2l.6-2.1c.4-.1.8-.3 1.2-.5l1.8 1.2 1.4-1.4-1.2-1.8c.2-.4.4-.8.5-1.2L21 11z"/></svg> Admin</div>
     <div class="sidebar-foot" id="sidebarFoot">Finanzas Familia</div>
   </aside>
@@ -1830,9 +1831,7 @@
         </select>
       </div>
       <div class="field"><label>Moneda</label>
-        <select class="select" name="moneda" id="ctaMoneda">
-          <option>EUR</option><option>USD</option><option>COP</option><option>MXN</option><option>GBP</option><option>ARS</option><option>CLP</option><option>PEN</option>
-        </select>
+        <select class="select" name="moneda" id="ctaMoneda"></select>
       </div>
     </div>
     <div class="field"><label>Saldo inicial</label><input class="input" type="number" step="0.01" name="saldo_inicial" id="ctaSaldo" value="0"></div>
@@ -5106,7 +5105,7 @@ function paintDivisas(div) {
   list.innerHTML = items.map(d => {
     const defTag = d.por_defecto ? '<span class="pill pos">Default</span>' : '';
     const activaTag = d.activa === false ? '<span class="pill neg">Inactiva</span>' : '';
-    return `<div class="card" data-div-id="${d.id}" style="padding: var(--s-3);">
+    return `<div class="card col-4" data-div-id="${d.id}" style="padding: var(--s-3);">
       <div style="display: flex; align-items: baseline; gap: var(--s-2); flex-wrap: wrap;">
         <strong style="font-size: 18px;">${escape(d.codigo)}</strong>
         <span style="font-size: 20px;">${escape(d.simbolo || '')}</span>
@@ -5131,7 +5130,7 @@ function paintTiposCambio(tcs) {
     return;
   }
   list.innerHTML = items.map(t =>
-    `<div class="card" style="padding: var(--s-3); display: flex; align-items: center; gap: var(--s-3);">
+    `<div class="card col-6" style="padding: var(--s-3); display: flex; align-items: center; gap: var(--s-3);">
       <div style="flex: 1;">
         <strong>1 ${escape(t.base)} = ${escape(String(t.ratio))} ${escape(t.destino)}</strong>
         <div class="body-sm" style="color: var(--on-surface-variant);">${escape(t.fecha || '—')}</div>
@@ -5955,6 +5954,23 @@ function poblarSelectMoneda_(sel, val) {
   }).join('');
 }
 
+// ponytail: variante usada por el form de cuenta (#ctaMoneda). A diferencia
+// de poblarSelectMoneda_, no recibe un valor preseleccionado: quien pinta el
+// sheet (openCuenta) elige después el valor que toque.
+function poblarCtaMoneda_() {
+  const el = $('#ctaMoneda'); if (!el) return;
+  const catalogo = ((Estado.bootstrap && Estado.bootstrap.divisas && Estado.bootstrap.divisas.items) || [])
+    .filter(d => d.activa !== false);
+  const codigos = catalogo.map(d => String(d.codigo || '').toUpperCase()).filter(Boolean);
+  if (!codigos.length) codigos.push('EUR'); // fallback si bootstrap aún no cargó
+  const def = (Estado.bootstrap && Estado.bootstrap.moneda_por_defecto) || 'EUR';
+  el.innerHTML = codigos.map(c => {
+    const lbl = (catalogo.find(d => String(d.codigo || '').toUpperCase() === c) || {}).nombre || c;
+    const tag = String(c).toUpperCase() === String(def).toUpperCase() ? ' (default)' : '';
+    return `<option value="${c}">${escape(c)} — ${escape(lbl)}${tag}</option>`;
+  }).join('');
+}
+
 // ponytail: muestra el equivalente en la moneda por defecto cuando el usuario
 // elige una moneda distinta. Lee la última tasa del cache de bootstrap
 // (TiposCambio) — si no hay tasa, muestra "—" y deja al backend el rechazo
@@ -6036,7 +6052,12 @@ function openCuenta(id, parentId) {
   $('#wrapCtaEstablecimiento').style.display = parent ? 'none' : '';
   $('#ctaNombre').value = c ? c.nombre : '';
   $('#ctaTipo').value = (c && c.tipo) ? c.tipo : 'activo';
-  $('#ctaMoneda').value = (c && c.moneda) ? c.moneda : 'EUR';
+  // ponytail: poblar el dropdown de moneda desde el catálogo de bootstrap
+  // (no lista hardcoded) — así monedas añadidas en Divisas aparecen al crear
+  // una cuenta nueva. Si una cuenta ya tiene una moneda que el usuario
+  // desactivó, conservamos la opción para no perder la fila al editar.
+  poblarCtaMoneda_();
+  $('#ctaMoneda').value = (c && c.moneda) ? c.moneda : (Estado.bootstrap.moneda_por_defecto || 'EUR');
   $('#ctaSaldo').value = c ? c.saldo_inicial : 0;
   poblarSelect('#ctaEstablecimiento', Estado.bootstrap.establecimientos, c ? (c.establecimiento_id || '') : '', e => e.nombre);
   setIconPick($('#ctaIcono'), (c && c.icono) || 'account_balance_wallet');
@@ -6293,6 +6314,13 @@ function renderResetCuentas() {
     wrap.innerHTML = '<div class="body-sm" style="color: var(--on-surface-variant); padding: var(--s-2) 0;">Aún no hay cuentas. Añade al menos una.</div>';
     return;
   }
+  // ponytail: catálogo dinámico de monedas (no lista hardcoded) para que las
+  // cuentas del reset reflejen el catálogo actual de Divisas.
+  const monedasCatalogo = ((Estado.bootstrap && Estado.bootstrap.divisas && Estado.bootstrap.divisas.items) || [])
+    .filter(d => d.activa !== false)
+    .map(d => String(d.codigo || '').toUpperCase()).filter(Boolean);
+  if (!monedasCatalogo.length) monedasCatalogo.push('EUR');
+  const defCodigo = (Estado.bootstrap && Estado.bootstrap.moneda_por_defecto) || 'EUR';
   wrap.innerHTML = resetConfig.cuentas.map(cta => {
     const subsHtml = (cta.subcuentas || []).map(sub => `
       <div class="reset-sub-row" data-cid="${escape(cta.cid)}" data-sid="${escape(sub.sid)}">
@@ -6310,7 +6338,10 @@ function renderResetCuentas() {
           <option value="pasivo"${cta.tipo === 'pasivo' ? ' selected' : ''}>Pasivo</option>
         </select>
         <select class="select" data-reset-field="cta-moneda" aria-label="Moneda">
-          ${['EUR','USD','COP','MXN','GBP','ARS','CLP','PEN'].map(m => `<option${cta.moneda === m ? ' selected' : ''}>${m}</option>`).join('')}
+          ${monedasCatalogo.map(m => {
+            const tag = m === defCodigo ? ' (default)' : '';
+            return `<option${cta.moneda === m ? ' selected' : ''}>${escape(m)}${tag}</option>`;
+          }).join('')}
         </select>
         <button type="button" class="btn btn-sm btn-outline reset-remove" data-reset-action="del-cta" aria-label="Quitar cuenta">×</button>
       </div>
@@ -6341,7 +6372,7 @@ function renderResetCategorias() {
 }
 
 $('#resetAddCta').addEventListener('click', () => {
-  resetConfig.cuentas.push({ cid: nextResetCid_(), nombre: '', tipo: 'activo', moneda: 'EUR', subcuentas: [] });
+  resetConfig.cuentas.push({ cid: nextResetCid_(), nombre: '', tipo: 'activo', moneda: (Estado.bootstrap && Estado.bootstrap.moneda_por_defecto) || 'EUR', subcuentas: [] });
   renderResetCuentas();
 });
 $('#resetAddCat').addEventListener('click', () => {
