@@ -1556,6 +1556,30 @@
       <div class="bento" id="estList" style="margin-top: var(--s-3);"></div>
     </section>
 
+    <!-- Divisas: catálogo + tipos de cambio. Accesible a cualquier usuario
+         con hoja asignada (no es admin-only). -->
+    <section class="view" data-view="divisas">
+      <div class="section-h">
+        <div>
+          <h2 style="font-size: 24px;">Divisas</h2>
+          <div class="card-sub">Moneda por defecto de la hoja y tipos de cambio para transacciones en monedas alternas.</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap;">
+          <button class="btn btn-primary" id="btnNuevaDivisa"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg> Nueva moneda</button>
+          <button class="btn btn-outline" id="btnNuevoTipoCambio"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M4 6h13l-3-3 1-1 5 5-5 5-1-1 3-3H4zm16 12H7l3 3-1 1-5-5 5-5 1 1-3 3h13z"/></svg> Nuevo tipo de cambio</button>
+        </div>
+      </div>
+
+      <div class="card-sub" style="margin-top: var(--s-4);">Moneda por defecto: <strong id="divisasDefaultLabel">—</strong></div>
+
+      <h3 class="title-md" style="margin-top: var(--s-5);">Monedas</h3>
+      <div class="bento" id="divisasList" style="margin-top: var(--s-3);"></div>
+
+      <h3 class="title-md" style="margin-top: var(--s-5);">Tipos de cambio</h3>
+      <div class="card-sub" style="margin-top: var(--s-2);">Al guardar un tipo de cambio se registra también su inverso, así las conversiones en ambos sentidos están siempre cubiertas.</div>
+      <div class="bento" id="tiposCambioList" style="margin-top: var(--s-3);"></div>
+    </section>
+
     <!-- Sin hojas asignadas -->
     <section class="view" data-view="sinHojas">
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center; padding: var(--s-7) var(--s-4);">
@@ -1701,6 +1725,10 @@
           <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16l-1 5h-3v2h-2V9h-4v2H8V9H5zm1 7h14v10H5z"/></svg>
           Establecimientos
         </button>
+        <button class="more-dropdown-item" type="button" data-route="divisas" role="menuitem">
+          <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h13l-3-3 1-1 5 5-5 5-1-1 3-3H4zm16 12H7l3 3-1 1-5-5 5-5 1 1-3 3h13z"/></svg>
+          Divisas
+        </button>
         <button class="more-dropdown-item" type="button" data-route="admin" data-rol-required="admin" role="menuitem">
           <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4-2.1-.6a6.9 6.9 0 0 0-.5-1.2l1.2-1.8-1.4-1.4-1.8 1.2c-.4-.2-.8-.4-1.2-.5L14 3h-2l-.6 2.1c-.4.1-.8.3-1.2.5L8.4 4.4 7 5.8l1.2 1.8c-.2.4-.4.8-.5 1.2L5.6 9v2l2.1.6c.1.4.3.8.5 1.2L7 14.6l1.4 1.4 1.8-1.2c.4.2.8.4 1.2.5L12 17h2l.6-2.1c.4-.1.8-.3 1.2-.5l1.8 1.2 1.4-1.4-1.2-1.8c.2-.4.4-.8.5-1.2L21 11z"/></svg>
           Admin
@@ -1728,6 +1756,15 @@
     <div class="field-row">
       <div class="field"><label>Importe</label><input class="input" type="number" step="0.01" min="0" name="importe" id="txImporte" required></div>
       <div class="field"><label>Fecha</label><input class="input" type="date" name="fecha" id="txFecha" required></div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Moneda</label>
+        <select class="select" name="moneda" id="txMoneda" required></select>
+      </div>
+      <div class="field" style="justify-content: flex-end;">
+        <div class="body-sm" id="txMonedaHint" style="color: var(--on-surface-variant); align-self: flex-end;"></div>
+      </div>
     </div>
     <div class="field"><label>Cuenta</label><select class="select" name="cuenta_id" id="txCuenta" required></select></div>
     <div class="field" id="wrapSubcuenta" style="display: none;"><label>Subcuenta</label><select class="select" name="subcuenta_id" id="txSubcuenta"><option value="">— Ninguna —</option></select></div>
@@ -1889,6 +1926,15 @@
       <div class="field"><label>Día del mes</label><input class="input" type="number" min="1" max="31" name="dia_mes" id="recDia" value="1"></div>
     </div>
     <div class="field-row">
+      <div class="field">
+        <label>Moneda</label>
+        <select class="select" name="moneda" id="recMoneda" required></select>
+      </div>
+      <div class="field" style="justify-content: flex-end;">
+        <div class="body-sm" id="recMonedaHint" style="color: var(--on-surface-variant); align-self: flex-end;"></div>
+      </div>
+    </div>
+    <div class="field-row">
       <div class="field"><label>Tipo</label>
         <select class="select" name="tipo" id="recTipo">
           <option value="gasto">Gasto</option>
@@ -1928,6 +1974,52 @@
     </div>
     <div style="display: flex; gap: var(--s-2); margin-top: var(--s-3);">
       <button type="button" class="btn btn-secondary" id="recCancel" style="flex: 1;">Cancelar</button>
+      <button type="submit" class="btn btn-primary" style="flex: 2;">Guardar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Sheet: nueva/editar moneda -->
+<div class="sheet bottom" id="sheetDivisa" role="dialog" aria-modal="true">
+  <div class="sheet-handle"></div>
+  <h3 id="sheetDivisaTitle">Nueva moneda</h3>
+  <form id="formDivisa" style="display: flex; flex-direction: column; gap: var(--s-3);">
+    <input type="hidden" name="id" id="divId">
+    <div class="field-row">
+      <div class="field"><label>Código (3 letras)</label><input class="input" type="text" name="codigo" id="divCodigo" required pattern="[A-Za-z]{3}" maxlength="3" placeholder="EUR"></div>
+      <div class="field"><label>Símbolo</label><input class="input" type="text" name="simbolo" id="divSimbolo" maxlength="3" placeholder="€"></div>
+    </div>
+    <div class="field"><label>Nombre</label><input class="input" type="text" name="nombre" id="divNombre" required placeholder="Euro"></div>
+    <div class="field" style="display: flex; justify-content: space-between; align-items: center;">
+      <label for="divActiva" style="margin: 0;">Activa</label>
+      <label class="switch"><input type="checkbox" id="divActiva" checked><span class="track"><span class="knob"></span></span></label>
+    </div>
+    <div style="display: flex; gap: var(--s-2); margin-top: var(--s-3);">
+      <button type="button" class="btn btn-secondary" id="divCancel" style="flex: 1;">Cancelar</button>
+      <button type="submit" class="btn btn-primary" style="flex: 2;">Guardar</button>
+    </div>
+  </form>
+</div>
+
+<!-- Sheet: nuevo tipo de cambio -->
+<div class="sheet bottom" id="sheetTipoCambio" role="dialog" aria-modal="true">
+  <div class="sheet-handle"></div>
+  <h3 id="sheetTipoCambioTitle">Nuevo tipo de cambio</h3>
+  <form id="formTipoCambio" style="display: flex; flex-direction: column; gap: var(--s-3);">
+    <div class="field-row">
+      <div class="field">
+        <label>Base (1 unidad =)</label>
+        <select class="select" name="base" id="tcBase" required></select>
+      </div>
+      <div class="field">
+        <label>Destino</label>
+        <select class="select" name="destino" id="tcDestino" required></select>
+      </div>
+    </div>
+    <div class="field"><label>Ratio (1 base = X destino)</label><input class="input" type="number" name="ratio" id="tcRatio" step="0.000001" min="0" required placeholder="0.92"></div>
+    <div class="body-sm" id="tcHint" style="color: var(--on-surface-variant);">Se guardará también la inversa para que las conversiones en ambos sentidos estén cubiertas.</div>
+    <div style="display: flex; gap: var(--s-2); margin-top: var(--s-3);">
+      <button type="button" class="btn btn-secondary" id="tcCancel" style="flex: 1;">Cancelar</button>
       <button type="submit" class="btn btn-primary" style="flex: 2;">Guardar</button>
     </div>
   </form>
@@ -2296,7 +2388,7 @@ function setIconPick(hidden, value) {
 }
 
 const Estado = {
-  bootstrap: { cuentas: [], categorias: [], establecimientos: [], transacciones: [], recurrentes: [], presupuestos: [], resumen: null, sesion: null, version: '', hojas: [], hojaActivaId: '' },
+  bootstrap: { cuentas: [], categorias: [], establecimientos: [], transacciones: [], recurrentes: [], presupuestos: [], resumen: null, sesion: null, version: '', hojas: [], hojaActivaId: '', divisas: { default_codigo: 'EUR', items: [] }, tiposCambio: [], moneda_por_defecto: 'EUR' },
   filtros: { cuenta_id: '', subcuenta_id: '', tipo: '', categoria_id: '', desde: '', hasta: '', q: '' },
   movOrden: { campo: 'fecha', direccion: 'desc' },
   pres: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1, asignado: {} },
@@ -2651,6 +2743,16 @@ function txEnMes_(t, anio, mes) {
   return f.getFullYear() === Number(anio) && (f.getMonth() + 1) === Number(mes);
 }
 
+// ponytail: helper de agregación. Las txs en moneda distinta a la default
+// llegan con `importe_en_defecto` ya calculado por el backend; las legacy
+// (sin ese campo) caen a `importe`. Esto evita que un gasto en COP sume
+// como 100000 en el resumen, que estaba implícitamente en EUR.
+function impDefLocal_(t) {
+  const v = t.importe_en_defecto;
+  if (v != null && v !== '' && !isNaN(Number(v))) return Number(v);
+  return Number(t.importe || 0);
+}
+
 function calcularProximosRecurrentesLocal_() {
   const recs = (Estado.bootstrap.recurrentes || []).filter(r => r.activa);
   const hoy = new Date();
@@ -2697,16 +2799,16 @@ function calcularResumenLocal_(anio, mes) {
   const txs = Estado.bootstrap.transacciones || [];
   const cuentasById = cuentasByIdLocal_();
   const enMes = txs.filter(t => txEnMes_(t, a, m));
-  const ingresos = enMes.filter(t => t.tipo === 'ingreso').reduce((s, t) => s + Number(t.importe || 0), 0);
-  const gastos = enMes.filter(t => t.tipo === 'gasto').reduce((s, t) => s + Number(t.importe || 0), 0);
+  const ingresos = enMes.filter(t => t.tipo === 'ingreso').reduce((s, t) => s + impDefLocal_(t), 0);
+  const gastos = enMes.filter(t => t.tipo === 'gasto').reduce((s, t) => s + impDefLocal_(t), 0);
   // ponytail: devoluciones restan del total de gastos del mes (revierte gastos).
-  const devoluciones = enMes.filter(t => t.tipo === 'devolucion').reduce((s, t) => s + Number(t.importe || 0), 0);
+  const devoluciones = enMes.filter(t => t.tipo === 'devolucion').reduce((s, t) => s + impDefLocal_(t), 0);
   const transferenciasGasto = enMes
     .filter(t => t.tipo === 'transferencia' && tipoTransferenciaPresupuestoLocal_(t, cuentasById) === 'gasto')
-    .reduce((s, t) => s + Number(t.importe || 0), 0);
+    .reduce((s, t) => s + impDefLocal_(t), 0);
   const transferenciasIngreso = enMes
     .filter(t => t.tipo === 'transferencia' && tipoTransferenciaPresupuestoLocal_(t, cuentasById) === 'ingreso')
-    .reduce((s, t) => s + Number(t.importe || 0), 0);
+    .reduce((s, t) => s + impDefLocal_(t), 0);
   const pendiente = enMes.filter(t => t.estado === 'pendiente').length;
   const vencido = enMes.filter(t => t.estado === 'vencido').length;
   const evol = [];
@@ -2716,9 +2818,9 @@ function calcularResumenLocal_(anio, mes) {
     const en = txs.filter(t => String(t.fecha).slice(0, 7) === k);
     evol.push({
       mes: k,
-      ingresos: en.filter(t => t.tipo === 'ingreso').reduce((s, t) => s + Number(t.importe || 0), 0),
-      gastos: en.filter(t => t.tipo === 'gasto').reduce((s, t) => s + Number(t.importe || 0), 0)
-              - en.filter(t => t.tipo === 'devolucion').reduce((s, t) => s + Number(t.importe || 0), 0)
+      ingresos: en.filter(t => t.tipo === 'ingreso').reduce((s, t) => s + impDefLocal_(t), 0),
+      gastos: en.filter(t => t.tipo === 'gasto').reduce((s, t) => s + impDefLocal_(t), 0)
+              - en.filter(t => t.tipo === 'devolucion').reduce((s, t) => s + impDefLocal_(t), 0)
     });
   }
   return {
@@ -2745,6 +2847,8 @@ function calcularCategoriasResumenLocal_(anio, mes) {
   const catsById = {};
   cats.forEach(c => { catsById[c.id] = c; });
   const cuentasById = cuentasByIdLocal_();
+  // ponytail: agregamos en moneda por defecto (importe_en_defecto) para que
+  // mezclar txs en EUR + USD no distorsione el resumen por categoría.
   const porCatRep = {};
   txs.forEach(t => {
     if (t.tipo !== 'transferencia') return;
@@ -2753,8 +2857,10 @@ function calcularCategoriasResumenLocal_(anio, mes) {
     if (tipoPresupuesto === 'neutro') return;
     const rep = parseRepartoDestinoLocal_(t.reparto_destino);
     if (!rep.length) return;
+    const totalRep = rep.reduce((s, x) => s + Number(x.importe || 0), 0);
     rep.forEach(r => {
-      const imp = Number(r.importe || 0);
+      const frac = totalRep > 0 ? Number(r.importe || 0) / totalRep : 0;
+      const imp = impDefLocal_(t) * frac;
       if (!(imp > 0)) return;
       const catId = r.categoria_id || '';
       const cat = catsById[catId];
@@ -2769,7 +2875,7 @@ function calcularCategoriasResumenLocal_(anio, mes) {
       if (t.categoria_id !== c.id) return false;
       return txEnMes_(t, a, m);
     }).reduce((s, t) => {
-      const imp = Number(t.importe || 0);
+      const imp = impDefLocal_(t);
       return s + (t.tipo === 'devolucion' ? -imp : imp);
     }, 0) + (porCatRep[c.id] || 0);
     return { id: c.id, nombre: c.nombre, color: c.color, esperado, real, diferencia: real - esperado };
@@ -2795,9 +2901,9 @@ function calcularResumenEstablecimientosLocal_(anio, mes) {
     .forEach(t => {
       const fila = porId[String(t.establecimiento_id || '')] || porId[''];
       if (!fila) return;
-      if (t.tipo === 'ingreso') fila.ingresos += Number(t.importe || 0);
-      else if (t.tipo === 'gasto') fila.gastos += Number(t.importe || 0);
-      else if (t.tipo === 'devolucion') fila.gastos -= Number(t.importe || 0); // ponytail: revierten gasto
+      if (t.tipo === 'ingreso') fila.ingresos += impDefLocal_(t);
+      else if (t.tipo === 'gasto') fila.gastos += impDefLocal_(t);
+      else if (t.tipo === 'devolucion') fila.gastos -= impDefLocal_(t); // ponytail: revierten gasto
     });
   filas.forEach(f => { f.neto = f.ingresos - f.gastos; });
   return { anio: a, mes: m, filas: filas };
@@ -3500,6 +3606,7 @@ function setRouteLoading(route) {
 // evitando errores del tipo "Cannot read properties of undefined (reading 'map')".
 function normalizarBootstrap(b) {
   b = b || {};
+  const divs = b.divisas && typeof b.divisas === 'object' ? b.divisas : {};
   return {
     cuentas: Array.isArray(b.cuentas) ? b.cuentas : [],
     categorias: Array.isArray(b.categorias) ? b.categorias : [],
@@ -3512,7 +3619,17 @@ function normalizarBootstrap(b) {
     version: b.version || '',
     data_version: b.data_version || '',
     hojas: Array.isArray(b.hojas) ? b.hojas : [],
-    hojaActivaId: b.hojaActivaId || ''
+    hojaActivaId: b.hojaActivaId || '',
+    // ponytail: catálogo de divisas + tipos de cambio + default. La UI de
+    // Divisas los lee de aquí; el selector de moneda del tx form también.
+    // Tipamos `default_codigo` como código ISO mayúsculas; si viene vacío o
+    // null, caemos a EUR para no romper el form.
+    divisas: {
+      default_codigo: String(divs.default_codigo || b.moneda_por_defecto || 'EUR').toUpperCase(),
+      items: Array.isArray(divs.items) ? divs.items : []
+    },
+    tiposCambio: Array.isArray(b.tiposCambio) ? b.tiposCambio : [],
+    moneda_por_defecto: String(b.moneda_por_defecto || divs.default_codigo || 'EUR').toUpperCase()
   };
 }
 
@@ -3909,7 +4026,7 @@ function bindVisibilitySync_() {
 }
 
 // === Rutas ===
-const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'admin', 'configuracion', 'sinHojas'];
+const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'divisas', 'admin', 'configuracion', 'sinHojas'];
 
 function usuarioSinHojas_() {
   const b = Estado.bootstrap || {};
@@ -3941,6 +4058,7 @@ function go(route) {
   if (route === 'conciliar') renderConciliar();
   if (route === 'categorias') renderCategorias();
   if (route === 'establecimientos') renderEstablecimientos();
+  if (route === 'divisas') renderDivisas();
   if (route === 'admin') renderAdmin();
   if (route === 'configuracion') renderConfiguracion();
   if (route === 'dashboard') renderDashboard();
@@ -4122,12 +4240,26 @@ function txRow(t) {
       <div class="tx-title">${escape(t.descripcion || (cat ? cat.nombre : 'Sin descripción'))}</div>
       <div class="tx-sub">${escape(t.fecha || '')} · ${detalle}</div>
     </div>
-    <div class="tx-amount ${cls}">${sign}${fmtMoneda(t.importe, t.moneda || (cta ? cta.moneda : 'EUR'))}</div>
+    <div class="tx-amount ${cls}" style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+      <span>${sign}${fmtMoneda(t.importe, t.moneda || (cta ? cta.moneda : 'EUR'))}</span>${renderImporteDefectoHtml_(t)}
+    </div>
     <div style="display: flex; gap: 2px;">
       <button class="icon-btn" data-tx-edit="${t.id}" title="Editar">${ICONOS.edit}</button>
       <button class="icon-btn" data-tx-del="${t.id}" title="Eliminar">${ICONOS.delete}</button>
     </div>
   </div>`;
+}
+
+// ponytail: línea secundaria bajo el importe de la tx cuando está en una
+// moneda distinta a la por defecto. Devuelve '' si no aplica. El backend
+// rellena `importe_en_defecto` al guardar, así que esta lectura es fiable.
+function renderImporteDefectoHtml_(t) {
+  const def = (Estado.bootstrap && Estado.bootstrap.moneda_por_defecto) || 'EUR';
+  const codigo = String(t.moneda || '').toUpperCase();
+  const impDef = t.importe_en_defecto;
+  if (!codigo || codigo === def) return '';
+  if (impDef == null || impDef === '') return '';
+  return `<span class="body-sm" style="color: var(--on-surface-variant); font-weight: 400;">≈ ${escape(fmtMoneda(impDef, def))}</span>`;
 }
 
 function tipoTransferenciaPresupuestoUI_(cuentaOrigenId, cuentaDestinoId) {
@@ -4389,7 +4521,10 @@ function renderMovimientos() {
       <td>${cuentaHtml}</td>
       <td><div style="display: flex; flex-wrap: wrap; gap: 4px;">${catsHtml}</div></td>
       <td><span class="pill ${pill}">${escape(t.estado)}</span></td>
-      <td class="num" style="color: ${color};">${sign}${fmtMoneda(t.importe, t.moneda || (cta ? cta.moneda : 'EUR'))}</td>
+      <td class="num" style="color: ${color};">
+        <div>${sign}${fmtMoneda(t.importe, t.moneda || (cta ? cta.moneda : 'EUR'))}</div>
+        ${renderImporteDefectoHtml_(t)}
+      </td>
       <td class="actions">
         <button class="icon-btn" data-tx-edit="${t.id}">${ICONOS.edit}</button>
         <button class="icon-btn" data-tx-del="${t.id}">${ICONOS.delete}</button>
@@ -4865,7 +5000,9 @@ function txRowSimple(t, opts) {
       <div class="tx-title">${escape(t.descripcion || (cat ? cat.nombre : 'Sin descripción'))}</div>
       <div class="tx-sub">${escape(t.fecha || '')} · ${detalle}</div>
     </div>
-    <div class="tx-amount ${cls}">${sign}${fmtMoneda(t.importe, t.moneda || (cta ? cta.moneda : 'EUR'))}</div>
+    <div class="tx-amount ${cls}" style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+      <span>${sign}${fmtMoneda(t.importe, t.moneda || (cta ? cta.moneda : 'EUR'))}</span>${renderImporteDefectoHtml_(t)}
+    </div>
   </div>`;
 }
 
@@ -4942,6 +5079,183 @@ function openCategoriaTxList(id, nombre, tipo) {
 
 $('#estTxListClose').addEventListener('click', closeAllSheets);
 $('#sheetCuentasDetalleClose').addEventListener('click', closeAllSheets);
+
+// === Divisas view ===
+// ponytail: refresca el catálogo + tipos de cambio contra el backend. Si el
+// servidor añadió/quító monedas (o cambió el default) actualizamos
+// Estado.bootstrap y repintamos. Llamada al entrar a la vista.
+async function renderDivisas() {
+  const div = await call('obtenerDivisas');
+  const tcs = await call('obtenerTiposCambio');
+  Estado.bootstrap.divisas = div;
+  Estado.bootstrap.tiposCambio = tcs;
+  Estado.bootstrap.moneda_por_defecto = String(div.default_codigo || 'EUR').toUpperCase();
+  $('#divisasDefaultLabel').textContent = Estado.bootstrap.moneda_por_defecto;
+  paintDivisas(div);
+  paintTiposCambio(tcs);
+}
+
+function paintDivisas(div) {
+  const list = $('#divisasList');
+  if (!list) return;
+  const items = (div && div.items) || [];
+  if (!items.length) {
+    list.innerHTML = '<div class="empty"><div class="title-sm">Sin monedas</div><div class="body-sm">Añade la primera con el botón superior.</div></div>';
+    return;
+  }
+  list.innerHTML = items.map(d => {
+    const defTag = d.por_defecto ? '<span class="pill pos">Default</span>' : '';
+    const activaTag = d.activa === false ? '<span class="pill neg">Inactiva</span>' : '';
+    return `<div class="card" data-div-id="${d.id}" style="padding: var(--s-3);">
+      <div style="display: flex; align-items: baseline; gap: var(--s-2); flex-wrap: wrap;">
+        <strong style="font-size: 18px;">${escape(d.codigo)}</strong>
+        <span style="font-size: 20px;">${escape(d.simbolo || '')}</span>
+        ${defTag}${activaTag}
+      </div>
+      <div class="body-sm" style="color: var(--on-surface-variant); margin-top: 4px;">${escape(d.nombre || '')}</div>
+      <div style="display: flex; gap: 6px; margin-top: var(--s-2); flex-wrap: wrap;">
+        ${d.por_defecto ? '' : `<button class="btn btn-sm btn-outline" data-div-set-defecto="${d.id}">Marcar default</button>`}
+        <button class="btn btn-sm btn-outline" data-div-edit="${d.id}">Editar</button>
+        ${d.por_defecto ? '' : `<button class="btn btn-sm btn-outline" data-div-del="${d.id}">Eliminar</button>`}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function paintTiposCambio(tcs) {
+  const list = $('#tiposCambioList');
+  if (!list) return;
+  const items = tcs || [];
+  if (!items.length) {
+    list.innerHTML = '<div class="empty"><div class="title-sm">Sin tipos de cambio</div><div class="body-sm">Añade uno con el botón superior.</div></div>';
+    return;
+  }
+  list.innerHTML = items.map(t =>
+    `<div class="card" style="padding: var(--s-3); display: flex; align-items: center; gap: var(--s-3);">
+      <div style="flex: 1;">
+        <strong>1 ${escape(t.base)} = ${escape(String(t.ratio))} ${escape(t.destino)}</strong>
+        <div class="body-sm" style="color: var(--on-surface-variant);">${escape(t.fecha || '—')}</div>
+      </div>
+      <button class="btn btn-sm btn-outline" data-tc-del="${t.id}">Eliminar</button>
+    </div>`
+  ).join('');
+}
+
+function openDivisa(id) {
+  const d = id ? (Estado.bootstrap.divisas.items || []).find(x => x.id === id) : null;
+  $('#sheetDivisaTitle').textContent = d ? 'Editar moneda' : 'Nueva moneda';
+  $('#divId').value = d ? d.id : '';
+  $('#divCodigo').value = d ? d.codigo : '';
+  $('#divSimbolo').value = d ? (d.simbolo || '') : '';
+  $('#divNombre').value = d ? d.nombre : '';
+  $('#divActiva').checked = d ? (d.activa !== false) : true;
+  // Si es nueva o edición de moneda no-default, dejamos editar el código;
+  // si es default, el código debe quedar fijo (es la moneda canónica).
+  const def = Estado.bootstrap.moneda_por_defecto;
+  $('#divCodigo').readOnly = !!(d && d.codigo === def);
+  openSheet('sheetDivisa');
+}
+
+function openTipoCambio() {
+  const items = (Estado.bootstrap.divisas && Estado.bootstrap.divisas.items) || [];
+  const opts = items.map(d => `<option value="${d.codigo}">${escape(d.codigo)} — ${escape(d.nombre || '')}</option>`).join('');
+  $('#tcBase').innerHTML = opts || '<option value="">— Añade monedas primero —</option>';
+  $('#tcDestino').innerHTML = opts || '<option value="">— Añade monedas primero —</option>';
+  // Sugerir el default como base.
+  const def = Estado.bootstrap.moneda_por_defecto;
+  if (def && items.some(d => d.codigo === def)) {
+    $('#tcBase').value = def;
+    const otra = items.find(d => d.codigo !== def);
+    if (otra) $('#tcDestino').value = otra.codigo;
+  }
+  $('#tcRatio').value = '';
+  openSheet('sheetTipoCambio');
+}
+
+function refrescarDivisasDespuesDeOperacion_() {
+  return call('obtenerDivisas').then(div => {
+    Estado.bootstrap.divisas = div;
+    Estado.bootstrap.moneda_por_defecto = String(div.default_codigo || 'EUR').toUpperCase();
+    $('#divisasDefaultLabel').textContent = Estado.bootstrap.moneda_por_defecto;
+    paintDivisas(div);
+    return call('obtenerTiposCambio');
+  }).then(tcs => {
+    Estado.bootstrap.tiposCambio = tcs;
+    paintTiposCambio(tcs);
+  });
+}
+
+if ($('#divisasList')) $('#divisasList').addEventListener('click', (e) => {
+  const editBtn = e.target.closest('[data-div-edit]');
+  const delBtn = e.target.closest('[data-div-del]');
+  const defBtn = e.target.closest('[data-div-set-defecto]');
+  if (editBtn) openDivisa(editBtn.dataset.divEdit);
+  else if (delBtn) {
+    const id = delBtn.dataset.divDel;
+    pedirConfirmacion('¿Eliminar esta moneda?', 'Eliminar', true, async () => {
+      try {
+        await call('eliminarDivisa', id);
+        await refrescarDivisasDespuesDeOperacion_();
+        toast('Moneda eliminada');
+      } catch (err) { toast(String(err.message || err)); }
+    });
+  } else if (defBtn) {
+    const id = defBtn.dataset.divSetDefecto;
+    call('setDivisaPorDefecto', id).then(refrescarDivisasDespuesDeOperacion_).then(() => toast('Moneda por defecto actualizada')).catch(err => toast(String(err.message || err)));
+  }
+});
+
+if ($('#tiposCambioList')) $('#tiposCambioList').addEventListener('click', (e) => {
+  const delBtn = e.target.closest('[data-tc-del]');
+  if (!delBtn) return;
+  const id = delBtn.dataset.tcDel;
+  pedirConfirmacion('¿Eliminar este tipo de cambio?', 'Eliminar', true, async () => {
+    try {
+      await call('eliminarTipoCambio', id);
+      await refrescarDivisasDespuesDeOperacion_();
+      toast('Tipo de cambio eliminado');
+    } catch (err) { toast(String(err.message || err)); }
+  });
+});
+
+if ($('#btnNuevaDivisa')) $('#btnNuevaDivisa').addEventListener('click', () => openDivisa());
+if ($('#btnNuevoTipoCambio')) $('#btnNuevoTipoCambio').addEventListener('click', () => openTipoCambio());
+if ($('#divCancel')) $('#divCancel').addEventListener('click', closeAllSheets);
+if ($('#tcCancel')) $('#tcCancel').addEventListener('click', closeAllSheets);
+
+if ($('#formDivisa')) $('#formDivisa').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const codigo = String(f.get('codigo') || '').toUpperCase().trim();
+  const payload = {
+    id: f.get('id') || '',
+    codigo: codigo,
+    simbolo: String(f.get('simbolo') || '').trim(),
+    nombre: String(f.get('nombre') || '').trim(),
+    activa: $('#divActiva').checked
+  };
+  try {
+    await call('guardarDivisa', payload);
+    await refrescarDivisasDespuesDeOperacion_();
+    closeAllSheets();
+    toast('Moneda guardada');
+  } catch (err) { toast(String(err.message || err)); }
+});
+
+if ($('#formTipoCambio')) $('#formTipoCambio').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const base = String(f.get('base') || '').toUpperCase();
+  const destino = String(f.get('destino') || '').toUpperCase();
+  const ratio = Number(f.get('ratio') || 0);
+  if (!base || !destino || !(ratio > 0)) { toast('Faltan datos'); return; }
+  try {
+    await call('guardarTipoCambio', base, destino, ratio);
+    await refrescarDivisasDespuesDeOperacion_();
+    closeAllSheets();
+    toast('Tipo de cambio guardado');
+  } catch (err) { toast(String(err.message || err)); }
+});
 
 $$('[data-est-nav]').forEach(b => b.addEventListener('click', () => {
   let { anio, mes } = Estado.estMes;
@@ -5122,6 +5436,10 @@ function openTx(id) {
   Estado._lastCtaDestinoId = '';
   poblarSelect('#txCuenta', Estado.bootstrap.cuentas, f.cuenta_id, c => c.nombre + ' (' + c.moneda + ')');
   poblarSelect('#txCuentaDest', Estado.bootstrap.cuentas, f.cuenta_destino_id, c => c.nombre + ' (' + c.moneda + ')');
+  // ponytail: selector de moneda. Default = la moneda por defecto del
+  // bootstrap; si estamos editando, conservamos la que traía la tx.
+  poblarSelectMoneda_('#txMoneda', f.moneda);
+  actualizarHintMoneda_();
   setTipoTx(f.tipo || 'gasto');
   if ((f.tipo || 'gasto') !== 'transferencia') {
     // ponytail: la devolución debe elegir una categoría de gasto.
@@ -5201,6 +5519,10 @@ function setTipoTx(tipo) {
   actualizarTotalReparto();
 }
 $$('[data-tx-tipo]').forEach(b => b.addEventListener('click', () => setTipoTx(b.dataset.txTipo)));
+const txMonedaSel = $('#txMoneda');
+if (txMonedaSel) txMonedaSel.addEventListener('change', actualizarHintMoneda_);
+const txImporteEl = $('#txImporte');
+if (txImporteEl) txImporteEl.addEventListener('input', actualizarHintMoneda_);
 
 function actualizarSubcuentasTx(preferred) {
   const isTransfer = Estado.txTipo === 'transferencia';
@@ -5546,6 +5868,9 @@ $('#formTx').addEventListener('submit', async (e) => {
     id: txId,
     tipo: Estado.txTipo,
     importe: Number(f.get('importe')),
+    // ponytail: moneda del importe. Si el usuario la cambió en el form, el
+    // backend la convierte a importe_en_defecto usando TiposCambio.
+    moneda: String(f.get('moneda') || Estado.bootstrap.moneda_por_defecto || 'EUR').toUpperCase(),
     fecha: f.get('fecha'),
     cuenta_id: f.get('cuenta_id'),
     subcuenta_id: f.get('subcuenta_id') || '',
@@ -5609,6 +5934,83 @@ $('#formTx').addEventListener('submit', async (e) => {
 function poblarSelect(sel, items, val, label) {
   const el = $(sel); if (!el) return;
   el.innerHTML = '<option value="">—</option>' + items.map(i => `<option value="${i.id}" ${i.id === val ? 'selected' : ''}>${escape(label(i))}</option>`).join('');
+}
+
+// ponytail: poblar un select de moneda desde el catálogo de bootstrap. Si
+// `val` no está en el catálogo (p.ej. una tx legacy con una moneda que el
+// usuario desactivó), igual la añadimos como opción para no perder la fila
+// al editar.
+function poblarSelectMoneda_(sel, val) {
+  const el = $(sel); if (!el) return;
+  const catalogo = ((Estado.bootstrap && Estado.bootstrap.divisas && Estado.bootstrap.divisas.items) || [])
+    .filter(d => d.activa !== false);
+  const codigos = catalogo.map(d => String(d.codigo || '').toUpperCase()).filter(Boolean);
+  if (val && codigos.indexOf(String(val).toUpperCase()) < 0) codigos.push(String(val).toUpperCase());
+  const def = (Estado.bootstrap && Estado.bootstrap.moneda_por_defecto) || 'EUR';
+  el.innerHTML = codigos.map(c => {
+    const lbl = (catalogo.find(d => String(d.codigo || '').toUpperCase() === c) || {}).nombre || c;
+    const selAttr = String(c).toUpperCase() === String(val || def).toUpperCase() ? 'selected' : '';
+    const tag = String(c).toUpperCase() === String(def).toUpperCase() ? ' (default)' : '';
+    return `<option value="${c}" ${selAttr}>${escape(c)} — ${escape(lbl)}${tag}</option>`;
+  }).join('');
+}
+
+// ponytail: muestra el equivalente en la moneda por defecto cuando el usuario
+// elige una moneda distinta. Lee la última tasa del cache de bootstrap
+// (TiposCambio) — si no hay tasa, muestra "—" y deja al backend el rechazo
+// al guardar.
+function actualizarHintMoneda_() {
+  const sel = $('#txMoneda'); if (!sel) return;
+  const hint = $('#txMonedaHint'); if (!hint) return;
+  const def = (Estado.bootstrap && Estado.bootstrap.moneda_por_defecto) || 'EUR';
+  const codigo = String(sel.value || def).toUpperCase();
+  if (codigo === def) {
+    hint.textContent = '';
+    return;
+  }
+  const importe = Number($('#txImporte').value || 0);
+  const ratio = ratioLocalEntre_(codigo, def);
+  if (importe > 0 && ratio > 0) {
+    hint.textContent = '≈ ' + fmtMoneda(importe * ratio, def);
+  } else if (ratio > 0) {
+    hint.textContent = '1 ' + codigo + ' = ' + ratio + ' ' + def;
+  } else {
+    hint.textContent = 'Sin tipo de cambio ' + codigo + '→' + def + '. Añádelo en Divisas.';
+  }
+}
+
+// ponytail: ratio más reciente entre dos monedas del cache de bootstrap.
+// Soporta dirección directa e inversa.
+function ratioLocalEntre_(origen, destino) {
+  origen = String(origen || '').toUpperCase();
+  destino = String(destino || '').toUpperCase();
+  if (!origen || !destino || origen === destino) return 1;
+  const tcs = ((Estado.bootstrap && Estado.bootstrap.tiposCambio) || []).slice()
+    .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  const directa = tcs.find(t => String(t.base || '').toUpperCase() === origen && String(t.destino || '').toUpperCase() === destino);
+  if (directa && Number(directa.ratio) > 0) return Number(directa.ratio);
+  const inversa = tcs.find(t => String(t.base || '').toUpperCase() === destino && String(t.destino || '').toUpperCase() === origen);
+  if (inversa && Number(inversa.ratio) > 0) return 1 / Number(inversa.ratio);
+  return 0;
+}
+
+// ponytail: variante del hint para el sheet de recurrentes. Misma idea que
+// actualizarHintMoneda_ pero lee #recMoneda / #recImporte.
+function actualizarHintMonedaRec_() {
+  const sel = $('#recMoneda'); if (!sel) return;
+  const hint = $('#recMonedaHint'); if (!hint) return;
+  const def = (Estado.bootstrap && Estado.bootstrap.moneda_por_defecto) || 'EUR';
+  const codigo = String(sel.value || def).toUpperCase();
+  if (codigo === def) { hint.textContent = ''; return; }
+  const importe = Number($('#recImporte').value || 0);
+  const ratio = ratioLocalEntre_(codigo, def);
+  if (importe > 0 && ratio > 0) {
+    hint.textContent = '≈ ' + fmtMoneda(importe * ratio, def);
+  } else if (ratio > 0) {
+    hint.textContent = '1 ' + codigo + ' = ' + ratio + ' ' + def;
+  } else {
+    hint.textContent = 'Sin tipo de cambio ' + codigo + '→' + def + '. Añádelo en Divisas.';
+  }
 }
 
 // === Cuenta sheet ===
@@ -6311,6 +6713,9 @@ function openRec(id) {
   $('#recAnioInicio').value = anioIni || '';
   poblarSelect('#recCuenta', Estado.bootstrap.cuentas, p.cuenta_id || '', c => c.nombre + ' (' + c.moneda + ')');
   poblarSelect('#recEstablecimiento', Estado.bootstrap.establecimientos, p.tipo === 'transferencia' ? '' : (p.establecimiento_id || ''), e => e.nombre);
+  // ponytail: selector de moneda para recurrentes. Mismo helper que en tx.
+  poblarSelectMoneda_('#recMoneda', p.moneda);
+  actualizarHintMonedaRec_();
   syncFormRecurrente(p);
   recDraft.id = r ? r.id : '';
   recDraft.plantilla = r ? r.plantilla : '';
@@ -6339,6 +6744,10 @@ $('#recPer').addEventListener('input', () => {
   renderRepartoRowsRec(subsD, Estado.repRecDest);
   actualizarTotalRepartoRec();
 });
+const recMonedaSel = $('#recMoneda');
+if (recMonedaSel) recMonedaSel.addEventListener('change', actualizarHintMonedaRec_);
+const recImporteEl = $('#recImporte');
+if (recImporteEl) recImporteEl.addEventListener('input', actualizarHintMonedaRec_);
 $('#formRec').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (Estado.guardandoRec) return;
@@ -6365,6 +6774,8 @@ $('#formRec').addEventListener('submit', async (e) => {
   const plantilla = Object.assign({}, base, {
     descripcion: f.get('descripcion'),
     importe: Number(f.get('importe')),
+    // ponytail: la moneda se propaga a las txs generadas desde esta plantilla.
+    moneda: String(f.get('moneda') || Estado.bootstrap.moneda_por_defecto || 'EUR').toUpperCase(),
     tipo: tipo,
     periodo_meses: Number(f.get('periodo_meses')),
     dia_mes: Number(f.get('dia_mes')),
