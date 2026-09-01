@@ -683,6 +683,8 @@
   .rep-account-movement { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: var(--s-2); padding: 6px 0; border-bottom: 1px solid var(--surface-container); color: var(--on-surface-variant); font-size: 13px; min-width: 0; }
   .rep-account-movement > :nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rep-account-movement strong { color: var(--on-surface); white-space: nowrap; }
+  .rep-movement-amounts { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }
+  .rep-movement-balance { color: var(--on-surface-variant); font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; }
   .rep-movement-amount.pos { color: var(--primary); }
   .rep-movement-amount.neg { color: var(--error); }
   .rep-movement-amount.neutral { color: var(--on-surface-variant); }
@@ -1683,13 +1685,13 @@
       <div class="bento rep-kpi-grid" id="repSummary" aria-live="polite"></div>
 
       <div class="bento" style="margin-top: var(--s-6);">
-        <div class="card col-7">
-          <div class="card-h"><h2>Distribución por categoría</h2></div>
-          <div id="repCategorias"></div>
-        </div>
-        <div class="card col-5">
+        <div class="card col-12">
           <div class="card-h"><h2>Movimientos del mes</h2><span class="label-md" id="repMovTotal">—</span></div>
           <div id="repMovimientosResumen"></div>
+        </div>
+        <div class="card col-12">
+          <div class="card-h"><h2>Distribución por categoría</h2></div>
+          <div id="repCategorias"></div>
         </div>
       </div>
 
@@ -3364,7 +3366,7 @@ function aplicarDeltaTxSobreCuentas_(cuentas, tx, factor) {
     else if (tipo === 'ingreso' || tipo === 'devolucion') deltaOrigen = importe;
     else if (tipo === 'gasto' || tipo === 'transferencia') deltaOrigen = -importe;
 
-    const subOrigen = findSub(ctaOrigen, tx.subcuenta_id);
+    const subOrigen = findSub(ctaOrigen, tx.subcuenta_id || (ctaOrigen.subcuentas && ctaOrigen.subcuentas[0] && ctaOrigen.subcuentas[0].id) || '');
     if (subOrigen) {
       subOrigen.saldo = Number(subOrigen.saldo || 0) + deltaOrigen * f;
       // Modelo aditivo: el saldo del padre incluye el de las subcuentas.
@@ -3394,7 +3396,7 @@ function aplicarDeltaTxSobreCuentas_(cuentas, tx, factor) {
         });
         bumpEvolucion(ctaDest, importeDest * f);
       } else {
-        const subDest = findSub(ctaDest, tx.subcuenta_destino_id);
+        const subDest = findSub(ctaDest, tx.subcuenta_destino_id || (ctaDest.subcuentas && ctaDest.subcuentas[0] && ctaDest.subcuentas[0].id) || '');
         if (subDest) {
           subDest.saldo = Number(subDest.saldo || 0) + importeDest * f;
           ctaDest.saldo = Number(ctaDest.saldo || 0) + importeDest * f;
@@ -6261,6 +6263,13 @@ function repCategoryColor_(color) {
   return /^#[0-9a-f]{6}$/i.test(String(color || '')) ? String(color) : '#00613e';
 }
 
+function repOrdenarTx_(txs) {
+  return (txs || []).slice().sort((a, b) => {
+    const fecha = String(a.fecha || '').localeCompare(String(b.fecha || ''));
+    return fecha || String(a.fecha_creacion || '').localeCompare(String(b.fecha_creacion || ''));
+  });
+}
+
 function repDistribution_(cats, tipo, txs) {
   const nombreTipo = tipo === 'gasto' ? 'Gastos' : 'Ingresos';
   const filas = cats.filter(c => c.tipo === tipo && Number(c.real || 0) > 0);
@@ -6298,20 +6307,36 @@ function repDistribution_(cats, tipo, txs) {
   return `<section class="rep-distribution-group" aria-label="${nombreTipo} por categoría"><div class="rep-distribution-head"><h3>${nombreTipo}</h3><span>Total ${fmtMoneda(total)}</span></div>${contenido}</section>`;
 }
 
-function repMovementRow_(t, category) {
-  const cuenta = (Estado.bootstrap.cuentas || []).find(c => c.id === t.cuenta_id);
+function repSaldoCuentaTras_(saldo, t, cuentaId) {
+  if (t.cuenta_id === cuentaId && t.cuenta_destino_id === cuentaId) return saldo;
+  let delta = 0;
+  const devolConDestino = t.tipo === 'devolucion' && t.cuenta_destino_id;
+  if (t.cuenta_id === cuentaId) {
+    if (devolConDestino) delta -= Number(t.importe || 0);
+    else if (t.tipo === 'ingreso' || t.tipo === 'devolucion') delta += Number(t.importe || 0);
+    else if (t.tipo === 'gasto' || t.tipo === 'transferencia') delta -= Number(t.importe || 0);
+  }
+  if ((t.tipo === 'transferencia' || t.tipo === 'devolucion') && t.cuenta_destino_id === cuentaId) {
+    delta += Number(t.importe_destino || t.importe || 0);
+  }
+  return saldo + delta;
+}
+
+function repMovementRow_(t, category, account, saldoAnterior) {
+  const cuenta = account || (Estado.bootstrap.cuentas || []).find(c => c.id === t.cuenta_id);
   const cuentaDestino = (Estado.bootstrap.cuentas || []).find(c => c.id === t.cuenta_destino_id);
   const sub = cuenta && (cuenta.subcuentas || []).find(s => s.id === t.subcuenta_id);
   const subDestino = cuentaDestino && (cuentaDestino.subcuentas || []).find(s => s.id === t.subcuenta_destino_id);
   const categoria = category || (Estado.bootstrap.categorias || []).find(c => c.id === t.categoria_id);
   const esTransferencia = t.tipo === 'transferencia' || t.tipo === 'devolucion';
-  const signo = t.tipo === 'ingreso' || t.tipo === 'devolucion' ? '+' : (t.tipo === 'gasto' ? '-' : '↔');
+  const signo = (t.tipo === 'ingreso' || t.tipo === 'devolucion') ? '+' : (t.tipo === 'gasto' ? '-' : '↔');
   const direccionTransferencia = tipoTransferenciaPresupuestoUI_(t.cuenta_id, t.cuenta_destino_id);
   const amountClass = direccionTransferencia === 'gasto' ? 'neg' : (direccionTransferencia === 'ingreso' ? 'pos' : (t.tipo === 'ingreso' || t.tipo === 'devolucion' ? 'pos' : (t.tipo === 'gasto' ? 'neg' : 'neutral')));
   const movimiento = esTransferencia
     ? `${cuenta ? escape(cuenta.nombre) : '—'}${sub ? ' · ' + escape(sub.nombre) : ''} → ${cuentaDestino ? escape(cuentaDestino.nombre) : '—'}${subDestino ? ' · ' + escape(subDestino.nombre) : ''}`
     : `${escape(t.descripcion || (categoria ? categoria.nombre : 'Sin descripción'))}${cuenta ? ' · ' + escape(cuenta.nombre) : ''}${sub ? ' · ' + escape(sub.nombre) : ''}`;
-  return `<div class="rep-account-movement"><span>${escape(t.fecha || '—')}</span><span>${movimiento}</span><strong class="data-tabular rep-movement-amount ${amountClass}">${signo}${fmtMoneda(t.importe, t.moneda || (cuenta ? cuenta.moneda : 'EUR'))}</strong></div>`;
+  const saldoResultante = account ? repSaldoCuentaTras_(saldoAnterior, t, account.id) : null;
+  return `<div class="rep-account-movement"><span>${escape(t.fecha || '—')}</span><span>${movimiento}</span><span class="rep-movement-amounts"><strong class="data-tabular rep-movement-amount ${amountClass}">${signo}${fmtMoneda(t.importe, t.moneda || (cuenta ? cuenta.moneda : 'EUR'))}</strong>${account ? `<span class="rep-movement-balance">Saldo ${fmtMoneda(saldoResultante, account.moneda)}</span>` : ''}</span></div>`;
 }
 
 function repAccountTxMatch_(tx, id, subId) {
@@ -6327,6 +6352,13 @@ function repRenderAccounts_(cuentas) {
   if (!cuentas.length) return emptyHtml('Sin cuentas', 'Crea una cuenta para consultar sus saldos.');
   return cuentas.map(cuenta => {
     const icono = ICONOS[cuenta.icono] || ICONOS.account_balance_wallet;
+    const movimientos = repOrdenarTx_(cuenta.movimientos || []);
+    let saldoRemanente = Number(cuenta.saldo_inicial || 0);
+    const accountTxs = movimientos.map(t => {
+      const row = repMovementRow_(t, null, cuenta, saldoRemanente);
+      saldoRemanente = repSaldoCuentaTras_(saldoRemanente, t, cuenta.id);
+      return row;
+    }).join('');
     const subs = (cuenta.subcuentas || []).map(sub => `
       <div class="rep-subcta">
         <div class="rep-subcta-main"><div class="body-sm rep-subcta-name">${escape(sub.nombre)}</div></div>
@@ -6335,7 +6367,7 @@ function repRenderAccounts_(cuentas) {
     return `<div class="rep-account">
       <div class="rep-account-head" data-rep-account="${escape(cuenta.id)}" data-rep-name="${escape(cuenta.nombre)}" tabindex="0" role="button" aria-label="Ver movimientos de ${escape(cuenta.nombre)}">
         <div class="acct-ico" style="${cuenta.tipo === 'pasivo' ? 'background: var(--error-container); color: var(--on-error-container);' : ''}">${icono}</div>
-        <div class="rep-account-head-main"><div class="rep-account-name">${escape(cuenta.nombre)}</div><div class="body-sm" style="color: var(--on-surface-variant);">${(cuenta.movimientos || []).length} movimientos en el mes</div></div>
+        <div class="rep-account-head-main"><div class="rep-account-name">${escape(cuenta.nombre)}</div><div class="body-sm" style="color: var(--on-surface-variant);">${movimientos.length} movimientos en el mes</div></div>
         <div class="rep-account-values" style="flex: 0 1 360px; margin: 0;">
           <div><div class="rep-account-value-label">Saldo inicial</div><div class="rep-account-value">${fmtMoneda(cuenta.saldo_inicial, cuenta.moneda)}</div></div>
           <div><div class="rep-account-value-label">Saldo final</div><div class="rep-account-value">${fmtMoneda(cuenta.saldo_final, cuenta.moneda)}</div></div>
@@ -6344,8 +6376,8 @@ function repRenderAccounts_(cuentas) {
       </div>
       ${subs ? `<div class="rep-subcuentas">${subs}</div>` : ''}
       <details class="rep-account-movs" open>
-        <summary class="rep-account-movs-summary"><span class="label-md" style="color: var(--on-surface-variant);">Transacciones del mes</span><span class="label-md" style="color: var(--on-surface-variant);">${(cuenta.movimientos || []).length}</span></summary>
-        <div class="rep-account-movs-content">${(cuenta.movimientos || []).length ? (cuenta.movimientos || []).map(repMovementRow_).join('') : '<div class="rep-list-note">Sin transacciones en el periodo.</div>'}</div>
+        <summary class="rep-account-movs-summary"><span class="label-md" style="color: var(--on-surface-variant);">Transacciones del mes</span><span class="label-md" style="color: var(--on-surface-variant);">${movimientos.length}</span></summary>
+        <div class="rep-account-movs-content">${movimientos.length ? accountTxs : '<div class="rep-list-note">Sin transacciones en el periodo.</div>'}</div>
       </details>
     </div>`;
   }).join('');
@@ -6363,7 +6395,7 @@ async function renderReportes() {
     if (anio !== Estado.repMes.anio || mes !== Estado.repMes.mes) return;
     const resumen = data.resumen || {};
     const categorias = data.categorias || [];
-    const transacciones = data.transacciones || [];
+    const transacciones = repOrdenarTx_(data.transacciones || []);
     const cuentas = data.cuentas || [];
     const ingresos = Number(resumen.ingresos || 0);
     const egresos = Number(resumen.gastos || 0);
@@ -7844,7 +7876,7 @@ $('#formRec').addEventListener('submit', async (e) => {
     periodo_meses: Number(f.get('periodo_meses')),
     dia_mes: Number(f.get('dia_mes')),
     cuenta_id: f.get('cuenta_id'),
-    subcuenta_id: esTransfer ? '' : (f.get('subcuenta_id') || ''),
+    subcuenta_id: f.get('subcuenta_id') || '',
     cuenta_destino_id: cuentaDestinoId,
     subcuenta_destino_id: usarReparto ? '' : subcuentaDestinoId,
     importe_destino: esTransfer && importeDestino > 0 ? importeDestino : '',
