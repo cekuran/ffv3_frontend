@@ -4008,6 +4008,38 @@ function parseConflictError_(err) {
   }
 }
 
+// ponytail: parsea errores DUPLICATE: del backend. Mismo shape que el conflict
+// parser; el frontend decide si mostrar confirm para reintentar con
+// force_duplicate=true o dejarlo en un toast informativo.
+function parseDuplicateError_(err) {
+  const msg = String((err && err.message) || err || '');
+  if (!msg.startsWith('DUPLICATE:')) return null;
+  try {
+    return JSON.parse(msg.slice('DUPLICATE:'.length));
+  } catch (_) {
+    return { mensaje: msg.slice('DUPLICATE:'.length) || 'Posible duplicado' };
+  }
+}
+
+// ponytail: muestra un confirm ofreciendo "Guardar igual" y reintenta la
+// llamada con force_duplicate=true. Si el usuario cancela, deja el form abierto
+// y el botón deshabilitado (mismo shape que manejarConflictoGuardado_).
+async function manejarDuplicadoGuardado_(dup, retry) {
+  const msg = (dup && dup.mensaje) || 'Ya existe un registro similar.';
+  return new Promise(resolve => {
+    openConfirm({
+      title: 'Posible duplicado',
+      message: msg + ' ¿Quieres guardarlo de todas formas?',
+      confirmLabel: 'Guardar igual',
+      onConfirm: async () => {
+        try { await retry(); }
+        catch (e) { toast('Error: ' + (e && e.message || e)); }
+        resolve();
+      }
+    });
+  });
+}
+
 // Firma estable de una tx para comparar versiones locales vs servidor.
 function txVersionKey_(t) {
   if (!t || !t.id) return '';
@@ -6373,7 +6405,12 @@ $('#formTx').addEventListener('submit', async (e) => {
     if (conflict) {
       await manejarConflictoGuardado_(conflict, 'tx');
     } else {
-      toast('Error: ' + err.message);
+      const dup = parseDuplicateError_(err);
+      if (dup) {
+        await manejarDuplicadoGuardado_(dup, () => call('guardarTransaccion', Object.assign({}, tx, { force_duplicate: true })));
+      } else {
+        toast('Error: ' + err.message);
+      }
     }
   }
   finally {
@@ -7303,7 +7340,15 @@ $('#formRec').addEventListener('submit', async (e) => {
     // desde memoria sin round-trip.
     refrescarDependientesRecurrentes_();
     toast(recDraft.id ? 'Plantilla actualizada' : 'Plantilla creada');
-  } catch (err) { toast('Error: ' + err.message); }
+  } catch (err) {
+    const dup = parseDuplicateError_(err);
+    if (dup) {
+      const argsDup = Object.assign({}, args, { force_duplicate: true });
+      await manejarDuplicadoGuardado_(dup, () => call('guardarRecurrente', argsDup));
+    } else {
+      toast('Error: ' + err.message);
+    }
+  }
   finally {
     Estado.guardandoRec = false;
     if (btnRec) { btnRec.disabled = false; btnRec.textContent = btnRecLabel || 'Guardar'; }
