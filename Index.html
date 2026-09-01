@@ -606,6 +606,54 @@
     .ppto-input { width: 100px; min-width: 100px; flex: none; }
   }
 
+  /* === Reportes === */
+  .rep-kpi-grid { margin-top: var(--s-6); }
+  .rep-kpi { display: flex; flex-direction: column; justify-content: space-between; min-height: 116px; }
+  .rep-kpi-value { font-size: clamp(26px, 4vw, 36px); line-height: 1.1; font-weight: 700; }
+  .rep-kpi-note { color: var(--on-surface-variant); font-size: 13px; margin-top: var(--s-2); }
+  .rep-bar-track { height: 18px; background: var(--surface-container-high); border-radius: var(--r-full); overflow: hidden; display: flex; gap: 2px; }
+  .rep-bar-segment { min-width: 3px; height: 100%; transition: width 0.6s ease-out; }
+  .rep-legend { display: flex; flex-direction: column; gap: var(--s-3); margin-top: var(--s-4); }
+  .rep-legend-row { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+  .rep-legend-dot { width: 12px; height: 12px; border-radius: var(--r-sm); flex: 0 0 12px; }
+  .rep-legend-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rep-account { padding: var(--s-4); background: var(--surface-container-low); border: 1px solid var(--outline-variant); border-radius: var(--r-xl); margin-bottom: var(--s-3); }
+  .rep-account-head { display: flex; align-items: center; gap: var(--s-3); cursor: pointer; min-width: 0; }
+  .rep-account-head-main { flex: 1; min-width: 0; }
+  .rep-account-name { font-weight: 700; }
+  .rep-account-values { display: grid; grid-template-columns: repeat(3, minmax(110px, 1fr)); gap: var(--s-3); margin-left: 48px; margin-top: var(--s-3); }
+  .rep-account-value-label { color: var(--on-surface-variant); font-size: 12px; }
+  .rep-account-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rep-subcuentas { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px dashed var(--outline-variant); margin: var(--s-3) 0 0 48px; padding-top: var(--s-3); }
+  .rep-subcta { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2); background: var(--surface-container-lowest); border-radius: var(--r-md); cursor: pointer; min-width: 0; }
+  .rep-subcta-main { flex: 1; min-width: 0; }
+  .rep-subcta-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rep-subcta-values { display: flex; gap: var(--s-3); flex-wrap: wrap; color: var(--on-surface-variant); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .rep-account-movs { border-top: 1px solid var(--surface-container); margin: var(--s-3) 0 0 48px; padding-top: var(--s-3); }
+  .rep-account-movement { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: var(--s-2); padding: 6px 0; border-bottom: 1px solid var(--surface-container); color: var(--on-surface-variant); font-size: 13px; min-width: 0; }
+  .rep-account-movement > :nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rep-account-movement strong { color: var(--on-surface); white-space: nowrap; }
+  .rep-list-note { color: var(--on-surface-variant); padding: var(--s-4) 0; text-align: center; }
+  @media (max-width: 767px) {
+    .rep-account-values { grid-template-columns: 1fr 1fr; margin-left: 0; }
+    .rep-account-values > :last-child { grid-column: 1 / -1; }
+    .rep-subcuentas, .rep-account-movs { margin-left: 0; }
+    .rep-subcta { align-items: flex-start; flex-direction: column; }
+    .rep-account-movement { grid-template-columns: 80px minmax(0, 1fr) auto; }
+    .rep-subcta-values { width: 100%; justify-content: space-between; }
+  }
+
+  @media print {
+    body { background: #fff; }
+    .sidebar, .header, .bottom-nav, .fab, .sheet-overlay, .sheet, .view:not(.is-active) { display: none !important; }
+    .app { padding: 0 !important; }
+    .main { padding: 0 !important; max-width: none !important; }
+    .view.is-active { display: block !important; }
+    .section-h, .card, .rep-account, .rep-subcuentas { break-inside: avoid; }
+    .card, .rep-account { box-shadow: none; }
+    #repMesNav, #repPdf { display: none !important; }
+  }
+
   /* === Bottom nav === */
   .bottom-nav {
     position: fixed;
@@ -1560,6 +1608,57 @@
       </div>
     </section>
 
+    <!-- Reportes -->
+    <section class="view" data-view="reportes">
+      <div class="section-h">
+        <div>
+          <h2 style="font-size: 24px;">Reportes</h2>
+          <div class="card-sub" id="repPeriodo">—</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; justify-content: flex-end;">
+          <div class="seg-control" id="repMesNav" aria-label="Cambiar mes del reporte">
+            <button type="button" data-rep-nav="prev" aria-label="Mes anterior">‹</button>
+            <span class="is-on" id="repMesLabel" style="padding: 6px 12px;">—</span>
+            <button type="button" data-rep-nav="next" aria-label="Mes siguiente">›</button>
+          </div>
+          <button class="btn btn-secondary btn-sm" type="button" id="repPdf"><span class="material-icons" aria-hidden="true">print</span> Guardar como PDF</button>
+        </div>
+      </div>
+
+      <div class="bento rep-kpi-grid" id="repSummary" aria-live="polite"></div>
+
+      <div class="bento" style="margin-top: var(--s-6);">
+        <div class="card col-7">
+          <div class="card-h"><h2>Distribución por categoría</h2><span class="label-md" id="repCategoriasTotal">—</span></div>
+          <div id="repCategorias"></div>
+        </div>
+        <div class="card col-5">
+          <div class="card-h"><h2>Movimientos del mes</h2><span class="label-md" id="repMovTotal">—</span></div>
+          <div id="repMovimientosResumen"></div>
+        </div>
+      </div>
+
+      <div class="bento" style="margin-top: var(--s-6);">
+        <div class="card col-6">
+          <div class="card-h"><h2>Ingresos</h2><span class="label-md" id="repIngresosTotal">—</span></div>
+          <div id="repIngresos"></div>
+        </div>
+        <div class="card col-6">
+          <div class="card-h"><h2>Egresos</h2><span class="label-md" id="repEgresosTotal">—</span></div>
+          <div id="repEgresos"></div>
+        </div>
+      </div>
+
+      <div class="section-h" style="margin-top: var(--s-7);">
+        <div>
+          <h2>Cuentas y subcuentas</h2>
+          <div class="card-sub">Saldos del mes seleccionado, incluyendo transferencias y reparto.</div>
+        </div>
+      </div>
+      <div id="repCuentas"></div>
+      <div id="repStatus" class="body-sm" role="status" aria-live="polite" style="padding: var(--s-4) 0;"></div>
+    </section>
+
     <!-- Recurrentes -->
     <section class="view" data-view="recurrentes">
       <div class="section-h">
@@ -1865,6 +1964,10 @@
         Más
       </button>
       <div class="more-dropdown" id="moreDropdown" role="menu">
+        <button class="more-dropdown-item" type="button" data-route="reportes" role="menuitem">
+          <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v2H4zm0 4h16v2H4zm0 4h10v2H4zm0 4h10v2H4zm12-5h4v2h-4zm0 4h4v2h-4z"/></svg>
+          Reportes
+        </button>
         <button class="more-dropdown-item" type="button" data-route="recurrentes" role="menuitem">
           <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l5-4-5-4v3H5v6h2zm10 10H7v-3l-5 4 5 4v-3h12v-6h-2z"/></svg>
           Recurrentes
@@ -2558,6 +2661,7 @@ const Estado = {
   movOrden: { campo: 'fecha', direccion: 'desc' },
   pres: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1, asignado: {} },
   estMes: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1 },
+  repMes: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1 },
   txTipo: 'gasto',
   txRepartoDest: [],
   repRecDest: [],
@@ -3738,6 +3842,14 @@ function setRouteLoading(route) {
     $('#movCount').textContent = '...';
     $('#movBody').innerHTML = loadingTableRowHtml('Actualizando movimientos...', 8);
   }
+  if (route === 'reportes') {
+    $('#repSummary').innerHTML = loadingBlockHtml('Actualizando reporte...');
+    $('#repCategorias').innerHTML = loadingBlockHtml('Actualizando categorías...');
+    $('#repMovimientosResumen').innerHTML = loadingBlockHtml('Actualizando movimientos...');
+    $('#repIngresos').innerHTML = loadingBlockHtml('Actualizando ingresos...');
+    $('#repEgresos').innerHTML = loadingBlockHtml('Actualizando egresos...');
+    $('#repCuentas').innerHTML = loadingBlockHtml('Actualizando cuentas...');
+  }
   if (route === 'presupuesto') {
     $('#presGasto').textContent = '...';
     $('#presTotal').textContent = '...';
@@ -4005,7 +4117,7 @@ function closeMoreMenu() {
 function updateMoreMenuActive(route) {
   const wrap = $('.more-wrap');
   if (!wrap) return;
-  wrap.classList.toggle('is-active', ['conciliar', 'recurrentes', 'categorias', 'establecimientos', 'admin'].includes(route));
+  wrap.classList.toggle('is-active', ['conciliar', 'reportes', 'recurrentes', 'categorias', 'establecimientos', 'admin'].includes(route));
 }
 
 let _txSyncToken = 0;
@@ -4226,7 +4338,7 @@ function bindVisibilitySync_() {
 }
 
 // === Rutas ===
-const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'divisas', 'viajes', 'admin', 'configuracion', 'sinHojas'];
+const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'reportes', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'divisas', 'viajes', 'admin', 'configuracion', 'sinHojas'];
 
 function usuarioSinHojas_() {
   const b = Estado.bootstrap || {};
@@ -4252,6 +4364,7 @@ function go(route) {
     return;
   }
   if (route === 'presupuesto') renderPresupuesto();
+  if (route === 'reportes') renderReportes();
   if (route === 'cuentas') renderCuentas();
   if (route === 'movimientos') renderMovimientos();
   if (route === 'recurrentes') renderRecurrentes();
@@ -5906,6 +6019,177 @@ $('#presCats').addEventListener('change', async e => {
     renderPresupuesto();
     toast('Presupuesto guardado');
   } catch (e) { toast('Error: ' + e.message); }
+});
+
+// === Reportes ===
+function repMesLabel_(anio, mes) {
+  return new Date(anio, mes - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+}
+
+function repCategoryColor_(color) {
+  return /^#[0-9a-f]{6}$/i.test(String(color || '')) ? String(color) : '#00613e';
+}
+
+function repTxList_(txs) {
+  return txs.length ? txs.map(t => txRowSimple(t)).join('') : emptyHtml('Sin movimientos', 'No hay movimientos de este tipo en el mes seleccionado.');
+}
+
+function repDistribution_(cats, tipo) {
+  const filas = cats.filter(c => c.tipo === tipo && Number(c.real || 0) > 0);
+  const total = filas.reduce((s, c) => s + Number(c.real || 0), 0);
+  if (!filas.length) return '<div class="rep-list-note">Sin ' + (tipo === 'gasto' ? 'gastos' : 'ingresos') + ' por categoría.</div>';
+  const bars = filas.map(c => {
+    const amount = Number(c.real || 0);
+    const pct = total > 0 ? amount / total * 100 : 0;
+    return `<div class="rep-bar-segment" tabindex="0" role="img" aria-label="${escape(c.nombre)}: ${Math.round(pct)}%, ${fmtMoneda(amount)}" style="width:${pct}%; background:${repCategoryColor_(c.color)};" title="${escape(c.nombre)} · ${Math.round(pct)}% · ${fmtMoneda(amount)}"></div>`;
+  }).join('');
+  const legend = filas.map(c => {
+    const amount = Number(c.real || 0);
+    const pct = total > 0 ? Math.round(amount / total * 100) : 0;
+    return `<div class="rep-legend-row"><span class="rep-legend-dot" style="background:${repCategoryColor_(c.color)};"></span><span class="body-sm rep-legend-name">${escape(c.nombre)}</span><span class="body-sm data-tabular">${pct}% · ${fmtMoneda(amount)}</span></div>`;
+  }).join('');
+  return `<div class="rep-bar-track" aria-label="Distribución de ${tipo === 'gasto' ? 'gastos' : 'ingresos'} por categoría">${bars}</div><div class="rep-legend">${legend}</div>`;
+}
+
+function repMovementRow_(t) {
+  const cuenta = (Estado.bootstrap.cuentas || []).find(c => c.id === t.cuenta_id);
+  const cuentaDestino = (Estado.bootstrap.cuentas || []).find(c => c.id === t.cuenta_destino_id);
+  const sub = cuenta && (cuenta.subcuentas || []).find(s => s.id === t.subcuenta_id);
+  const subDestino = cuentaDestino && (cuentaDestino.subcuentas || []).find(s => s.id === t.subcuenta_destino_id);
+  const categoria = (Estado.bootstrap.categorias || []).find(c => c.id === t.categoria_id);
+  const esTransferencia = t.tipo === 'transferencia' || t.tipo === 'devolucion';
+  const signo = t.tipo === 'ingreso' || t.tipo === 'devolucion' ? '+' : (t.tipo === 'gasto' ? '-' : '↔');
+  const movimiento = esTransferencia
+    ? `${cuenta ? escape(cuenta.nombre) : '—'}${sub ? ' · ' + escape(sub.nombre) : ''} → ${cuentaDestino ? escape(cuentaDestino.nombre) : '—'}${subDestino ? ' · ' + escape(subDestino.nombre) : ''}`
+    : `${escape(t.descripcion || (categoria ? categoria.nombre : 'Sin descripción'))}${cuenta ? ' · ' + escape(cuenta.nombre) : ''}${sub ? ' · ' + escape(sub.nombre) : ''}`;
+  return `<div class="rep-account-movement"><span>${escape(t.fecha || '—')}</span><span>${movimiento}</span><strong class="data-tabular">${signo}${fmtMoneda(t.importe, t.moneda || (cuenta ? cuenta.moneda : 'EUR'))}</strong></div>`;
+}
+
+function repAccountTxMatch_(tx, id, subId) {
+  if (subId) {
+    if (String(tx.subcuenta_id || '') === String(subId)) return true;
+    if (String(tx.subcuenta_destino_id || '') === String(subId)) return true;
+    return (parseRepartoFromTx_(tx) || []).some(r => String(r.subcuenta_id || '') === String(subId));
+  }
+  return String(tx.cuenta_id || '') === String(id) || String(tx.cuenta_destino_id || '') === String(id);
+}
+
+function repRenderAccounts_(cuentas) {
+  if (!cuentas.length) return emptyHtml('Sin cuentas', 'Crea una cuenta para consultar sus saldos.');
+  return cuentas.map(cuenta => {
+    const icono = ICONOS[cuenta.icono] || ICONOS.account_balance_wallet;
+    const subs = (cuenta.subcuentas || []).map(sub => `
+      <div class="rep-subcta" data-rep-sub="${escape(sub.id)}" data-rep-name="${escape(sub.nombre)}" tabindex="0" role="button" aria-label="Ver movimientos de ${escape(sub.nombre)}">
+        <div class="rep-subcta-main"><div class="body-sm rep-subcta-name">${escape(sub.nombre)}</div></div>
+        <div class="rep-subcta-values"><span>Inicial ${fmtMoneda(sub.saldo_inicial, cuenta.moneda)}</span><span>→</span><span>Final ${fmtMoneda(sub.saldo_final, cuenta.moneda)}</span></div>
+      </div>`).join('');
+    return `<div class="rep-account">
+      <div class="rep-account-head" data-rep-account="${escape(cuenta.id)}" data-rep-name="${escape(cuenta.nombre)}" tabindex="0" role="button" aria-label="Ver movimientos de ${escape(cuenta.nombre)}">
+        <div class="acct-ico" style="${cuenta.tipo === 'pasivo' ? 'background: var(--error-container); color: var(--on-error-container);' : ''}">${icono}</div>
+        <div class="rep-account-head-main"><div class="rep-account-name">${escape(cuenta.nombre)}</div><div class="body-sm" style="color: var(--on-surface-variant);">${(cuenta.movimientos || []).length} movimientos en el mes</div></div>
+        <div class="rep-account-values" style="flex: 0 1 360px; margin: 0;">
+          <div><div class="rep-account-value-label">Saldo inicial</div><div class="rep-account-value">${fmtMoneda(cuenta.saldo_inicial, cuenta.moneda)}</div></div>
+          <div><div class="rep-account-value-label">Saldo final</div><div class="rep-account-value">${fmtMoneda(cuenta.saldo_final, cuenta.moneda)}</div></div>
+          <div><div class="rep-account-value-label">Variación</div><div class="rep-account-value">${fmtMoneda(Number(cuenta.saldo_final || 0) - Number(cuenta.saldo_inicial || 0), cuenta.moneda)}</div></div>
+        </div>
+      </div>
+      ${subs ? `<div class="rep-subcuentas">${subs}</div>` : ''}
+      <div class="rep-account-movs">
+        <div class="label-md" style="color: var(--on-surface-variant); margin-bottom: var(--s-2);">Transacciones del mes</div>
+        ${(cuenta.movimientos || []).length ? (cuenta.movimientos || []).map(repMovementRow_).join('') : '<div class="rep-list-note">Sin transacciones en el periodo.</div>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function renderReportes() {
+  const { anio, mes } = Estado.repMes;
+  const periodo = repMesLabel_(anio, mes);
+  $('#repPeriodo').textContent = 'Resumen de ' + periodo + ' · moneda ' + (Estado.bootstrap.moneda_por_defecto || 'EUR');
+  $('#repMesLabel').textContent = new Date(anio, mes - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
+  setRouteLoading('reportes');
+  $('#repStatus').textContent = '';
+  try {
+    const data = await call('obtenerReporteMensual', anio, mes);
+    if (anio !== Estado.repMes.anio || mes !== Estado.repMes.mes) return;
+    const resumen = data.resumen || {};
+    const categorias = data.categorias || [];
+    const transacciones = data.transacciones || [];
+    const cuentas = data.cuentas || [];
+    const ingresos = Number(resumen.ingresos || 0);
+    const egresos = Number(resumen.gastos || 0);
+    const esperado = categorias.reduce((s, c) => s + Number(c.esperado || 0), 0);
+    const presupuesto = categorias.reduce((s, c) => s + Number(c.real || 0), 0);
+    const pctPres = esperado > 0 ? Math.round(presupuesto / esperado * 100) : 0;
+    const kpis = [
+      { label: 'Ingresos', value: fmtMoneda(ingresos), note: 'Ingresos registrados', cls: 'pos' },
+      { label: 'Egresos', value: fmtMoneda(egresos), note: 'Gastos menos devoluciones', cls: 'neg' },
+      { label: 'Saldo neto', value: fmtMoneda(ingresos - egresos), note: 'Ingresos menos egresos', cls: ingresos - egresos >= 0 ? 'pos' : 'neg' },
+      { label: 'Presupuesto', value: fmtMoneda(esperado), note: pctPres + '% utilizado · ' + fmtMoneda(presupuesto), cls: pctPres > 100 ? 'neg' : '' }
+    ];
+    $('#repSummary').innerHTML = kpis.map(k => `<div class="card col-3 rep-kpi"><div><div class="label-md" style="color: var(--on-surface-variant);">${k.label}</div><div class="rep-kpi-value ${k.cls}">${k.value}</div></div><div class="rep-kpi-note">${k.note}</div></div>`).join('');
+    $('#repCategoriasTotal').textContent = fmtMoneda(categorias.reduce((s, c) => s + Math.max(0, Number(c.real || 0)), 0));
+    $('#repCategorias').innerHTML = repDistribution_(categorias, 'gasto') + repDistribution_(categorias, 'ingreso');
+    const transferencias = transacciones.filter(t => t.tipo === 'transferencia').length;
+    const pendientes = transacciones.filter(t => t.estado === 'pendiente' || t.estado === 'vencido').length;
+    $('#repMovTotal').textContent = transacciones.length + ' movimientos';
+    $('#repMovimientosResumen').innerHTML = [
+      ['Transacciones', transacciones.length],
+      ['Transferencias', transferencias],
+      ['Pendientes o vencidas', pendientes]
+    ].map(([label, value]) => `<div class="kpi" style="padding: var(--s-2) 0;"><div class="kpi-ico bg-primary"><span class="material-icons" aria-hidden="true">receipt_long</span></div><div><div class="label-md" style="color: var(--on-surface-variant);">${label}</div><div class="title-md">${value}</div></div></div>`).join('');
+    const ingresosTx = transacciones.filter(t => t.tipo === 'ingreso' || t.tipo === 'devolucion');
+    const egresosTx = transacciones.filter(t => t.tipo === 'gasto');
+    $('#repIngresosTotal').textContent = ingresosTx.length + ' movimientos';
+    $('#repEgresosTotal').textContent = egresosTx.length + ' movimientos';
+    $('#repIngresos').innerHTML = repTxList_(ingresosTx);
+    $('#repEgresos').innerHTML = repTxList_(egresosTx);
+    $('#repCuentas').innerHTML = repRenderAccounts_(cuentas);
+    $('#repStatus').textContent = cuentas.length ? '' : 'No hay cuentas visibles para el periodo seleccionado.';
+  } catch (e) {
+    $('#repSummary').innerHTML = emptyHtml('No se pudo cargar', e.message || 'Inténtalo de nuevo.');
+    $('#repCategorias').innerHTML = '';
+    $('#repMovimientosResumen').innerHTML = '';
+    $('#repIngresos').innerHTML = '';
+    $('#repEgresos').innerHTML = '';
+    $('#repCuentas').innerHTML = '';
+    $('#repStatus').textContent = '';
+  }
+}
+
+$$('[data-rep-nav]').forEach(b => b.addEventListener('click', () => {
+  let { anio, mes } = Estado.repMes;
+  if (b.dataset.repNav === 'prev') { mes--; if (mes < 1) { mes = 12; anio--; } }
+  else { mes++; if (mes > 12) { mes = 1; anio++; } }
+  Estado.repMes.anio = anio;
+  Estado.repMes.mes = mes;
+  renderReportes();
+}));
+
+function openReportAccountTx_(id, nombre) {
+  return openMonthTxList_(Estado.repMes, nombre || 'Cuenta', t => repAccountTxMatch_(t, id));
+}
+
+function openReportSubTx_(id, nombre) {
+  return openMonthTxList_(Estado.repMes, nombre || 'Subcuenta', t => repAccountTxMatch_(t, '', id));
+}
+
+$('#repCuentas').addEventListener('click', e => {
+  const account = e.target.closest('[data-rep-account]');
+  if (account) return openReportAccountTx_(account.dataset.repAccount, account.dataset.repName);
+  const sub = e.target.closest('[data-rep-sub]');
+  if (sub) return openReportSubTx_(sub.dataset.repSub, sub.dataset.repName);
+});
+$('#repCuentas').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const account = e.target.closest('[data-rep-account]');
+  if (account) return openReportAccountTx_(account.dataset.repAccount, account.dataset.repName);
+  const sub = e.target.closest('[data-rep-sub]');
+  if (sub) return openReportSubTx_(sub.dataset.repSub, sub.dataset.repName);
+});
+
+$('#repPdf').addEventListener('click', () => {
+  if (getActiveRoute() === 'reportes') window.print();
 });
 
 // === Sheets ===
