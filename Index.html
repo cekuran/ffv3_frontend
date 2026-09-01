@@ -588,7 +588,8 @@
   .subcta-row.subcta-row-lg .subcta-balance { font-size: 16px; }
 
   /* === Bar chart === */
-  .bars { display: flex; align-items: stretch; gap: 6px; height: 180px; padding: 0 4px; position: relative; }
+  /* ponytail: padding-left reserva espacio para las etiquetas del eje Y a la izquierda, sin superponerse a las barras */
+  .bars { display: flex; align-items: stretch; gap: 6px; height: 180px; padding: 0 4px 0 56px; position: relative; }
   /* ponytail: .bar llena la altura para que el baseline quede en el medio del stack; el .bar-fill se ancla a la línea 0 (centro) y crece hacia arriba o abajo según el signo */
   .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; height: 100%; position: relative; }
   .bar-stack { width: 100%; max-width: 24px; background: var(--surface-container-high); border-radius: 4px; position: relative; overflow: hidden; flex: 1; }
@@ -598,8 +599,8 @@
   .bar-fill.negativo { top: 50%; bottom: auto; }
   .bar-label { font-size: 10px; color: var(--on-surface-variant); font-weight: 600; }
   .bars-grid { position: absolute; inset: 0; pointer-events: none; }
-  .bars-grid > span { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--on-surface-variant); opacity: 0.18; font-size: 9px; color: var(--on-surface-variant); padding-left: 4px; }
-  .bars-grid > span.zero { border-top-style: solid; opacity: 0.45; }
+  .bars-grid > span { position: absolute; width: 50px; right: auto; left: 0; border-top: 1px dashed var(--on-surface-variant); opacity: 0.55; font-size: 9px; color: var(--on-surface-variant); text-align: right; padding-right: 6px; box-sizing: border-box; }
+  .bars-grid > span.zero { border-top-style: solid; opacity: 0.7; }
   .bars-tooltip { position: fixed; background: var(--surface-container-highest); color: var(--on-surface); padding: 6px 10px; border-radius: 6px; font-size: 12px; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.18); z-index: 1000; white-space: nowrap; opacity: 0; transition: opacity 0.15s; }
 
   /* === Progress === */
@@ -3119,9 +3120,10 @@ function calcularResumenLocal_(anio, mes) {
               - en.filter(t => t.tipo === 'devolucion').reduce((s, t) => s + impDefLocal_(t), 0)
     });
   }
-  // ponytail: balance global al final de cada mes. Saldo actual menos la
-  // acumulación de movimientos netos en meses posteriores al target.
-  const cuentasAll = Estado.bootstrap.cuentas || [];
+  // ponytail: balance global al final de cada mes. Suma del saldo actual de
+  // cuentas de activos y pasivos (c.saldo ya es agregador de sus subcuentas)
+  // menos la acumulación de movimientos netos en meses posteriores al target.
+  const cuentasAll = (Estado.bootstrap.cuentas || []).filter(c => c.tipo === 'activo' || c.tipo === 'pasivo');
   const currentBalance = cuentasAll.reduce((s, c) => s + Number(c.saldo || 0), 0);
   const netByMonth = {};
   txs.forEach(t => {
