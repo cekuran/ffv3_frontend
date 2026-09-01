@@ -690,11 +690,16 @@
   .rep-movement-amount.neutral { color: var(--on-surface-variant); }
   .rep-list-note { color: var(--on-surface-variant); padding: var(--s-4) 0; text-align: center; }
   @media (max-width: 767px) {
-    .rep-account-values { grid-template-columns: 1fr 1fr; margin-left: 0; }
+    .rep-account { padding: var(--s-3); }
+    .rep-account-head { flex-direction: column; align-items: flex-start; }
+    .rep-account-head-main { width: 100%; }
+    .rep-account-values { flex: none !important; width: 100%; grid-template-columns: 1fr 1fr; margin: var(--s-3) 0 0 !important; }
     .rep-account-values > :last-child { grid-column: 1 / -1; }
     .rep-subcuentas, .rep-account-movs { margin-left: 0; }
-    .rep-account-movement { grid-template-columns: 80px minmax(0, 1fr) auto; }
+    .rep-subcta-summary { align-items: flex-start; flex-direction: column; }
     .rep-subcta-values { width: 100%; justify-content: space-between; }
+    .rep-account-movement { grid-template-columns: 68px minmax(0, 1fr); gap: var(--s-1) var(--s-2); }
+    .rep-account-movement > :last-child { grid-column: 2; align-items: flex-start; }
   }
 
   @media print {
