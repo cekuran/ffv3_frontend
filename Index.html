@@ -588,13 +588,19 @@
   .subcta-row.subcta-row-lg .subcta-balance { font-size: 16px; }
 
   /* === Bar chart === */
-  .bars { display: flex; align-items: end; gap: 6px; height: 140px; padding: 0 4px; }
-  /* ponytail: .bar necesita altura definida para que el height:% de .bar-stack se resuelva; con align-items:end queda content-sized y colapsa a 0 */
-  .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; height: 100%; }
-  .bar-stack { width: 100%; max-width: 24px; background: var(--surface-container-high); border-radius: 4px 4px 0 0; position: relative; overflow: hidden; }
-  .bar-fill { position: absolute; bottom: 0; left: 0; right: 0; background: var(--primary); opacity: 0.7; transition: height 0.6s ease-out; }
+  .bars { display: flex; align-items: stretch; gap: 6px; height: 180px; padding: 0 4px; position: relative; }
+  /* ponytail: .bar llena la altura para que el baseline quede en el medio del stack; el .bar-fill se ancla a la línea 0 (centro) y crece hacia arriba o abajo según el signo */
+  .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; height: 100%; position: relative; }
+  .bar-stack { width: 100%; max-width: 24px; background: var(--surface-container-high); border-radius: 4px; position: relative; overflow: hidden; flex: 1; }
+  .bar-fill { position: absolute; left: 0; right: 0; background: var(--primary); opacity: 0.7; transition: height 0.6s ease-out, top 0.6s ease-out, bottom 0.6s ease-out; }
   .bar-fill.pasivo { background: var(--error); opacity: 0.6; }
+  .bar-fill.positivo { bottom: 50%; top: auto; }
+  .bar-fill.negativo { top: 50%; bottom: auto; }
   .bar-label { font-size: 10px; color: var(--on-surface-variant); font-weight: 600; }
+  .bars-grid { position: absolute; inset: 0; pointer-events: none; }
+  .bars-grid > span { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--on-surface-variant); opacity: 0.18; font-size: 9px; color: var(--on-surface-variant); padding-left: 4px; }
+  .bars-grid > span.zero { border-top-style: solid; opacity: 0.45; }
+  .bars-tooltip { position: fixed; background: var(--surface-container-highest); color: var(--on-surface); padding: 6px 10px; border-radius: 6px; font-size: 12px; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.18); z-index: 1000; white-space: nowrap; opacity: 0; transition: opacity 0.15s; }
 
   /* === Progress === */
   .progress { width: 100%; height: 8px; background: var(--surface-container-high); border-radius: var(--r-full); overflow: hidden; }
@@ -1445,8 +1451,8 @@
           <div class="card-h">
             <h2>Evolución Mensual</h2>
             <div class="legend">
-              <span><span class="dot" style="background: var(--primary);"></span>Activo</span>
-              <span><span class="dot" style="background: var(--error);"></span>Pasivo</span>
+              <span><span class="dot" style="background: var(--primary);"></span>Balance positivo</span>
+              <span><span class="dot" style="background: var(--error);"></span>Balance negativo</span>
             </div>
           </div>
           <div class="bars" id="dashBars"></div>
@@ -3113,6 +3119,31 @@ function calcularResumenLocal_(anio, mes) {
               - en.filter(t => t.tipo === 'devolucion').reduce((s, t) => s + impDefLocal_(t), 0)
     });
   }
+  // ponytail: balance global al final de cada mes. Saldo actual menos la
+  // acumulación de movimientos netos en meses posteriores al target.
+  const cuentasAll = Estado.bootstrap.cuentas || [];
+  const currentBalance = cuentasAll.reduce((s, c) => s + Number(c.saldo || 0), 0);
+  const netByMonth = {};
+  txs.forEach(t => {
+    const k = String(t.fecha).slice(0, 7);
+    let delta = 0;
+    if (t.tipo === 'ingreso') delta = impDefLocal_(t);
+    else if (t.tipo === 'gasto') delta = -impDefLocal_(t);
+    else if (t.tipo === 'devolucion') delta = impDefLocal_(t);
+    if (delta !== 0) netByMonth[k] = (netByMonth[k] || 0) + delta;
+  });
+  // ponytail: los meses del rango sin movimientos también participan en el
+  // suffix sum; si los dejamos fuera, su futureNet queda en 0 y se subestima
+  // el balance histórico cuando hay txs en meses posteriores.
+  evol.forEach(e => { if (!(e.mes in netByMonth)) netByMonth[e.mes] = 0; });
+  const allMonths = Object.keys(netByMonth).sort();
+  const futureNet = {};
+  let running = 0;
+  for (let i = allMonths.length - 1; i >= 0; i--) {
+    futureNet[allMonths[i]] = running;
+    running += netByMonth[allMonths[i]];
+  }
+  evol.forEach(e => { e.balance = currentBalance - (futureNet[e.mes] || 0); });
   return {
     anio: a,
     mes: m,
@@ -4432,22 +4463,55 @@ function renderDashboard() {
     : fmtMoneda(presTotal - gastoPres) + ' restantes';
   $('#dashPresRest').style.color = colorPres;
 
-  // Bar chart
-  // Bar chart — Evolución Mensual: neto mensual (ingresos − gastos)
-  // Verde (activo) cuando el mes es positivo, rojo (pasivo) cuando es negativo.
+  // Bar chart — Evolución Mensual: balance global al final de cada mes.
+  // La barra crece hacia arriba si el balance es positivo, hacia abajo si es
+  // negativo. Líneas de referencia cada 25% para leer la escala; hover muestra
+  // el detalle del mes.
   const evol = resumen.evol || [];
-  const maxAbs = Math.max(1, ...evol.map(e => Math.abs(Number(e.ingresos || 0) - Number(e.gastos || 0))));
-  $('#dashBars').innerHTML = evol.map(m => {
-    const neto = Number(m.ingresos || 0) - Number(m.gastos || 0);
-    const h = Math.round((Math.abs(neto) / maxAbs) * 100);
-    const neg = neto < 0;
-    return `<div class="bar">
-      <div class="bar-stack" style="height: ${Math.max(8, h)}%;">
-        <div class="bar-fill${neg ? ' pasivo' : ''}" style="height: 100%;"></div>
+  const balances = evol.map(e => Number(e.balance != null ? e.balance : (Number(e.ingresos || 0) - Number(e.gastos || 0))));
+  const maxAbs = Math.max(1, ...balances.map(v => Math.abs(v)));
+  // ponytail: el stack ocupa toda la altura, el fill se ancla al 50% (cero)
+  // y crece el % correspondiente al |balance|/maxAbs. Para evitar una barra
+  // invisible cuando el balance es ~0, forzamos un mínimo visual de 6%.
+  const barsHtml = evol.map((m, idx) => {
+    const bal = balances[idx];
+    const neg = bal < 0;
+    const h = Math.max(6, Math.round((Math.abs(bal) / maxAbs) * 50));
+    const tip = `${fmtMesCorto(m.mes)} · Balance: ${fmtMoneda(bal)}`;
+    return `<div class="bar" data-tip="${escape(tip)}">
+      <div class="bar-stack">
+        <div class="bar-fill${neg ? ' pasivo' : ''} ${neg ? 'negativo' : 'positivo'}" style="height: ${h}%;"></div>
       </div>
       <div class="bar-label">${fmtMesCorto(m.mes)}</div>
     </div>`;
   }).join('');
+  // ponytail: 5 líneas de referencia — top, +medio, cero (sólida), -medio, bottom.
+  // Las etiquetas en los extremos muestran el valor de la escala (±maxAbs).
+  const scaleLabels = [
+    { top: '0%', label: fmtMoneda(maxAbs) },
+    { top: '25%', label: '' },
+    { top: '50%', label: '0 €', zero: true },
+    { top: '75%', label: '' },
+    { top: '100%', label: fmtMoneda(-maxAbs) }
+  ];
+  const gridHtml = '<div class="bars-grid">' + scaleLabels.map(s =>
+    `<span class="${s.zero ? 'zero' : ''}" style="top:${s.top}">${s.label}</span>`
+  ).join('') + '</div>';
+  $('#dashBars').innerHTML = gridHtml + barsHtml;
+  // ponytail: tooltip único reutilizado; delegación de eventos sobre el contenedor
+  const tip = document.createElement('div');
+  tip.className = 'bars-tooltip';
+  tip.id = 'dashBarsTip';
+  $('#dashBars').appendChild(tip);
+  $('#dashBars').onmousemove = (ev) => {
+    const bar = ev.target.closest('.bar');
+    if (!bar) { tip.style.opacity = 0; return; }
+    tip.textContent = bar.dataset.tip || '';
+    tip.style.opacity = 1;
+    tip.style.left = (ev.clientX + 12) + 'px';
+    tip.style.top = (ev.clientY - 28) + 'px';
+  };
+  $('#dashBars').onmouseleave = () => { tip.style.opacity = 0; };
 
   // Cuentas preview
   const preview = cuentas.slice(0, 3);
