@@ -645,11 +645,15 @@
   .rep-account-value-label { color: var(--on-surface-variant); font-size: 12px; }
   .rep-account-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .rep-subcuentas { display: flex; flex-direction: column; gap: var(--s-2); border-top: 1px dashed var(--outline-variant); margin: var(--s-3) 0 0 48px; padding-top: var(--s-3); }
-  .rep-subcta { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2); background: var(--surface-container-lowest); border-radius: var(--r-md); cursor: pointer; min-width: 0; }
+  .rep-subcta { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2); background: var(--surface-container-lowest); border-radius: var(--r-md); min-width: 0; }
   .rep-subcta-main { flex: 1; min-width: 0; }
   .rep-subcta-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rep-subcta-values { display: flex; gap: var(--s-3); flex-wrap: wrap; color: var(--on-surface-variant); font-size: 13px; font-variant-numeric: tabular-nums; }
   .rep-account-movs { border-top: 1px solid var(--surface-container); margin: var(--s-3) 0 0 48px; padding-top: var(--s-3); }
+  .rep-account-movs-summary { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); padding: var(--s-2) 0; cursor: pointer; list-style: none; }
+  .rep-account-movs-summary::-webkit-details-marker { display: none; }
+  .rep-account-movs[open] .rep-account-movs-summary { padding-bottom: var(--s-2); }
+  .rep-account-movs-content { padding-top: var(--s-1); }
   .rep-account-movement { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: var(--s-2); padding: 6px 0; border-bottom: 1px solid var(--surface-container); color: var(--on-surface-variant); font-size: 13px; min-width: 0; }
   .rep-account-movement > :nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rep-account-movement strong { color: var(--on-surface); white-space: nowrap; }
@@ -661,7 +665,6 @@
     .rep-account-values { grid-template-columns: 1fr 1fr; margin-left: 0; }
     .rep-account-values > :last-child { grid-column: 1 / -1; }
     .rep-subcuentas, .rep-account-movs { margin-left: 0; }
-    .rep-subcta { align-items: flex-start; flex-direction: column; }
     .rep-account-movement { grid-template-columns: 80px minmax(0, 1fr) auto; }
     .rep-subcta-values { width: 100%; justify-content: space-between; }
   }
@@ -673,8 +676,8 @@
     .main { padding: 0 !important; max-width: none !important; }
     .view.is-active { display: block !important; }
     .section-h, .card, .rep-account, .rep-subcuentas { break-inside: avoid; }
-    .rep-category-txs { display: block !important; }
-    .rep-category-summary::after { display: none; }
+    .rep-category-txs, .rep-account-movs-content { display: block !important; }
+    .rep-category-summary::after, .rep-account-movs-summary::after { display: none; }
     .card, .rep-account { box-shadow: none; }
     #repMesNav, #repPdf { display: none !important; }
   }
@@ -6184,7 +6187,7 @@ function repRenderAccounts_(cuentas) {
   return cuentas.map(cuenta => {
     const icono = ICONOS[cuenta.icono] || ICONOS.account_balance_wallet;
     const subs = (cuenta.subcuentas || []).map(sub => `
-      <div class="rep-subcta" data-rep-sub="${escape(sub.id)}" data-rep-name="${escape(sub.nombre)}" tabindex="0" role="button" aria-label="Ver movimientos de ${escape(sub.nombre)}">
+      <div class="rep-subcta">
         <div class="rep-subcta-main"><div class="body-sm rep-subcta-name">${escape(sub.nombre)}</div></div>
         <div class="rep-subcta-values"><span>Inicial ${fmtMoneda(sub.saldo_inicial, cuenta.moneda)}</span><span>→</span><span>Final ${fmtMoneda(sub.saldo_final, cuenta.moneda)}</span></div>
       </div>`).join('');
@@ -6199,10 +6202,10 @@ function repRenderAccounts_(cuentas) {
         </div>
       </div>
       ${subs ? `<div class="rep-subcuentas">${subs}</div>` : ''}
-      <div class="rep-account-movs">
-        <div class="label-md" style="color: var(--on-surface-variant); margin-bottom: var(--s-2);">Transacciones del mes</div>
-        ${(cuenta.movimientos || []).length ? (cuenta.movimientos || []).map(repMovementRow_).join('') : '<div class="rep-list-note">Sin transacciones en el periodo.</div>'}
-      </div>
+      <details class="rep-account-movs" open>
+        <summary class="rep-account-movs-summary"><span class="label-md" style="color: var(--on-surface-variant);">Transacciones del mes</span><span class="label-md" style="color: var(--on-surface-variant);">${(cuenta.movimientos || []).length}</span></summary>
+        <div class="rep-account-movs-content">${(cuenta.movimientos || []).length ? (cuenta.movimientos || []).map(repMovementRow_).join('') : '<div class="rep-list-note">Sin transacciones en el periodo.</div>'}</div>
+      </details>
     </div>`;
   }).join('');
 }
@@ -6266,22 +6269,14 @@ function openReportAccountTx_(id, nombre) {
   return openMonthTxList_(Estado.repMes, nombre || 'Cuenta', t => repAccountTxMatch_(t, id));
 }
 
-function openReportSubTx_(id, nombre) {
-  return openMonthTxList_(Estado.repMes, nombre || 'Subcuenta', t => repAccountTxMatch_(t, '', id));
-}
-
 $('#repCuentas').addEventListener('click', e => {
   const account = e.target.closest('[data-rep-account]');
   if (account) return openReportAccountTx_(account.dataset.repAccount, account.dataset.repName);
-  const sub = e.target.closest('[data-rep-sub]');
-  if (sub) return openReportSubTx_(sub.dataset.repSub, sub.dataset.repName);
 });
 $('#repCuentas').addEventListener('keydown', e => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   const account = e.target.closest('[data-rep-account]');
   if (account) return openReportAccountTx_(account.dataset.repAccount, account.dataset.repName);
-  const sub = e.target.closest('[data-rep-sub]');
-  if (sub) return openReportSubTx_(sub.dataset.repSub, sub.dataset.repName);
 });
 
 $('#repPdf').addEventListener('click', () => {
