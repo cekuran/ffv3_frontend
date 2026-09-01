@@ -193,6 +193,110 @@
   /* Defensa: usuario basico nunca debe ver admin (nav, dropdown ni vista)
      aunque is-active / inline style se cuelen. */
   body.app-no-es-admin [data-rol-required="admin"] { display: none !important; }
+
+  /* === Viajes carousel === */
+  /* ponytail: un solo par de flechas, flex siblings de la card. En desktop
+     quedan a izquierda/derecha sin superponerse al contenido; en móvil la
+     card pasa arriba y las flechas abajo (50% cada una). Sin colisiones. */
+  .viaje-carousel {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: var(--s-3);
+  }
+  .viaje-card {
+    flex: 1;
+    min-width: 0;
+    padding: var(--s-5) var(--s-6);
+  }
+  .viaje-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+    flex-wrap: wrap;
+  }
+  .viaje-dates {
+    color: var(--on-surface-variant);
+  }
+  .viaje-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-3);
+    margin-top: var(--s-4);
+    padding: var(--s-4);
+    background: var(--surface-container-low);
+    border-radius: var(--r-md);
+  }
+  .viaje-metric { min-width: 0; }
+  .viaje-metric .label-md {
+    color: var(--on-surface-variant);
+    margin-bottom: 4px;
+  }
+  .viaje-metric .title-md { word-break: break-word; }
+  .viaje-actions {
+    display: flex;
+    gap: var(--s-2);
+    margin-top: var(--s-4);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .viaje-toggle { margin-left: auto; }
+  .viaje-counter {
+    margin-top: var(--s-4);
+    text-align: center;
+    color: var(--on-surface-variant);
+  }
+  .viaje-arrow {
+    flex: 0 0 48px;
+    width: 48px;
+    align-self: center;
+    height: 48px;
+    border-radius: var(--r-full);
+    background: var(--surface-container-lowest);
+    border: 1px solid var(--surface-container);
+    display: grid;
+    place-items: center;
+    font-size: 24px;
+    line-height: 1;
+    color: var(--on-surface);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .viaje-arrow:hover:not([disabled]) {
+    background: var(--primary-container);
+    color: var(--on-primary-container);
+    border-color: var(--primary-container);
+  }
+  .viaje-arrow[disabled] { opacity: 0.35; cursor: default; }
+
+  @media (max-width: 768px) {
+    .viaje-card { padding: var(--s-4); }
+    .viaje-arrow { flex-basis: 44px; width: 44px; height: 44px; font-size: 22px; }
+    .viaje-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /* Móvil: la card ocupa fila propia arriba, las dos flechas comparten la
+     fila de abajo a 50% cada una. Sin absoluto, sin colisión. */
+  @media (max-width: 520px) {
+    .viaje-carousel { flex-wrap: wrap; gap: var(--s-2); }
+    .viaje-card {
+      flex: 1 1 100%;
+      order: 1;
+      padding: var(--s-3);
+    }
+    .viaje-arrow-prev, .viaje-arrow-next {
+      flex: 1 1 calc(50% - var(--s-1));
+      height: 44px;
+      border-radius: var(--r-md);
+    }
+    .viaje-arrow-prev { order: 2; }
+    .viaje-arrow-next { order: 3; }
+    .viaje-head { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .viaje-metrics { grid-template-columns: 1fr; }
+    .viaje-toggle { margin-left: 0; width: 100%; }
+  }
+
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
   /* === Bento grid === */
@@ -1594,7 +1698,7 @@
           Nuevo viaje
         </button>
       </div>
-      <div class="bento" id="viajesList" style="margin-top: var(--s-4);"></div>
+      <div id="viajesList" style="margin-top: var(--s-4);"></div>
       <div id="viajeDetalle" style="margin-top: var(--s-5);"></div>
     </section>
 
@@ -4075,7 +4179,7 @@ function bindVisibilitySync_() {
 }
 
 // === Rutas ===
-const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'divisas', 'admin', 'configuracion', 'sinHojas'];
+const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'divisas', 'viajes', 'admin', 'configuracion', 'sinHojas'];
 
 function usuarioSinHojas_() {
   const b = Estado.bootstrap || {};
@@ -5318,8 +5422,8 @@ async function renderViajes() {
     Estado.bootstrap.viajes = data;
     paintViajes(data);
     const det = $('#viajeDetalle');
-    if (det && Estado.viajeSeleccionadoId) {
-      paintViajeDetalle(await call('obtenerDetalleViaje', Estado.viajeSeleccionadoId));
+    if (det && Estado.viajeSeleccionadoId && (data.items || []).some(v => v.id === Estado.viajeSeleccionadoId)) {
+      await refrescarDetalleViaje_();
     } else if (det) {
       det.innerHTML = '';
     }
@@ -5328,48 +5432,66 @@ async function renderViajes() {
   }
 }
 
+// ponytail: carrusel de viajes — un viaje visible a la vez con flechas y
+// contador, evita que la vista se llene de cards cuando hay muchos viajes.
 function paintViajes(data) {
   const list = $('#viajesList');
   if (!list) return;
   const items = (data && data.items) || [];
-  const moneda = (data && data.moneda_por_defecto) || Estado.bootstrap.moneda_por_defecto || 'EUR';
   if (!items.length) {
     list.innerHTML = emptyHtml('Sin viajes', 'Crea uno con el botón superior para empezar.');
     return;
   }
-  const fmt = v => fmtMoneda(v, moneda);
-  list.innerHTML = items.map(v => {
-    const dentro = v.gasto_real <= v.viatico_total;
-    const color = dentro ? 'var(--primary)' : 'var(--error)';
-    const diffAbs = Math.abs(v.viatico_total - v.gasto_real);
-    const diffTxt = (v.viatico_total - v.gasto_real >= 0 ? '+' : '−') + fmt(diffAbs);
-    return `
-    <div class="card col-6" data-viaje-card="${v.id}" style="padding: var(--s-3); cursor: pointer;">
-      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap;">
-        <strong class="title-sm">${escape(v.nombre)}</strong>
-        <span class="label-md data-tabular" style="color: var(--on-surface-variant);">${escape(v.fecha_inicio)} → ${escape(v.fecha_fin)} · ${v.dias} día${v.dias === 1 ? '' : 's'}</span>
-      </div>
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); margin-top: var(--s-3);">
-        <div>
-          <div class="label-md" style="color: var(--on-surface-variant);">Viático/día</div>
-          <div class="title-md data-tabular">${fmt(v.viatico_diario)}</div>
+  if (!items.some(v => v.id === Estado.viajeSeleccionadoId)) {
+    Estado.viajeSeleccionadoId = items[0].id;
+  }
+  const idx = items.findIndex(v => v.id === Estado.viajeSeleccionadoId);
+  const v = items[idx];
+  const moneda = (data && data.moneda_por_defecto) || Estado.bootstrap.moneda_por_defecto || 'EUR';
+  const fmt = val => fmtMoneda(val, moneda);
+  const saldo = Number(v.viatico_total || 0) - Number(v.gasto_real || 0);
+  const color = saldo >= 0 ? 'var(--primary)' : 'var(--error)';
+  const detalleVisible = !!($('#viajeDetalle') && $('#viajeDetalle').innerHTML.trim());
+  list.innerHTML = `
+    <div class="viaje-carousel">
+      <button class="viaje-arrow viaje-arrow-prev" id="viajePrev" aria-label="Viaje anterior" ${idx === 0 ? 'disabled' : ''}>‹</button>
+      <div class="card viaje-card">
+        <div class="viaje-head">
+          <strong class="title-md">${escape(v.nombre)}</strong>
+          <span class="label-md data-tabular viaje-dates">${escape(v.fecha_inicio)} → ${escape(v.fecha_fin)} · ${v.dias} día${v.dias === 1 ? '' : 's'}</span>
         </div>
-        <div>
-          <div class="label-md" style="color: var(--on-surface-variant);">Gasto real</div>
-          <div class="title-md data-tabular">${fmt(v.gasto_real)}</div>
+        <div class="viaje-metrics">
+          <div class="viaje-metric">
+            <div class="label-md">Viático/día</div>
+            <div class="title-md data-tabular">${fmt(v.viatico_diario)}</div>
+          </div>
+          <div class="viaje-metric">
+            <div class="label-md">Gasto real</div>
+            <div class="title-md data-tabular">${fmt(v.gasto_real)}</div>
+          </div>
+          <div class="viaje-metric">
+            <div class="label-md">Saldo</div>
+            <div class="title-md data-tabular" style="color: ${color};">${fmt(saldo)}</div>
+          </div>
         </div>
-        <div>
-          <div class="label-md" style="color: var(--on-surface-variant);">Saldo</div>
-          <div class="title-md data-tabular" style="color: ${color};">${diffTxt}</div>
+        <div class="viaje-actions">
+          <button class="btn btn-sm btn-outline" id="viajeEditar">Editar</button>
+          <button class="btn btn-sm btn-outline" id="viajeEliminar">Eliminar</button>
+          <button class="btn btn-sm ${detalleVisible ? 'btn-secondary' : 'btn-primary'} viaje-toggle" id="viajeToggleDetalle">${detalleVisible ? 'Ocultar detalle' : 'Ver detalle'}</button>
         </div>
+        <div class="label-md data-tabular viaje-counter">Viaje ${idx + 1} de ${items.length} · ${v.tx_count} tx vinculada${v.tx_count === 1 ? '' : 's'}</div>
       </div>
-      <div style="display: flex; gap: var(--s-2); margin-top: var(--s-3); flex-wrap: wrap;">
-        <button class="btn btn-sm btn-outline" data-viaje-edit="${v.id}">Editar</button>
-        <button class="btn btn-sm btn-outline" data-viaje-del="${v.id}">Eliminar</button>
-        <span class="label-md" style="margin-left: auto; color: var(--on-surface-variant); align-self: center;">${v.tx_count} tx vinculada${v.tx_count === 1 ? '' : 's'}</span>
-      </div>
-    </div>`;
-  }).join('');
+      <button class="viaje-arrow viaje-arrow-next" id="viajeNext" aria-label="Viaje siguiente" ${idx === items.length - 1 ? 'disabled' : ''}>›</button>
+    </div>
+  `;
+}
+
+async function refrescarDetalleViaje_() {
+  const det = $('#viajeDetalle');
+  if (!det || !Estado.viajeSeleccionadoId) return;
+  det.innerHTML = loadingBlockHtml('Cargando detalle...');
+  try { paintViajeDetalle(await call('obtenerDetalleViaje', Estado.viajeSeleccionadoId)); }
+  catch (err) { toast(String(err.message || err)); }
 }
 
 async function paintViajeDetalle(d) {
@@ -5452,6 +5574,12 @@ function renderViajeTxList_(d) {
   cont.innerHTML = txs.map(t => {
     const checked = t.viaje_id === d.id ? 'checked' : '';
     const checkedBg = t.viaje_id === d.id ? 'background: var(--surface-container-low);' : '';
+    // ponytail: misma convención que la vista Movimientos — ingresos/devoluciones
+    // en verde (primary), gastos en rojo (error), transferencias en gris.
+    const esIngresoVisual = t.tipo === 'ingreso' || t.tipo === 'devolucion';
+    const sign = esIngresoVisual ? '+' : (t.tipo === 'gasto' ? '−' : '');
+    const color = esIngresoVisual ? 'var(--primary)' : (t.tipo === 'gasto' ? 'var(--error)' : 'var(--on-surface-variant)');
+    const importe = t.importe_en_defecto || t.importe;
     return `
       <label style="display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) var(--s-3); border-radius: var(--r-md); ${checkedBg} cursor: pointer;">
         <input type="checkbox" data-viaje-tx="${escape(t.id)}" ${checked} style="margin: 0;">
@@ -5459,7 +5587,7 @@ function renderViajeTxList_(d) {
           <div class="body-sm" style="font-weight: 600;">${escape(t.descripcion || '(sin descripción)')}</div>
           <div class="label-md" style="color: var(--on-surface-variant);">${escape(t.fecha)} · ${escape(t.tipo)}</div>
         </div>
-        <div class="data-tabular" style="font-weight: 600;">${fmtMoneda(t.importe_en_defecto || t.importe, moneda)}</div>
+        <div class="data-tabular" style="font-weight: 700; color: ${color};">${sign}${fmtMoneda(importe, moneda)}</div>
       </label>
     `;
   }).join('');
@@ -5490,17 +5618,31 @@ if ($('#btnNuevoViaje')) $('#btnNuevoViaje').addEventListener('click', () => ope
 if ($('#viajeCancel')) $('#viajeCancel').addEventListener('click', closeAllSheets);
 
 if ($('#viajesList')) $('#viajesList').addEventListener('click', async (e) => {
-  const card = e.target.closest('[data-viaje-card]');
-  const editBtn = e.target.closest('[data-viaje-edit]');
-  const delBtn = e.target.closest('[data-viaje-del]');
-  if (editBtn) {
-    e.stopPropagation();
-    openViaje(editBtn.dataset.viajeEdit);
+  const items = (Estado.bootstrap.viajes && Estado.bootstrap.viajes.items) || [];
+  const idx = items.findIndex(v => v.id === Estado.viajeSeleccionadoId);
+  if (e.target.closest('#viajePrev')) {
+    if (idx > 0) {
+      Estado.viajeSeleccionadoId = items[idx - 1].id;
+      paintViajes(Estado.bootstrap.viajes);
+      await refrescarDetalleViaje_();
+    }
     return;
   }
-  if (delBtn) {
-    e.stopPropagation();
-    const id = delBtn.dataset.viajeDel;
+  if (e.target.closest('#viajeNext')) {
+    if (idx >= 0 && idx < items.length - 1) {
+      Estado.viajeSeleccionadoId = items[idx + 1].id;
+      paintViajes(Estado.bootstrap.viajes);
+      await refrescarDetalleViaje_();
+    }
+    return;
+  }
+  if (e.target.closest('#viajeEditar')) {
+    openViaje(Estado.viajeSeleccionadoId);
+    return;
+  }
+  if (e.target.closest('#viajeEliminar')) {
+    const id = Estado.viajeSeleccionadoId;
+    if (!id) return;
     pedirConfirmacion('¿Eliminar este viaje? Las transacciones vinculadas se desasociarán.', 'Eliminar', true, async () => {
       try {
         await call('eliminarViaje', id);
@@ -5512,18 +5654,20 @@ if ($('#viajesList')) $('#viajesList').addEventListener('click', async (e) => {
     });
     return;
   }
-  if (card) {
-    Estado.viajeSeleccionadoId = card.dataset.viajeCard;
-    const det = $('#viajeDetalle'); if (det) det.innerHTML = loadingBlockHtml('Cargando detalle...');
-    try { paintViajeDetalle(await call('obtenerDetalleViaje', Estado.viajeSeleccionadoId)); }
-    catch (err) { toast(String(err.message || err)); }
+  if (e.target.closest('#viajeToggleDetalle')) {
+    const det = $('#viajeDetalle');
+    if (!det) return;
+    const visible = !!det.innerHTML.trim();
+    if (visible) { det.innerHTML = ''; }
+    else { await refrescarDetalleViaje_(); }
+    paintViajes(Estado.bootstrap.viajes);
   }
 });
 
 if ($('#viajeDetalle')) $('#viajeDetalle').addEventListener('click', async (e) => {
   if (e.target.closest('#viajeDetalleCerrar')) {
-    Estado.viajeSeleccionadoId = '';
     $('#viajeDetalle').innerHTML = '';
+    paintViajes(Estado.bootstrap.viajes);
     return;
   }
   if (e.target.closest('#viajeGuardarVinculo')) {
@@ -5724,6 +5868,11 @@ function openConfirm({ title, message, danger = false, confirmLabel = 'Confirmar
   $('#sheetConfirmCancel').onclick = closeAllSheets;
   openSheet('sheetConfirm');
 }
+// ponytail: alias posicional — los call sites de Divisas / TiposCambio / Viajes
+// usan la firma vieja (mensaje, label, danger, callback). Mantener el alias
+// evita tocar 3 sitios hasta que se actualicen a la firma de openConfirm.
+const pedirConfirmacion = (message, confirmLabel, danger, onConfirm) =>
+  openConfirm({ message, confirmLabel, danger, onConfirm });
 
 // === Tx sheet ===
 function openTx(id) {
