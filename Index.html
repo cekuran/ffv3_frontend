@@ -587,38 +587,40 @@
   .subcta-row.subcta-row-lg .subcta-name { font-size: 15px; }
   .subcta-row.subcta-row-lg .subcta-balance { font-size: 16px; }
 
-  /* === Bar chart === */
-  /* ponytail: el plot y el eje X son filas separadas; el plot reserva padding-left
-     para las etiquetas de escala y el eje X reserva el mismo espacio para que
-     las etiquetas mensuales se alineen con sus barras. */
-  .bars { padding: 0 4px 0 56px; position: relative; }
-  .bars-plot { display: flex; align-items: stretch; gap: 6px; height: 180px; position: relative; }
-  .bars-axis { display: flex; gap: 6px; padding-top: 4px; }
-  /* ponytail: .bar llena la altura del plot; el .bar-fill se ancla a la línea 0
-     (centro del plot) y crece hacia arriba o abajo según el signo */
-  .bar { flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 0; height: 100%; position: relative; }
-  /* ponytail: el track del bar-stack va transparente para que la barra se vea
-     anclada en el cero, no "rellenando desde abajo". El cero se marca con la
-     línea sólida del grid. */
+  /* === Bar chart (shared .bars — used by cuentas view) === */
+  /* ponytail: el contenedor .bars vuelve a su forma original (flex row) para
+     no romper el chart de cada cuenta; el dashboard usa .chart-bars con
+     estructura plot + axis para soportar escala bidireccional. */
+  .bars { display: flex; align-items: end; gap: 6px; height: 140px; padding: 0 4px; }
+  .bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; height: 100%; position: relative; }
   .bar-stack { width: 100%; max-width: 24px; background: transparent; border-radius: 4px; position: relative; overflow: hidden; flex: 1; }
   .bar-fill { position: absolute; left: 0; right: 0; background: var(--primary); opacity: 0.85; transition: height 0.6s ease-out, top 0.6s ease-out, bottom 0.6s ease-out; border-radius: 3px; }
   .bar-fill.pasivo { background: var(--error); opacity: 0.85; }
-  .bar-fill.positivo { bottom: 50%; top: auto; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-  .bar-fill.negativo { top: 50%; bottom: auto; border-top-left-radius: 0; border-top-right-radius: 0; }
-  /* ponytail: cuando ningún mes es negativo, el cero cae al fondo y la barra
-     crece desde abajo; lo mismo al revés si todos son no positivos */
-  .bars.all-positive .bar-fill.positivo { bottom: 0; border-bottom-left-radius: 3px; border-bottom-right-radius: 3px; }
-  .bars.all-negative .bar-fill.negativo { top: 0; border-top-left-radius: 3px; border-top-right-radius: 3px; }
-  .bar-axis-label { flex: 1; text-align: center; font-size: 10px; color: var(--on-surface-variant); font-weight: 600; }
-  .bar-current { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 700; color: var(--on-surface); white-space: nowrap; }
-  /* ponytail: las líneas del grid se extienden a lo largo de todo el plot (left:0
-     right:0); el label se ancla a la izquierda de la línea, dentro del padding
-     del contenedor .bars. */
-  .bars-grid { position: absolute; inset: 0; pointer-events: none; }
-  .bars-grid .grid-line { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--on-surface-variant); opacity: 0.4; }
-  .bars-grid .grid-line.zero { border-top-style: solid; opacity: 0.6; }
-  .bars-grid .grid-label { position: absolute; right: 100%; top: 50%; transform: translateY(-50%); padding-right: 6px; font-size: 9px; color: var(--on-surface-variant); white-space: nowrap; background: var(--surface); }
-  .bars-tooltip { position: fixed; background: var(--surface-container-highest); color: var(--on-surface); padding: 6px 10px; border-radius: 6px; font-size: 12px; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.18); z-index: 1000; white-space: nowrap; opacity: 0; transition: opacity 0.15s; }
+  .bar-label { font-size: 10px; color: var(--on-surface-variant); font-weight: 600; }
+
+  /* === Dashboard chart (.chart-bars — plot + axis rows, escala bidireccional) === */
+  .chart-bars { padding: 0 4px 0 56px; position: relative; }
+  .chart-bars .bars-plot { display: flex; align-items: stretch; gap: 6px; height: 180px; position: relative; }
+  .chart-bars .bars-axis { display: flex; gap: 6px; padding-top: 4px; }
+  .chart-bars .bar { justify-content: stretch; }
+  /* ponytail: el chart se rerendera tras cada sync; la transición de height
+     hacía que pareciera "loading" otra vez aunque los valores fueran los mismos.
+     Pintamos los valores correctos al instante. */
+  .chart-bars .bar-fill { transition: none; }
+  /* ponytail: el fill se ancla al 50% (cero) y crece hacia arriba o abajo según el signo */
+  .chart-bars .bar-fill.positivo { bottom: 50%; top: auto; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .chart-bars .bar-fill.negativo { top: 50%; bottom: auto; border-top-left-radius: 0; border-top-right-radius: 0; }
+  /* ponytail: cuando ningún mes es negativo, el cero cae al fondo; idem al revés */
+  .chart-bars.all-positive .bar-fill.positivo { bottom: 0; border-bottom-left-radius: 3px; border-bottom-right-radius: 3px; }
+  .chart-bars.all-negative .bar-fill.negativo { top: 0; border-top-left-radius: 3px; border-top-right-radius: 3px; }
+  .chart-bars .bar-axis-label { flex: 1; text-align: center; font-size: 10px; color: var(--on-surface-variant); font-weight: 600; }
+  .chart-bars .bar-current { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 700; color: var(--on-surface); white-space: nowrap; }
+  /* ponytail: líneas del grid a lo largo de todo el plot; label anclado a la izquierda */
+  .chart-bars .bars-grid { position: absolute; inset: 0; pointer-events: none; }
+  .chart-bars .grid-line { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--on-surface-variant); opacity: 0.4; }
+  .chart-bars .grid-line.zero { border-top-style: solid; opacity: 0.6; }
+  .chart-bars .grid-label { position: absolute; right: 100%; top: 50%; transform: translateY(-50%); padding-right: 6px; font-size: 9px; color: var(--on-surface-variant); white-space: nowrap; background: var(--surface); }
+  .chart-bars .bars-tooltip { position: fixed; background: var(--surface-container-highest); color: var(--on-surface); padding: 6px 10px; border-radius: 6px; font-size: 12px; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.18); z-index: 1000; white-space: nowrap; opacity: 0; transition: opacity 0.15s; }
 
   /* === Progress === */
   .progress { width: 100%; height: 8px; background: var(--surface-container-high); border-radius: var(--r-full); overflow: hidden; }
@@ -3112,57 +3114,82 @@ function calcularResumenLocal_(anio, mes) {
   const m = Number(mes || (new Date().getMonth() + 1));
   const txs = Estado.bootstrap.transacciones || [];
   const cuentasById = cuentasByIdLocal_();
-  const enMes = txs.filter(t => txEnMes_(t, a, m));
-  const ingresos = enMes.filter(t => t.tipo === 'ingreso').reduce((s, t) => s + impDefLocal_(t), 0);
-  const gastos = enMes.filter(t => t.tipo === 'gasto').reduce((s, t) => s + impDefLocal_(t), 0);
-  // ponytail: devoluciones restan del total de gastos del mes (revierte gastos).
-  const devoluciones = enMes.filter(t => t.tipo === 'devolucion').reduce((s, t) => s + impDefLocal_(t), 0);
-  const transferenciasGasto = enMes
-    .filter(t => t.tipo === 'transferencia' && tipoTransferenciaPresupuestoLocal_(t, cuentasById) === 'gasto')
-    .reduce((s, t) => s + impDefLocal_(t), 0);
-  const transferenciasIngreso = enMes
-    .filter(t => t.tipo === 'transferencia' && tipoTransferenciaPresupuestoLocal_(t, cuentasById) === 'ingreso')
-    .reduce((s, t) => s + impDefLocal_(t), 0);
-  const pendiente = enMes.filter(t => t.estado === 'pendiente').length;
-  const vencido = enMes.filter(t => t.estado === 'vencido').length;
+  const mesActualKey = a + '-' + String(m).padStart(2, '0');
+  // ponytail: una sola pasada sobre txs para construir buckets por mes + agregados
+  // del mes actual. Antes hacía ~20 pasadas (filter por tipo, por mes, etc.); ahora 1.
+  const porMes = Object.create(null);
+  let ingresos = 0, gastos = 0, devoluciones = 0;
+  let transferenciasGasto = 0, transferenciasIngreso = 0;
+  let pendiente = 0, vencido = 0;
+  for (let i = 0; i < txs.length; i++) {
+    const t = txs[i];
+    const fechaStr = String(t.fecha || '');
+    if (!fechaStr) continue;
+    const k = fechaStr.slice(0, 7);
+    let bucket = porMes[k];
+    if (!bucket) bucket = porMes[k] = { ingresos: 0, gastos: 0, devoluciones: 0, tGasto: 0, tIngreso: 0 };
+    const v = impDefLocal_(t);
+    if (t.tipo === 'ingreso') {
+      bucket.ingresos += v;
+      if (k === mesActualKey) ingresos += v;
+    } else if (t.tipo === 'gasto') {
+      bucket.gastos += v;
+      if (k === mesActualKey) gastos += v;
+    } else if (t.tipo === 'devolucion') {
+      bucket.devoluciones += v;
+      if (k === mesActualKey) devoluciones += v;
+    } else if (t.tipo === 'transferencia') {
+      const tipo = tipoTransferenciaPresupuestoLocal_(t, cuentasById);
+      if (tipo === 'gasto') {
+        bucket.tGasto += v;
+        if (k === mesActualKey) transferenciasGasto += v;
+      } else if (tipo === 'ingreso') {
+        bucket.tIngreso += v;
+        if (k === mesActualKey) transferenciasIngreso += v;
+      }
+    }
+    if (k === mesActualKey) {
+      if (t.estado === 'pendiente') pendiente++;
+      else if (t.estado === 'vencido') vencido++;
+    }
+  }
+  // ponytail: evol últimos 12 meses — los buckets ya están computados, solo armamos el array
   const evol = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(a, m - 1 - i, 1);
     const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    const en = txs.filter(t => String(t.fecha).slice(0, 7) === k);
+    const b = porMes[k];
     evol.push({
       mes: k,
-      ingresos: en.filter(t => t.tipo === 'ingreso').reduce((s, t) => s + impDefLocal_(t), 0),
-      gastos: en.filter(t => t.tipo === 'gasto').reduce((s, t) => s + impDefLocal_(t), 0)
-              - en.filter(t => t.tipo === 'devolucion').reduce((s, t) => s + impDefLocal_(t), 0)
+      ingresos: b ? b.ingresos : 0,
+      gastos: (b ? b.gastos : 0) - (b ? b.devoluciones : 0)
     });
   }
-  // ponytail: balance global al final de cada mes. Suma del saldo actual de
-  // cuentas de activos y pasivos (c.saldo ya es agregador de sus subcuentas)
-  // menos la acumulación de movimientos netos en meses posteriores al target.
+  // ponytail: balance global al final de cada mes. Saldo actual menos la
+  // acumulación de movimientos netos en meses posteriores al target.
   const cuentasAll = (Estado.bootstrap.cuentas || []).filter(c => c.tipo === 'activo' || c.tipo === 'pasivo');
   const currentBalance = cuentasAll.reduce((s, c) => s + Number(c.saldo || 0), 0);
-  const netByMonth = {};
-  txs.forEach(t => {
-    const k = String(t.fecha).slice(0, 7);
-    let delta = 0;
-    if (t.tipo === 'ingreso') delta = impDefLocal_(t);
-    else if (t.tipo === 'gasto') delta = -impDefLocal_(t);
-    else if (t.tipo === 'devolucion') delta = impDefLocal_(t);
-    if (delta !== 0) netByMonth[k] = (netByMonth[k] || 0) + delta;
-  });
-  // ponytail: los meses del rango sin movimientos también participan en el
-  // suffix sum; si los dejamos fuera, su futureNet queda en 0 y se subestima
-  // el balance histórico cuando hay txs en meses posteriores.
-  evol.forEach(e => { if (!(e.mes in netByMonth)) netByMonth[e.mes] = 0; });
-  const allMonths = Object.keys(netByMonth).sort();
-  const futureNet = {};
-  let running = 0;
-  for (let i = allMonths.length - 1; i >= 0; i--) {
-    futureNet[allMonths[i]] = running;
-    running += netByMonth[allMonths[i]];
+  // netByMonth derivado de los buckets ya computados (ingresos - gastos + devoluciones por mes)
+  const netByMonth = Object.create(null);
+  for (const k in porMes) {
+    const b = porMes[k];
+    netByMonth[k] = b.ingresos - b.gastos + b.devoluciones;
   }
-  evol.forEach(e => { e.balance = currentBalance - (futureNet[e.mes] || 0); });
+  // ponytail: meses del rango sin movimientos también participan en el suffix sum
+  for (let i = 0; i < evol.length; i++) {
+    const k = evol[i].mes;
+    if (!(k in netByMonth)) netByMonth[k] = 0;
+  }
+  const sortedKeys = Object.keys(netByMonth).sort();
+  const futureNet = Object.create(null);
+  let running = 0;
+  for (let i = sortedKeys.length - 1; i >= 0; i--) {
+    futureNet[sortedKeys[i]] = running;
+    running += netByMonth[sortedKeys[i]];
+  }
+  for (let i = 0; i < evol.length; i++) {
+    evol[i].balance = currentBalance - (futureNet[evol[i].mes] || 0);
+  }
   return {
     anio: a,
     mes: m,
@@ -4546,7 +4573,7 @@ function renderDashboard() {
     `<div class="bar-axis-label">${fmtMesCorto(m.mes)}</div>`
   ).join('') + '</div>';
   const barsEl = $('#dashBars');
-  barsEl.className = 'bars' + (modo ? ' ' + modo : '');
+  barsEl.className = 'chart-bars' + (modo ? ' ' + modo : '');
   barsEl.innerHTML = `<div class="bars-plot">${gridHtml}${barsHtml}</div>${axisHtml}`;
   // ponytail: tooltip único reutilizado; delegación de eventos sobre el contenedor
   const tip = document.createElement('div');
