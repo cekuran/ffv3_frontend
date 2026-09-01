@@ -1364,7 +1364,7 @@
           </div>
         </div>
 
-        <div class="card col-8">
+        <div class="card col-7">
           <div class="card-h">
             <h2>Evolución Mensual</h2>
             <div class="legend">
@@ -1375,17 +1375,23 @@
           <div class="bars" id="dashBars"></div>
         </div>
 
-        <div class="card col-4">
-          <div class="card-h"><h2>Salud Financiera</h2></div>
-          <div class="kpi" style="margin-bottom: var(--s-4);">
-            <div class="kpi-ico bg-primary"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6 8 14l-4-4-2 2 6 6 10-10z"/></svg></div>
+        <div class="card col-5">
+          <div class="card-h"><h2>Gasto actual</h2><span class="link" data-go="presupuesto">Ver presupuesto →</span></div>
+          <div style="display: flex; justify-content: space-between; align-items: end; margin-bottom: var(--s-4);">
             <div>
-              <div class="label-md" style="color: var(--on-surface-variant);">Ahorro del mes</div>
-              <div class="title-md" id="dashAhorro">0,00 €</div>
+              <div class="label-md" style="color: var(--on-surface-variant);">Gasto actual</div>
+              <div class="display-lg" id="dashGasto">0,00 €</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="label-md" style="color: var(--on-surface-variant);">Presupuesto</div>
+              <div class="title-md" id="dashPresTotal">0,00 €</div>
             </div>
           </div>
-          <div class="progress" style="height: 12px;"><div class="progress-fill" id="dashAhorroBar" style="width: 0%;"></div></div>
-          <div class="body-sm" id="dashAhorroSub" style="color: var(--on-surface-variant); margin-top: 8px;">Ingresos menos gastos del mes en curso.</div>
+          <div class="progress" style="height: 12px;"><div class="progress-fill" id="dashPresBar" style="width: 0%;"></div></div>
+          <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--on-surface-variant);">
+            <span id="dashPresPct">0% utilizado</span>
+            <span id="dashPresRest">0,00 € restantes</span>
+          </div>
         </div>
       </div>
 
@@ -4276,9 +4282,23 @@ function renderDashboard() {
   const neto = ingresos - gastos;
   const pct = ingresos > 0 ? Math.round((neto / ingresos) * 100) : 0;
   $('#dashTrend').innerHTML = ICONOS.trending_up + ' ' + (pct >= 0 ? '+' : '') + pct + '% este mes';
-  $('#dashAhorro').textContent = fmtMoneda(neto);
-  $('#dashAhorroBar').style.width = Math.min(100, Math.max(0, pct)) + '%';
-  $('#dashAhorroSub').textContent = (ingresos > 0 ? 'Has ahorrado el ' + pct + '% de tus ingresos este mes.' : 'Aún no hay ingresos registrados este mes.');
+  // Gasto actual vs presupuesto (mismo cálculo que la vista Presupuesto)
+  const gastoPres = Number(resumen.gastosPresupuesto != null ? resumen.gastosPresupuesto : gastos);
+  const presTotal = (Estado.bootstrap.presupuestos || []).reduce((s, p) => s + Number(p.importe_esperado || 0), 0);
+  const presPct = presTotal > 0 ? Math.round((gastoPres / presTotal) * 100) : 0;
+  const excedido = gastoPres > presTotal;
+  const colorPres = excedido ? 'var(--error)' : 'var(--primary)';
+  $('#dashGasto').textContent = fmtMoneda(gastoPres);
+  $('#dashGasto').style.color = colorPres;
+  $('#dashPresTotal').textContent = fmtMoneda(presTotal);
+  $('#dashPresBar').style.width = Math.min(100, presPct) + '%';
+  $('#dashPresBar').className = 'progress-fill' + (excedido ? ' danger' : (presPct >= 80 ? ' warn' : ''));
+  $('#dashPresPct').textContent = presPct + '% utilizado';
+  $('#dashPresPct').style.color = colorPres;
+  $('#dashPresRest').textContent = excedido
+    ? fmtMoneda(gastoPres - presTotal) + ' en exceso'
+    : fmtMoneda(presTotal - gastoPres) + ' restantes';
+  $('#dashPresRest').style.color = colorPres;
 
   // Bar chart
   // Bar chart — Evolución Mensual: neto mensual (ingresos − gastos)
