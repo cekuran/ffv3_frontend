@@ -304,7 +304,8 @@
   .bento { display: grid; gap: var(--s-4); grid-template-columns: 1fr; }
   @media (min-width: 768px) { .bento { grid-template-columns: repeat(12, 1fr); } }
   .col-12 { grid-column: span 1; }
-  @media (min-width: 768px) { .col-12 { grid-column: span 12; } .col-8 { grid-column: span 8; } .col-7 { grid-column: span 7; } .col-5 { grid-column: span 5; } .col-4 { grid-column: span 4; } .col-6 { grid-column: span 6; } }
+  .col-3 { grid-column: span 1; }
+  @media (min-width: 768px) { .col-12 { grid-column: span 12; } .col-8 { grid-column: span 8; } .col-7 { grid-column: span 7; } .col-5 { grid-column: span 5; } .col-4 { grid-column: span 4; } .col-6 { grid-column: span 6; } .col-3 { grid-column: span 3; } }
 
   /* recResumen: responsive grid independiente del bento global */
   .recResumen-grid { display: grid; gap: var(--s-4); grid-template-columns: 1fr; }
@@ -611,9 +612,20 @@
   .rep-kpi { display: flex; flex-direction: column; justify-content: space-between; min-height: 116px; }
   .rep-kpi-value { font-size: clamp(26px, 4vw, 36px); line-height: 1.1; font-weight: 700; }
   .rep-kpi-note { color: var(--on-surface-variant); font-size: 13px; margin-top: var(--s-2); }
+  .rep-distribution-group + .rep-distribution-group { border-top: 1px solid var(--surface-container); margin-top: var(--s-5); padding-top: var(--s-5); }
+  .rep-distribution-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-3); }
+  .rep-distribution-head h3 { margin: 0; font-size: 16px; line-height: 24px; }
+  .rep-distribution-head span { color: var(--on-surface-variant); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .rep-bar-track { height: 18px; background: var(--surface-container-high); border-radius: var(--r-full); overflow: hidden; display: flex; gap: 2px; }
   .rep-bar-segment { min-width: 3px; height: 100%; transition: width 0.6s ease-out; }
   .rep-legend { display: flex; flex-direction: column; gap: var(--s-3); margin-top: var(--s-4); }
+  .rep-category-block + .rep-category-block { border-top: 1px solid var(--surface-container); margin-top: var(--s-3); padding-top: var(--s-3); }
+  .rep-category-summary { cursor: pointer; list-style: none; }
+  .rep-category-summary::-webkit-details-marker { display: none; }
+  .rep-category-summary::after { content: '⌄'; margin-left: var(--s-2); color: var(--on-surface-variant); font-size: 18px; }
+  .rep-category-block[open] .rep-category-summary::after { content: '⌃'; }
+  .rep-category-txs { margin: var(--s-2) 0 0 24px; }
+  .rep-category-txs .rep-account-movement { font-size: 12px; grid-template-columns: 84px minmax(0, 1fr) auto; }
   .rep-legend-row { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
   .rep-legend-dot { width: 12px; height: 12px; border-radius: var(--r-sm); flex: 0 0 12px; }
   .rep-legend-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -633,6 +645,9 @@
   .rep-account-movement { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: center; gap: var(--s-2); padding: 6px 0; border-bottom: 1px solid var(--surface-container); color: var(--on-surface-variant); font-size: 13px; min-width: 0; }
   .rep-account-movement > :nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rep-account-movement strong { color: var(--on-surface); white-space: nowrap; }
+  .rep-movement-amount.pos { color: var(--primary); }
+  .rep-movement-amount.neg { color: var(--error); }
+  .rep-movement-amount.neutral { color: var(--on-surface-variant); }
   .rep-list-note { color: var(--on-surface-variant); padding: var(--s-4) 0; text-align: center; }
   @media (max-width: 767px) {
     .rep-account-values { grid-template-columns: 1fr 1fr; margin-left: 0; }
@@ -650,6 +665,8 @@
     .main { padding: 0 !important; max-width: none !important; }
     .view.is-active { display: block !important; }
     .section-h, .card, .rep-account, .rep-subcuentas { break-inside: avoid; }
+    .rep-category-txs { display: block !important; }
+    .rep-category-summary::after { display: none; }
     .card, .rep-account { box-shadow: none; }
     #repMesNav, #repPdf { display: none !important; }
   }
@@ -1347,6 +1364,7 @@
     <div class="nav-item" data-route="cuentas"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v4H4zm0 6h16v10H4zm3 3h6v2H7z"/></svg> Cuentas</div>
     <div class="nav-item" data-route="movimientos"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v3H4zm0 5h16v2H4zm0 4h10v2H4z"/></svg> Movimientos</div>
     <div class="nav-item" data-route="presupuesto"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M5 21V8l7-5 7 5v13h-4v-7H9v7z"/></svg> Presupuesto</div>
+    <div class="nav-item" data-route="reportes"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v2H4zm0 4h16v2H4zm0 4h10v2H4zm0 4h10v2H4zm12-5h4v2h-4zm0 4h4v2h-4z"/></svg> Reportes</div>
     <div class="nav-item" data-route="recurrentes"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l5-4-5-4v3H5v6h2zm10 10H7v-3l-5 4 5 4v-3h12v-6h-2z"/></svg> Recurrentes</div>
     <div class="nav-item" data-route="establecimientos"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16l-1 5h-3v2h-2V9h-4v2H8V9H5zm1 7h14v10H5z"/></svg> Establecimientos</div>
     <div class="nav-item" data-route="viajes"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg> Viajes</div>
@@ -1629,23 +1647,12 @@
 
       <div class="bento" style="margin-top: var(--s-6);">
         <div class="card col-7">
-          <div class="card-h"><h2>Distribución por categoría</h2><span class="label-md" id="repCategoriasTotal">—</span></div>
+          <div class="card-h"><h2>Distribución por categoría</h2></div>
           <div id="repCategorias"></div>
         </div>
         <div class="card col-5">
           <div class="card-h"><h2>Movimientos del mes</h2><span class="label-md" id="repMovTotal">—</span></div>
           <div id="repMovimientosResumen"></div>
-        </div>
-      </div>
-
-      <div class="bento" style="margin-top: var(--s-6);">
-        <div class="card col-6">
-          <div class="card-h"><h2>Ingresos</h2><span class="label-md" id="repIngresosTotal">—</span></div>
-          <div id="repIngresos"></div>
-        </div>
-        <div class="card col-6">
-          <div class="card-h"><h2>Egresos</h2><span class="label-md" id="repEgresosTotal">—</span></div>
-          <div id="repEgresos"></div>
         </div>
       </div>
 
@@ -3846,8 +3853,6 @@ function setRouteLoading(route) {
     $('#repSummary').innerHTML = loadingBlockHtml('Actualizando reporte...');
     $('#repCategorias').innerHTML = loadingBlockHtml('Actualizando categorías...');
     $('#repMovimientosResumen').innerHTML = loadingBlockHtml('Actualizando movimientos...');
-    $('#repIngresos').innerHTML = loadingBlockHtml('Actualizando ingresos...');
-    $('#repEgresos').innerHTML = loadingBlockHtml('Actualizando egresos...');
     $('#repCuentas').innerHTML = loadingBlockHtml('Actualizando cuentas...');
   }
   if (route === 'presupuesto') {
@@ -6030,39 +6035,57 @@ function repCategoryColor_(color) {
   return /^#[0-9a-f]{6}$/i.test(String(color || '')) ? String(color) : '#00613e';
 }
 
-function repTxList_(txs) {
-  return txs.length ? txs.map(t => txRowSimple(t)).join('') : emptyHtml('Sin movimientos', 'No hay movimientos de este tipo en el mes seleccionado.');
-}
-
-function repDistribution_(cats, tipo) {
+function repDistribution_(cats, tipo, txs) {
+  const nombreTipo = tipo === 'gasto' ? 'Gastos' : 'Ingresos';
   const filas = cats.filter(c => c.tipo === tipo && Number(c.real || 0) > 0);
   const total = filas.reduce((s, c) => s + Number(c.real || 0), 0);
-  if (!filas.length) return '<div class="rep-list-note">Sin ' + (tipo === 'gasto' ? 'gastos' : 'ingresos') + ' por categoría.</div>';
-  const bars = filas.map(c => {
-    const amount = Number(c.real || 0);
-    const pct = total > 0 ? amount / total * 100 : 0;
-    return `<div class="rep-bar-segment" tabindex="0" role="img" aria-label="${escape(c.nombre)}: ${Math.round(pct)}%, ${fmtMoneda(amount)}" style="width:${pct}%; background:${repCategoryColor_(c.color)};" title="${escape(c.nombre)} · ${Math.round(pct)}% · ${fmtMoneda(amount)}"></div>`;
-  }).join('');
-  const legend = filas.map(c => {
-    const amount = Number(c.real || 0);
-    const pct = total > 0 ? Math.round(amount / total * 100) : 0;
-    return `<div class="rep-legend-row"><span class="rep-legend-dot" style="background:${repCategoryColor_(c.color)};"></span><span class="body-sm rep-legend-name">${escape(c.nombre)}</span><span class="body-sm data-tabular">${pct}% · ${fmtMoneda(amount)}</span></div>`;
-  }).join('');
-  return `<div class="rep-bar-track" aria-label="Distribución de ${tipo === 'gasto' ? 'gastos' : 'ingresos'} por categoría">${bars}</div><div class="rep-legend">${legend}</div>`;
+  const contenido = !filas.length
+    ? '<div class="rep-list-note">Sin ' + nombreTipo.toLowerCase() + ' por categoría.</div>'
+    : (() => {
+      const bars = filas.map(c => {
+        const amount = Number(c.real || 0);
+        const pct = total > 0 ? amount / total * 100 : 0;
+        return `<div class="rep-bar-segment" tabindex="0" role="img" aria-label="${escape(c.nombre)}: ${Math.round(pct)}%, ${fmtMoneda(amount)}" style="width:${pct}%; background:${repCategoryColor_(c.color)};" title="${escape(c.nombre)} · ${Math.round(pct)}% · ${fmtMoneda(amount)}"></div>`;
+      }).join('');
+      const legend = filas.map(c => {
+        const amount = Number(c.real || 0);
+        const pct = total > 0 ? Math.round(amount / total * 100) : 0;
+        const categoryTxs = txs.filter(t => {
+          if (t.tipo === 'transferencia') {
+            return tipoTransferenciaPresupuestoUI_(t.cuenta_id, t.cuenta_destino_id) === tipo &&
+              (parseRepartoFromTx_(t) || []).some(r => String(r.categoria_id || '') === String(c.id));
+          }
+          if (tipo === 'gasto') return (t.tipo === 'gasto' || t.tipo === 'devolucion') && String(t.categoria_id || '') === String(c.id);
+          return t.tipo === 'ingreso' && String(t.categoria_id || '') === String(c.id);
+        });
+        const rows = categoryTxs.map(t => {
+          if (t.tipo === 'transferencia') {
+            const parcial = (parseRepartoFromTx_(t) || []).filter(r => String(r.categoria_id || '') === String(c.id)).reduce((s, r) => s + Number(r.importe || 0), 0);
+            return repMovementRow_(Object.assign({}, t, { importe: parcial, descripcion: t.descripcion ? t.descripcion + ' (parcial)' : 'Transferencia (parcial)' }), c);
+          }
+          return repMovementRow_(t, c);
+        }).join('');
+        return `<details class="rep-category-block" open><summary class="rep-legend-row rep-category-summary"><span class="rep-legend-dot" style="background:${repCategoryColor_(c.color)};"></span><span class="body-sm rep-legend-name">${escape(c.nombre)}</span><span class="body-sm data-tabular">${pct}% · ${fmtMoneda(amount)}</span></summary><div class="rep-category-txs">${rows || '<div class="rep-list-note">Sin transacciones en esta categoría.</div>'}</div></details>`;
+      }).join('');
+      return `<div class="rep-bar-track" aria-label="Distribución de ${nombreTipo.toLowerCase()} por categoría">${bars}</div><div class="rep-legend">${legend}</div>`;
+    })();
+  return `<section class="rep-distribution-group" aria-label="${nombreTipo} por categoría"><div class="rep-distribution-head"><h3>${nombreTipo}</h3><span>Total ${fmtMoneda(total)}</span></div>${contenido}</section>`;
 }
 
-function repMovementRow_(t) {
+function repMovementRow_(t, category) {
   const cuenta = (Estado.bootstrap.cuentas || []).find(c => c.id === t.cuenta_id);
   const cuentaDestino = (Estado.bootstrap.cuentas || []).find(c => c.id === t.cuenta_destino_id);
   const sub = cuenta && (cuenta.subcuentas || []).find(s => s.id === t.subcuenta_id);
   const subDestino = cuentaDestino && (cuentaDestino.subcuentas || []).find(s => s.id === t.subcuenta_destino_id);
-  const categoria = (Estado.bootstrap.categorias || []).find(c => c.id === t.categoria_id);
+  const categoria = category || (Estado.bootstrap.categorias || []).find(c => c.id === t.categoria_id);
   const esTransferencia = t.tipo === 'transferencia' || t.tipo === 'devolucion';
   const signo = t.tipo === 'ingreso' || t.tipo === 'devolucion' ? '+' : (t.tipo === 'gasto' ? '-' : '↔');
+  const direccionTransferencia = tipoTransferenciaPresupuestoUI_(t.cuenta_id, t.cuenta_destino_id);
+  const amountClass = direccionTransferencia === 'gasto' ? 'neg' : (direccionTransferencia === 'ingreso' ? 'pos' : (t.tipo === 'ingreso' || t.tipo === 'devolucion' ? 'pos' : (t.tipo === 'gasto' ? 'neg' : 'neutral')));
   const movimiento = esTransferencia
     ? `${cuenta ? escape(cuenta.nombre) : '—'}${sub ? ' · ' + escape(sub.nombre) : ''} → ${cuentaDestino ? escape(cuentaDestino.nombre) : '—'}${subDestino ? ' · ' + escape(subDestino.nombre) : ''}`
     : `${escape(t.descripcion || (categoria ? categoria.nombre : 'Sin descripción'))}${cuenta ? ' · ' + escape(cuenta.nombre) : ''}${sub ? ' · ' + escape(sub.nombre) : ''}`;
-  return `<div class="rep-account-movement"><span>${escape(t.fecha || '—')}</span><span>${movimiento}</span><strong class="data-tabular">${signo}${fmtMoneda(t.importe, t.moneda || (cuenta ? cuenta.moneda : 'EUR'))}</strong></div>`;
+  return `<div class="rep-account-movement"><span>${escape(t.fecha || '—')}</span><span>${movimiento}</span><strong class="data-tabular rep-movement-amount ${amountClass}">${signo}${fmtMoneda(t.importe, t.moneda || (cuenta ? cuenta.moneda : 'EUR'))}</strong></div>`;
 }
 
 function repAccountTxMatch_(tx, id, subId) {
@@ -6128,8 +6151,7 @@ async function renderReportes() {
       { label: 'Presupuesto', value: fmtMoneda(esperado), note: pctPres + '% utilizado · ' + fmtMoneda(presupuesto), cls: pctPres > 100 ? 'neg' : '' }
     ];
     $('#repSummary').innerHTML = kpis.map(k => `<div class="card col-3 rep-kpi"><div><div class="label-md" style="color: var(--on-surface-variant);">${k.label}</div><div class="rep-kpi-value ${k.cls}">${k.value}</div></div><div class="rep-kpi-note">${k.note}</div></div>`).join('');
-    $('#repCategoriasTotal').textContent = fmtMoneda(categorias.reduce((s, c) => s + Math.max(0, Number(c.real || 0)), 0));
-    $('#repCategorias').innerHTML = repDistribution_(categorias, 'gasto') + repDistribution_(categorias, 'ingreso');
+    $('#repCategorias').innerHTML = repDistribution_(categorias, 'gasto', transacciones) + repDistribution_(categorias, 'ingreso', transacciones);
     const transferencias = transacciones.filter(t => t.tipo === 'transferencia').length;
     const pendientes = transacciones.filter(t => t.estado === 'pendiente' || t.estado === 'vencido').length;
     $('#repMovTotal').textContent = transacciones.length + ' movimientos';
@@ -6138,20 +6160,12 @@ async function renderReportes() {
       ['Transferencias', transferencias],
       ['Pendientes o vencidas', pendientes]
     ].map(([label, value]) => `<div class="kpi" style="padding: var(--s-2) 0;"><div class="kpi-ico bg-primary"><span class="material-icons" aria-hidden="true">receipt_long</span></div><div><div class="label-md" style="color: var(--on-surface-variant);">${label}</div><div class="title-md">${value}</div></div></div>`).join('');
-    const ingresosTx = transacciones.filter(t => t.tipo === 'ingreso' || t.tipo === 'devolucion');
-    const egresosTx = transacciones.filter(t => t.tipo === 'gasto');
-    $('#repIngresosTotal').textContent = ingresosTx.length + ' movimientos';
-    $('#repEgresosTotal').textContent = egresosTx.length + ' movimientos';
-    $('#repIngresos').innerHTML = repTxList_(ingresosTx);
-    $('#repEgresos').innerHTML = repTxList_(egresosTx);
     $('#repCuentas').innerHTML = repRenderAccounts_(cuentas);
     $('#repStatus').textContent = cuentas.length ? '' : 'No hay cuentas visibles para el periodo seleccionado.';
   } catch (e) {
     $('#repSummary').innerHTML = emptyHtml('No se pudo cargar', e.message || 'Inténtalo de nuevo.');
     $('#repCategorias').innerHTML = '';
     $('#repMovimientosResumen').innerHTML = '';
-    $('#repIngresos').innerHTML = '';
-    $('#repEgresos').innerHTML = '';
     $('#repCuentas').innerHTML = '';
     $('#repStatus').textContent = '';
   }
