@@ -270,6 +270,14 @@
     border-color: var(--primary-container);
   }
   .viaje-arrow[disabled] { opacity: 0.35; cursor: default; }
+  .viaje-arrow-sm {
+    position: static;
+    transform: none;
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    flex: 0 0 36px;
+  }
 
   @media (max-width: 768px) {
     .viaje-card { padding: var(--s-4); }
@@ -2664,6 +2672,9 @@ function setIconPick(hidden, value) {
 const Estado = {
   bootstrap: { cuentas: [], categorias: [], establecimientos: [], transacciones: [], recurrentes: [], presupuestos: [], resumen: null, sesion: null, version: '', hojas: [], hojaActivaId: '', divisas: { default_codigo: 'EUR', items: [] }, tiposCambio: [], moneda_por_defecto: 'EUR', viajes: { items: [], moneda_por_defecto: 'EUR' } },
   viajeSeleccionadoId: '',
+  viajeDiaIdx: 0,
+  viajeTxSeleccion: null,
+  viajeDetalleCache: null,
   filtros: { cuenta_id: '', subcuenta_id: '', tipo: '', categoria_id: '', desde: '', hasta: '', q: '' },
   movOrden: { campo: 'fecha', direccion: 'desc' },
   pres: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1, asignado: {} },
@@ -5676,6 +5687,15 @@ async function refrescarDetalleViaje_() {
 async function paintViajeDetalle(d) {
   const cont = $('#viajeDetalle');
   if (!cont || !d) { if (cont) cont.innerHTML = ''; return; }
+  // ponytail: viajeTxSeleccion es el set "deseado" que persiste entre días.
+  // Se (re)inicializa desde lo que ya está vinculado — así cambiar de viaje
+  // descarta los toggles pendientes del viaje anterior.
+  Estado.viajeTxSeleccion = new Set(
+    (d.transacciones_en_rango || []).filter(t => t.viaje_id === d.id).map(t => t.id)
+  );
+  Estado.viajeDiaIdx = 0;
+  Estado.viajeDetalleCache = d;
+  if (Estado.viajeDiaIdx >= d.dias.length) Estado.viajeDiaIdx = 0;
   const moneda = Estado.bootstrap.viajes.moneda_por_defecto || Estado.bootstrap.moneda_por_defecto || 'EUR';
   const fmt = v => fmtMoneda(v, moneda);
   const totalGasto = d.dias.reduce((s, x) => s + Number(x.gasto_real || 0), 0);
@@ -5731,10 +5751,18 @@ async function paintViajeDetalle(d) {
 
     <div class="card" style="margin-top: var(--s-3); padding: var(--s-4);">
       <div style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap;">
-        <h3 class="title-md" style="margin: 0;">Transacciones del rango</h3>
-        <button class="btn btn-sm btn-outline" id="viajeGuardarVinculo">Guardar selección</button>
+        <h3 class="title-md" style="margin: 0;">Seleccionar transacciones</h3>
+        <button class="btn btn-sm btn-primary" id="viajeGuardarVinculo">Guardar selección</button>
       </div>
-      <div class="card-sub" style="margin-top: var(--s-2);">Marca las transacciones que pertenecen al viaje. Solo se muestran las del rango ${escape(d.fecha_inicio)} → ${escape(d.fecha_fin)}.</div>
+      <div class="card-sub" style="margin-top: var(--s-2);">Navega día a día para marcar las transacciones que pertenecen al viaje. La selección se guarda al pulsar el botón.</div>
+      <div class="viaje-day-nav" style="margin-top: var(--s-3); display: flex; align-items: center; gap: var(--s-3);">
+        <button class="viaje-arrow viaje-arrow-sm" id="viajeDiaPrev" aria-label="Día anterior" ${Estado.viajeDiaIdx === 0 ? 'disabled' : ''}>‹</button>
+        <div style="flex: 1; text-align: center;">
+          <div class="title-sm data-tabular" id="viajeDiaFecha">—</div>
+          <div class="label-md" style="color: var(--on-surface-variant);" id="viajeDiaCounter">—</div>
+        </div>
+        <button class="viaje-arrow viaje-arrow-sm" id="viajeDiaNext" aria-label="Día siguiente" ${Estado.viajeDiaIdx >= d.dias.length - 1 ? 'disabled' : ''}>›</button>
+      </div>
       <div id="viajeTxList" style="margin-top: var(--s-3); display: flex; flex-direction: column; gap: var(--s-1); max-height: 420px; overflow: auto;"></div>
     </div>
   `;
@@ -5744,15 +5772,34 @@ async function paintViajeDetalle(d) {
 function renderViajeTxList_(d) {
   const cont = $('#viajeTxList');
   if (!cont) return;
-  const txs = d.transacciones_en_rango || [];
-  if (!txs.length) {
-    cont.innerHTML = emptyHtml('Sin transacciones en el rango', 'Registra movimientos con fecha entre inicio y fin.');
+  const diaIdx = Estado.viajeDiaIdx;
+  const dia = d.dias[diaIdx];
+  // ponytail: el navegador de días filtra la lista. La selección persistida
+  // vive en Estado.viajeTxSeleccion, así togglear en un día no se pierde al
+  // navegar a otro. El servidor recibe el set completo en guardar.
+  const sel = Estado.viajeTxSeleccion || new Set();
+  const txsDelDia = (d.transacciones_en_rango || []).filter(t => t.fecha === (dia ? dia.fecha : ''));
+  // Actualizar cabeceras del navegador
+  const fechaEl = $('#viajeDiaFecha');
+  const counterEl = $('#viajeDiaCounter');
+  const prevBtn = $('#viajeDiaPrev');
+  const nextBtn = $('#viajeDiaNext');
+  if (fechaEl) fechaEl.textContent = dia ? dia.fecha : '—';
+  if (counterEl) counterEl.textContent = dia ? `Día ${diaIdx + 1} de ${d.dias.length}` : 'Sin días';
+  if (prevBtn) prevBtn.disabled = diaIdx <= 0;
+  if (nextBtn) nextBtn.disabled = diaIdx >= d.dias.length - 1;
+  if (!dia) {
+    cont.innerHTML = emptyHtml('Sin días en el rango', 'Acorta el rango para habilitar la selección.');
+    return;
+  }
+  if (!txsDelDia.length) {
+    cont.innerHTML = emptyHtml('Sin transacciones este día', 'Registra un movimiento con esta fecha o navega a otro día.');
     return;
   }
   const moneda = Estado.bootstrap.viajes.moneda_por_defecto || Estado.bootstrap.moneda_por_defecto || 'EUR';
-  cont.innerHTML = txs.map(t => {
-    const checked = t.viaje_id === d.id ? 'checked' : '';
-    const checkedBg = t.viaje_id === d.id ? 'background: var(--surface-container-low);' : '';
+  cont.innerHTML = txsDelDia.map(t => {
+    const checked = sel.has(t.id) ? 'checked' : '';
+    const checkedBg = sel.has(t.id) ? 'background: var(--surface-container-low);' : '';
     // ponytail: misma convención que la vista Movimientos — ingresos/devoluciones
     // en verde (primary), gastos en rojo (error), transferencias en gris.
     const esIngresoVisual = t.tipo === 'ingreso' || t.tipo === 'devolucion';
@@ -5764,7 +5811,7 @@ function renderViajeTxList_(d) {
         <input type="checkbox" data-viaje-tx="${escape(t.id)}" ${checked} style="margin: 0;">
         <div style="flex: 1; min-width: 0;">
           <div class="body-sm" style="font-weight: 600;">${escape(t.descripcion || '(sin descripción)')}</div>
-          <div class="label-md" style="color: var(--on-surface-variant);">${escape(t.fecha)} · ${escape(t.tipo)}</div>
+          <div class="label-md" style="color: var(--on-surface-variant);">${escape(t.tipo)}</div>
         </div>
         <div class="data-tabular" style="font-weight: 700; color: ${color};">${sign}${fmtMoneda(importe, moneda)}</div>
       </label>
@@ -5846,19 +5893,54 @@ if ($('#viajesList')) $('#viajesList').addEventListener('click', async (e) => {
 if ($('#viajeDetalle')) $('#viajeDetalle').addEventListener('click', async (e) => {
   if (e.target.closest('#viajeDetalleCerrar')) {
     $('#viajeDetalle').innerHTML = '';
+    Estado.viajeTxSeleccion = null;
+    Estado.viajeDiaIdx = 0;
     paintViajes(Estado.bootstrap.viajes);
+    return;
+  }
+  // ponytail: navegar entre días repinta solo la lista de txs. La selección
+  // ya está en Estado.viajeTxSeleccion, así no se pierde al cambiar de día.
+  if (e.target.closest('#viajeDiaPrev')) {
+    if (Estado.viajeDiaIdx > 0) {
+      Estado.viajeDiaIdx--;
+      renderViajeTxList_(Estado.viajeDetalleCache);
+    }
+    return;
+  }
+  if (e.target.closest('#viajeDiaNext')) {
+    const cache = Estado.viajeDetalleCache;
+    if (cache && Estado.viajeDiaIdx < cache.dias.length - 1) {
+      Estado.viajeDiaIdx++;
+      renderViajeTxList_(cache);
+    }
     return;
   }
   if (e.target.closest('#viajeGuardarVinculo')) {
     const id = Estado.viajeSeleccionadoId;
     if (!id) return;
-    const ids = $$('#viajeTxList input[data-viaje-tx]:checked').map(i => i.dataset.viajeTx);
+    // Enviamos el set completo (no solo lo que se ve) — la UI sólo muestra
+    // el día actual, pero la selección cubre todos los días visitados.
+    const ids = Array.from(Estado.viajeTxSeleccion || []);
     try {
       paintViajeDetalle(await call('vincularTransaccionesViaje', id, ids));
       await refrescarViajes_();
       toast('Selección guardada');
     } catch (err) { toast(String(err.message || err)); }
   }
+});
+
+// ponytail: capturar toggles de checkboxes en la lista de txs. Evento change
+// (no click) para que el estado visual ya esté aplicado cuando leemos .checked.
+if ($('#viajeDetalle')) $('#viajeDetalle').addEventListener('change', (e) => {
+  const cb = e.target.closest('input[data-viaje-tx]');
+  if (!cb) return;
+  if (!Estado.viajeTxSeleccion) Estado.viajeTxSeleccion = new Set();
+  const id = cb.dataset.viajeTx;
+  if (cb.checked) Estado.viajeTxSeleccion.add(id);
+  else Estado.viajeTxSeleccion.delete(id);
+  // Repintar sutilmente el fondo de la fila para feedback visual inmediato.
+  const label = cb.closest('label');
+  if (label) label.style.background = cb.checked ? 'var(--surface-container-low)' : '';
 });
 
 if ($('#formViaje')) $('#formViaje').addEventListener('submit', async (e) => {
