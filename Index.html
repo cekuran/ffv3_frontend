@@ -1182,6 +1182,7 @@
     <div class="nav-item" data-route="categorias"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4v6h6zm10 0h-6v6h6zM10 14H4v6h6zm10 0h-6v6h6z"/></svg> Categorías</div>
     <div class="nav-item" data-route="establecimientos"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16l-1 5h-3v2h-2V9h-4v2H8V9H5zm1 7h14v10H5z"/></svg> Establecimientos</div>
     <div class="nav-item" data-route="divisas"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h13l-3-3 1-1 5 5-5 5-1-1 3-3H4zm16 12H7l3 3-1 1-5-5 5-5 1 1-3 3h13z"/></svg> Divisas</div>
+    <div class="nav-item" data-route="viajes"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg> Viajes</div>
     <div class="nav-item" data-route="admin" data-rol-required="admin"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4-2.1-.6a6.9 6.9 0 0 0-.5-1.2l1.2-1.8-1.4-1.4-1.8 1.2c-.4-.2-.8-.4-1.2-.5L14 3h-2l-.6 2.1c-.4.1-.8.3-1.2.5L8.4 4.4 7 5.8l1.2 1.8c-.2.4-.4.8-.5 1.2L5.6 9v2l2.1.6c.1.4.3.8.5 1.2L7 14.6l1.4 1.4 1.8-1.2c.4.2.8.4 1.2.5L12 17h2l.6-2.1c.4-.1.8-.3 1.2-.5l1.8 1.2 1.4-1.4-1.2-1.8c.2-.4.4-.8.5-1.2L21 11z"/></svg> Admin</div>
     <div class="sidebar-foot" id="sidebarFoot">Finanzas Familia</div>
   </aside>
@@ -1581,6 +1582,22 @@
       <div class="bento" id="tiposCambioList" style="margin-top: var(--s-3);"></div>
     </section>
 
+    <!-- Viajes: rango + viático diario vs gasto real. -->
+    <section class="view" data-view="viajes">
+      <div class="section-h">
+        <div>
+          <h2 style="font-size: 24px;">Viajes</h2>
+          <div class="card-sub">Define un viaje, su viático diario y marca qué transacciones pertenecen a él.</div>
+        </div>
+        <button class="btn btn-primary" id="btnNuevoViaje">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+          Nuevo viaje
+        </button>
+      </div>
+      <div class="bento" id="viajesList" style="margin-top: var(--s-4);"></div>
+      <div id="viajeDetalle" style="margin-top: var(--s-5);"></div>
+    </section>
+
     <!-- Sin hojas asignadas -->
     <section class="view" data-view="sinHojas">
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center; padding: var(--s-7) var(--s-4);">
@@ -1729,6 +1746,10 @@
         <button class="more-dropdown-item" type="button" data-route="divisas" role="menuitem">
           <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h13l-3-3 1-1 5 5-5 5-1-1 3-3H4zm16 12H7l3 3-1 1-5-5 5-5 1 1-3 3h13z"/></svg>
           Divisas
+        </button>
+        <button class="more-dropdown-item" type="button" data-route="viajes" role="menuitem">
+          <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg>
+          Viajes
         </button>
         <button class="more-dropdown-item" type="button" data-route="admin" data-rol-required="admin" role="menuitem">
           <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4-2.1-.6a6.9 6.9 0 0 0-.5-1.2l1.2-1.8-1.4-1.4-1.8 1.2c-.4-.2-.8-.4-1.2-.5L14 3h-2l-.6 2.1c-.4.1-.8.3-1.2.5L8.4 4.4 7 5.8l1.2 1.8c-.2.4-.4.8-.5 1.2L5.6 9v2l2.1.6c.1.4.3.8.5 1.2L7 14.6l1.4 1.4 1.8-1.2c.4.2.8.4 1.2.5L12 17h2l.6-2.1c.4-.1.8-.3 1.2-.5l1.8 1.2 1.4-1.4-1.2-1.8c.2-.4.4-.8.5-1.2L21 11z"/></svg>
@@ -2019,6 +2040,28 @@
     <div class="body-sm" id="tcHint" style="color: var(--on-surface-variant);">Se guardará también la inversa para que las conversiones en ambos sentidos estén cubiertas.</div>
     <div style="display: flex; gap: var(--s-2); margin-top: var(--s-3);">
       <button type="button" class="btn btn-secondary" id="tcCancel" style="flex: 1;">Cancelar</button>
+      <button type="submit" class="btn btn-primary" style="flex: 2;">Guardar</button>
+    </div>
+  </form>
+</div>
+
+<div class="sheet bottom" id="sheetViaje" role="dialog" aria-modal="true">
+  <div class="sheet-handle"></div>
+  <h3 id="sheetViajeTitle">Nuevo viaje</h3>
+  <form id="formViaje" style="display: flex; flex-direction: column; gap: var(--s-3);">
+    <input type="hidden" name="id" id="viajeId">
+    <div class="field"><label>Nombre</label><input class="input" name="nombre" id="viajeNombre" required maxlength="120" placeholder="Ej. Madrid Q1"></div>
+    <div class="field-row">
+      <div class="field"><label>Inicio</label><input class="input" type="date" name="fecha_inicio" id="viajeInicio" required></div>
+      <div class="field"><label>Fin</label><input class="input" type="date" name="fecha_fin" id="viajeFin" required></div>
+    </div>
+    <div class="field">
+      <label>Viático diario (<span id="viajeMonedaLabel">EUR</span>)</label>
+      <input class="input" type="number" name="viatico_diario" id="viajeViatico" step="0.01" min="0" required placeholder="0,00">
+    </div>
+    <div class="field"><label>Notas</label><textarea class="textarea" name="notas" id="viajeNotas" maxlength="500" placeholder="Objetivo, observaciones…"></textarea></div>
+    <div style="display: flex; gap: var(--s-2); margin-top: var(--s-3);">
+      <button type="button" class="btn btn-secondary" id="viajeCancel" style="flex: 1;">Cancelar</button>
       <button type="submit" class="btn btn-primary" style="flex: 2;">Guardar</button>
     </div>
   </form>
@@ -2387,7 +2430,8 @@ function setIconPick(hidden, value) {
 }
 
 const Estado = {
-  bootstrap: { cuentas: [], categorias: [], establecimientos: [], transacciones: [], recurrentes: [], presupuestos: [], resumen: null, sesion: null, version: '', hojas: [], hojaActivaId: '', divisas: { default_codigo: 'EUR', items: [] }, tiposCambio: [], moneda_por_defecto: 'EUR' },
+  bootstrap: { cuentas: [], categorias: [], establecimientos: [], transacciones: [], recurrentes: [], presupuestos: [], resumen: null, sesion: null, version: '', hojas: [], hojaActivaId: '', divisas: { default_codigo: 'EUR', items: [] }, tiposCambio: [], moneda_por_defecto: 'EUR', viajes: { items: [], moneda_por_defecto: 'EUR' } },
+  viajeSeleccionadoId: '',
   filtros: { cuenta_id: '', subcuenta_id: '', tipo: '', categoria_id: '', desde: '', hasta: '', q: '' },
   movOrden: { campo: 'fecha', direccion: 'desc' },
   pres: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1, asignado: {} },
@@ -3599,6 +3643,12 @@ function setRouteLoading(route) {
   if (route === 'establecimientos') {
     $('#estList').innerHTML = loadingBlockHtml('Actualizando establecimientos...');
   }
+  if (route === 'viajes') {
+    const list = $('#viajesList');
+    if (list) list.innerHTML = loadingBlockHtml('Actualizando viajes...');
+    const det = $('#viajeDetalle');
+    if (det) det.innerHTML = '';
+  }
 }
 
 // Garantiza que el bootstrap siempre tenga las colecciones esperadas como arrays,
@@ -4058,6 +4108,7 @@ function go(route) {
   if (route === 'categorias') renderCategorias();
   if (route === 'establecimientos') renderEstablecimientos();
   if (route === 'divisas') renderDivisas();
+  if (route === 'viajes') renderViajes();
   if (route === 'admin') renderAdmin();
   if (route === 'configuracion') renderConfiguracion();
   if (route === 'dashboard') renderDashboard();
@@ -5253,6 +5304,257 @@ if ($('#formTipoCambio')) $('#formTipoCambio').addEventListener('submit', async 
     await refrescarDivisasDespuesDeOperacion_();
     closeAllSheets();
     toast('Tipo de cambio guardado');
+  } catch (err) { toast(String(err.message || err)); }
+});
+
+// === Viajes view ===
+// ponytail: el resumen se pinta desde Estado (cacheado en bootstrap) para
+// evitar N round-trips al entrar; al editar/eliminar/vincular refrescamos.
+async function renderViajes() {
+  const list = $('#viajesList');
+  if (list) list.innerHTML = loadingBlockHtml('Cargando viajes...');
+  try {
+    const data = await call('obtenerViajes');
+    Estado.bootstrap.viajes = data;
+    paintViajes(data);
+    const det = $('#viajeDetalle');
+    if (det && Estado.viajeSeleccionadoId) {
+      paintViajeDetalle(await call('obtenerDetalleViaje', Estado.viajeSeleccionadoId));
+    } else if (det) {
+      det.innerHTML = '';
+    }
+  } catch (err) {
+    if (list) list.innerHTML = emptyHtml('No se pudieron cargar los viajes', err.message || 'Inténtalo de nuevo.');
+  }
+}
+
+function paintViajes(data) {
+  const list = $('#viajesList');
+  if (!list) return;
+  const items = (data && data.items) || [];
+  const moneda = (data && data.moneda_por_defecto) || Estado.bootstrap.moneda_por_defecto || 'EUR';
+  if (!items.length) {
+    list.innerHTML = emptyHtml('Sin viajes', 'Crea uno con el botón superior para empezar.');
+    return;
+  }
+  const fmt = v => fmtMoneda(v, moneda);
+  list.innerHTML = items.map(v => {
+    const dentro = v.gasto_real <= v.viatico_total;
+    const color = dentro ? 'var(--primary)' : 'var(--error)';
+    const diffAbs = Math.abs(v.viatico_total - v.gasto_real);
+    const diffTxt = (v.viatico_total - v.gasto_real >= 0 ? '+' : '−') + fmt(diffAbs);
+    return `
+    <div class="card col-6" data-viaje-card="${v.id}" style="padding: var(--s-3); cursor: pointer;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap;">
+        <strong class="title-sm">${escape(v.nombre)}</strong>
+        <span class="label-md data-tabular" style="color: var(--on-surface-variant);">${escape(v.fecha_inicio)} → ${escape(v.fecha_fin)} · ${v.dias} día${v.dias === 1 ? '' : 's'}</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); margin-top: var(--s-3);">
+        <div>
+          <div class="label-md" style="color: var(--on-surface-variant);">Viático/día</div>
+          <div class="title-md data-tabular">${fmt(v.viatico_diario)}</div>
+        </div>
+        <div>
+          <div class="label-md" style="color: var(--on-surface-variant);">Gasto real</div>
+          <div class="title-md data-tabular">${fmt(v.gasto_real)}</div>
+        </div>
+        <div>
+          <div class="label-md" style="color: var(--on-surface-variant);">Saldo</div>
+          <div class="title-md data-tabular" style="color: ${color};">${diffTxt}</div>
+        </div>
+      </div>
+      <div style="display: flex; gap: var(--s-2); margin-top: var(--s-3); flex-wrap: wrap;">
+        <button class="btn btn-sm btn-outline" data-viaje-edit="${v.id}">Editar</button>
+        <button class="btn btn-sm btn-outline" data-viaje-del="${v.id}">Eliminar</button>
+        <span class="label-md" style="margin-left: auto; color: var(--on-surface-variant); align-self: center;">${v.tx_count} tx vinculada${v.tx_count === 1 ? '' : 's'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function paintViajeDetalle(d) {
+  const cont = $('#viajeDetalle');
+  if (!cont || !d) { if (cont) cont.innerHTML = ''; return; }
+  const moneda = Estado.bootstrap.viajes.moneda_por_defecto || Estado.bootstrap.moneda_por_defecto || 'EUR';
+  const fmt = v => fmtMoneda(v, moneda);
+  const totalGasto = d.dias.reduce((s, x) => s + Number(x.gasto_real || 0), 0);
+  const totalViatico = Number(d.viatico_diario || 0) * d.dias.length;
+  const saldo = totalViatico - totalGasto;
+  const color = saldo >= 0 ? 'var(--primary)' : 'var(--error)';
+  cont.innerHTML = `
+    <div class="card" style="padding: var(--s-4);">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap;">
+        <div>
+          <h3 class="title-md" style="margin: 0;">${escape(d.nombre)}</h3>
+          <div class="body-sm" style="color: var(--on-surface-variant);">${escape(d.fecha_inicio)} → ${escape(d.fecha_fin)} · ${d.dias.length} día${d.dias.length === 1 ? '' : 's'}</div>
+        </div>
+        <div style="display: flex; gap: var(--s-2);">
+          <button class="btn btn-sm btn-outline" id="viajeDetalleCerrar">Cerrar detalle</button>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-3); margin-top: var(--s-3);">
+        <div>
+          <div class="label-md" style="color: var(--on-surface-variant);">Viático diario</div>
+          <div class="title-md data-tabular">${fmt(d.viatico_diario)}</div>
+        </div>
+        <div>
+          <div class="label-md" style="color: var(--on-surface-variant);">Viático total</div>
+          <div class="title-md data-tabular">${fmt(totalViatico)}</div>
+        </div>
+        <div>
+          <div class="label-md" style="color: var(--on-surface-variant);">Gasto real</div>
+          <div class="title-md data-tabular">${fmt(totalGasto)}</div>
+        </div>
+        <div>
+          <div class="label-md" style="color: var(--on-surface-variant);">Saldo</div>
+          <div class="title-md data-tabular" style="color: ${color};">${fmt(saldo)}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: var(--s-3); padding: var(--s-4);">
+      <h3 class="title-md" style="margin: 0 0 var(--s-2);">Detalle por día</h3>
+      <div class="table-wrap" style="border: 1px solid var(--surface-container); border-radius: var(--r-md);">
+        <table class="table">
+          <thead><tr><th>Fecha</th><th class="num">Viático</th><th class="num">Gasto</th><th class="num">Saldo</th></tr></thead>
+          <tbody>
+            ${d.dias.map(x => {
+              const s = Number(x.viatico_diario || 0) - Number(x.gasto_real || 0);
+              const c = s >= 0 ? 'var(--primary)' : 'var(--error)';
+              return `<tr><td>${escape(x.fecha)}</td><td class="num data-tabular">${fmt(x.viatico_diario)}</td><td class="num data-tabular">${fmt(x.gasto_real)}</td><td class="num data-tabular" style="color: ${c};">${fmt(s)}</td></tr>`;
+            }).join('') || '<tr><td colspan="4" class="loading-table-row">Sin días en el rango</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: var(--s-3); padding: var(--s-4);">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap;">
+        <h3 class="title-md" style="margin: 0;">Transacciones del rango</h3>
+        <button class="btn btn-sm btn-outline" id="viajeGuardarVinculo">Guardar selección</button>
+      </div>
+      <div class="card-sub" style="margin-top: var(--s-2);">Marca las transacciones que pertenecen al viaje. Solo se muestran las del rango ${escape(d.fecha_inicio)} → ${escape(d.fecha_fin)}.</div>
+      <div id="viajeTxList" style="margin-top: var(--s-3); display: flex; flex-direction: column; gap: var(--s-1); max-height: 420px; overflow: auto;"></div>
+    </div>
+  `;
+  renderViajeTxList_(d);
+}
+
+function renderViajeTxList_(d) {
+  const cont = $('#viajeTxList');
+  if (!cont) return;
+  const txs = d.transacciones_en_rango || [];
+  if (!txs.length) {
+    cont.innerHTML = emptyHtml('Sin transacciones en el rango', 'Registra movimientos con fecha entre inicio y fin.');
+    return;
+  }
+  const moneda = Estado.bootstrap.viajes.moneda_por_defecto || Estado.bootstrap.moneda_por_defecto || 'EUR';
+  cont.innerHTML = txs.map(t => {
+    const checked = t.viaje_id === d.id ? 'checked' : '';
+    const checkedBg = t.viaje_id === d.id ? 'background: var(--surface-container-low);' : '';
+    return `
+      <label style="display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) var(--s-3); border-radius: var(--r-md); ${checkedBg} cursor: pointer;">
+        <input type="checkbox" data-viaje-tx="${escape(t.id)}" ${checked} style="margin: 0;">
+        <div style="flex: 1; min-width: 0;">
+          <div class="body-sm" style="font-weight: 600;">${escape(t.descripcion || '(sin descripción)')}</div>
+          <div class="label-md" style="color: var(--on-surface-variant);">${escape(t.fecha)} · ${escape(t.tipo)}</div>
+        </div>
+        <div class="data-tabular" style="font-weight: 600;">${fmtMoneda(t.importe_en_defecto || t.importe, moneda)}</div>
+      </label>
+    `;
+  }).join('');
+}
+
+async function openViaje(id) {
+  const items = (Estado.bootstrap.viajes && Estado.bootstrap.viajes.items) || [];
+  const v = id ? items.find(x => x.id === id) : null;
+  $('#sheetViajeTitle').textContent = v ? 'Editar viaje' : 'Nuevo viaje';
+  $('#viajeId').value = v ? v.id : '';
+  $('#viajeNombre').value = v ? v.nombre : '';
+  $('#viajeInicio').value = v ? v.fecha_inicio : '';
+  $('#viajeFin').value = v ? v.fecha_fin : '';
+  $('#viajeViatico').value = v ? v.viatico_diario : '';
+  $('#viajeNotas').value = v ? (v.notas || '') : '';
+  $('#viajeMonedaLabel').textContent = Estado.bootstrap.viajes.moneda_por_defecto || Estado.bootstrap.moneda_por_defecto || 'EUR';
+  openSheet('sheetViaje');
+}
+
+async function refrescarViajes_() {
+  const data = await call('obtenerViajes');
+  Estado.bootstrap.viajes = data;
+  paintViajes(data);
+  return data;
+}
+
+if ($('#btnNuevoViaje')) $('#btnNuevoViaje').addEventListener('click', () => openViaje());
+if ($('#viajeCancel')) $('#viajeCancel').addEventListener('click', closeAllSheets);
+
+if ($('#viajesList')) $('#viajesList').addEventListener('click', async (e) => {
+  const card = e.target.closest('[data-viaje-card]');
+  const editBtn = e.target.closest('[data-viaje-edit]');
+  const delBtn = e.target.closest('[data-viaje-del]');
+  if (editBtn) {
+    e.stopPropagation();
+    openViaje(editBtn.dataset.viajeEdit);
+    return;
+  }
+  if (delBtn) {
+    e.stopPropagation();
+    const id = delBtn.dataset.viajeDel;
+    pedirConfirmacion('¿Eliminar este viaje? Las transacciones vinculadas se desasociarán.', 'Eliminar', true, async () => {
+      try {
+        await call('eliminarViaje', id);
+        Estado.viajeSeleccionadoId = '';
+        await refrescarViajes_();
+        const det = $('#viajeDetalle'); if (det) det.innerHTML = '';
+        toast('Viaje eliminado');
+      } catch (err) { toast(String(err.message || err)); }
+    });
+    return;
+  }
+  if (card) {
+    Estado.viajeSeleccionadoId = card.dataset.viajeCard;
+    const det = $('#viajeDetalle'); if (det) det.innerHTML = loadingBlockHtml('Cargando detalle...');
+    try { paintViajeDetalle(await call('obtenerDetalleViaje', Estado.viajeSeleccionadoId)); }
+    catch (err) { toast(String(err.message || err)); }
+  }
+});
+
+if ($('#viajeDetalle')) $('#viajeDetalle').addEventListener('click', async (e) => {
+  if (e.target.closest('#viajeDetalleCerrar')) {
+    Estado.viajeSeleccionadoId = '';
+    $('#viajeDetalle').innerHTML = '';
+    return;
+  }
+  if (e.target.closest('#viajeGuardarVinculo')) {
+    const id = Estado.viajeSeleccionadoId;
+    if (!id) return;
+    const ids = $$('#viajeTxList input[data-viaje-tx]:checked').map(i => i.dataset.viajeTx);
+    try {
+      paintViajeDetalle(await call('vincularTransaccionesViaje', id, ids));
+      await refrescarViajes_();
+      toast('Selección guardada');
+    } catch (err) { toast(String(err.message || err)); }
+  }
+});
+
+if ($('#formViaje')) $('#formViaje').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const payload = {
+    id: f.get('id') || '',
+    nombre: String(f.get('nombre') || '').trim(),
+    fecha_inicio: String(f.get('fecha_inicio') || ''),
+    fecha_fin: String(f.get('fecha_fin') || ''),
+    viatico_diario: Number(f.get('viatico_diario') || 0),
+    notas: String(f.get('notas') || '').trim()
+  };
+  if (!payload.nombre || !payload.fecha_inicio || !payload.fecha_fin) { toast('Faltan datos'); return; }
+  try {
+    await call('guardarViaje', payload);
+    await refrescarViajes_();
+    closeAllSheets();
+    toast('Viaje guardado');
   } catch (err) { toast(String(err.message || err)); }
 });
 
