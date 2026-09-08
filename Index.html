@@ -4421,12 +4421,16 @@ async function sincronizarTransacciones(opciones) {
       Estado.bootstrap.transacciones = servidor;
       cacheTransaccionesRecientes_(servidor);
       Estado.lastTxSyncAt = Date.now();
-      // Resúmenes del mes actual en cliente: el dashboard no necesita
-      // otro round-trip a obtenerResumen tras cada sync.
-      refrescarResumenDashboardLocal_();
       if (diff.dirty || opts.forceSaldos) {
         await reconciliarSaldosSiHaceFalta_(diff.dirty ? diff : { dirty: true }, opts);
       }
+      // Resúmenes del mes actual en cliente: el dashboard no necesita otro
+      // round-trip a obtenerResumen tras cada sync.
+      // ponytail: DEBE ir después de reconciliarSaldosSiHaceFalta_, porque
+      // calcularResumenLocal_ deriva evol[].balance del saldo de las cuentas. Si se
+      // calcula antes de reconciliar, la serie de balance queda pintada con saldos
+      // viejos y solo se corregía en el siguiente ciclo de sync ("demora en actualizar").
+      refrescarResumenDashboardLocal_();
     if (opts.render !== false) {
       renderDashboard();
       renderMovimientos();
@@ -5115,6 +5119,12 @@ async function borrarTx(id) {
     cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
     if (txAnterior) actualizarSaldosLocalesTrasTx_(txAnterior, null);
     refrescarDependientesRecurrentes_();
+    // ponytail: mismo motivo que en aplicarResultadoGuardadoTx_ — si el resumen local
+    // no puede recalcularse (txs incompletas en memoria), reconciliamos en background
+    // para que la serie de balance/evol no quede desfasada hasta el próximo sync.
+    if (!transaccionesCompletasEnMemoria_()) {
+      sincronizarTransacciones({ render: true, toastOnError: false });
+    }
     if (location.hash.startsWith('#/')) go(location.hash.slice(2));
     else renderDashboard();
   toast('Movimiento eliminado');
@@ -8248,6 +8258,15 @@ function aplicarResultadoGuardadoTx_(result, txAnterior) {
   // Dashboard, presupuesto y recurrentes leen resumen/cats desde memoria:
   // actualizar sin round-trip tras cada alta/edición de movimiento.
   refrescarDependientesRecurrentes_();
+  // ponytail: si aún no tenemos TODAS las txs en memoria (típico tras F5 con el
+  // cache acotado de 50 y sin sync previo), refrescarResumenDashboardLocal_ aborta
+  // y el resumen —y con él la serie de balance/evol del gráfico— se queda con los
+  // datos del bootstrap, corrigiéndose solo en el siguiente sync oportunista ("se
+  // actualiza después de mucho tiempo"). Forzamos un sync en segundo plano para
+  // reconciliar de inmediato; sincronizarTransacciones coalesce llamadas concurrentes.
+  if (!transaccionesCompletasEnMemoria_()) {
+    sincronizarTransacciones({ render: true, toastOnError: false });
+  }
   limpiarFiltrosInvalidos();
   poblarFiltros();
   if (location.hash.startsWith('#/')) go(location.hash.slice(2));
