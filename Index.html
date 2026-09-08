@@ -599,28 +599,54 @@
   .bar-fill.pasivo { background: var(--error); opacity: 0.85; }
   .bar-label { font-size: 10px; color: var(--on-surface-variant); font-weight: 600; }
 
-  /* === Dashboard chart (.chart-bars — plot + axis rows, escala bidireccional) === */
-  .chart-bars { padding: 0 4px 0 56px; position: relative; }
-  .chart-bars .bars-plot { display: flex; align-items: stretch; gap: 6px; height: 180px; position: relative; }
-  .chart-bars .bars-axis { display: flex; gap: 6px; padding-top: 4px; }
-  .chart-bars .bar { justify-content: stretch; }
-  /* ponytail: el chart se rerendera tras cada sync; la transición de height
-     hacía que pareciera "loading" otra vez aunque los valores fueran los mismos.
-     Pintamos los valores correctos al instante. */
-  .chart-bars .bar-fill { transition: none; }
-  /* ponytail: el fill se ancla al 50% (cero) y crece hacia arriba o abajo según el signo */
-  .chart-bars .bar-fill.positivo { bottom: 50%; top: auto; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-  .chart-bars .bar-fill.negativo { top: 50%; bottom: auto; border-top-left-radius: 0; border-top-right-radius: 0; }
-  /* ponytail: cuando ningún mes es negativo, el cero cae al fondo; idem al revés */
-  .chart-bars.all-positive .bar-fill.positivo { bottom: 0; border-bottom-left-radius: 3px; border-bottom-right-radius: 3px; }
-  .chart-bars.all-negative .bar-fill.negativo { top: 0; border-top-left-radius: 3px; border-top-right-radius: 3px; }
+  /* === Dashboard chart (.chart-bars — plot + axis rows, ingresos/egresos en barras paralelas ↑, balance como línea con eje derecho) === */
+  .chart-bars { padding: 0 68px 0 56px; position: relative; }
+  .chart-bars .bars-plot { display: flex; align-items: stretch; gap: 0; height: 180px; position: relative; }
+  .chart-bars .bars-axis { display: flex; gap: 0; padding-top: 6px; }
+  /* ponytail: cada mes es un .bar-group con dos .bar paralelos (ingreso + gasto).
+     Sin gap entre grupos: cada grupo ocupa exactamente 1/N del ancho (flex:1), así
+     su centro cae en (i+0.5)/N y la línea/puntos del balance (posicionados en ese %)
+     quedan perfectamente alineados. La separación visual entre meses la da el padding
+     interno del grupo (box-sizing:border-box global mantiene los anchos iguales). */
+  .chart-bars .bar-group { flex: 1; display: flex; gap: 4px; align-items: stretch; min-width: 0; height: 100%; position: relative; padding: 0 7px; }
+  .chart-bars .bar { flex: 1; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; min-width: 0; height: 100%; position: relative; gap: 0; }
+  /* ponytail: el bar-stack llena todo el ancho de su .bar (sin max-width) para
+     que las dos barras del mes queden realmente pegadas. align-items:center
+     en el padre las centra verticalmente cuando son bajas. */
+  .chart-bars .bar-stack { flex: 1; width: 100%; background: transparent; border-radius: 3px; position: relative; overflow: hidden; align-self: stretch; min-height: 0; }
+  /* ponytail: ambas barras crecen desde bottom:0 y llenan el bar-stack al 100%.
+     Sin border-radius para que ingresos y gastos queden realmente pegados. */
+  .chart-bars .bar-fill { transition: opacity 0.15s, filter 0.15s; position: absolute; left: 0; right: 0; bottom: 0; top: auto; border-radius: 4px 4px 0 0; opacity: 0.95; cursor: pointer; min-height: 3px; }
+  .chart-bars .bar:hover .bar-fill { opacity: 1; filter: brightness(1.12); }
+  .chart-bars .bar-fill.ingreso { background: var(--primary); }
+  .chart-bars .bar-fill.egreso { background: #d32f2f; }
+  /* ponytail: SVG del balance superpuesto. El balance usa su propio eje derecho
+     (balanceY en JS mapea [balLo, balHi] → [100%, 0%]), independiente de las barras.
+     width/height:100% son IMPRESCINDIBLES: sin ellos el SVG usa su tamaño intrínseco
+     (300x150) en lugar de llenar el plot, y la polilínea se dibuja comprimida en la
+     esquina superior izquierda, desalineada de los puntos DOM. */
+  .chart-bars .balance-line { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .chart-bars .balance-line polyline { fill: none; stroke: var(--primary); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+  /* ponytail: los puntos del balance son nodos DOM circulares posicionados en %,
+     así nunca se deforman en óvalos como pasaba con los <circle> del SVG estirado. */
+  .chart-bars .balance-dot { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--primary); border: 2px solid var(--surface); transform: translate(-50%, -50%); box-shadow: 0 1px 3px rgba(0,0,0,0.22); cursor: pointer; pointer-events: all; transition: transform 0.15s; z-index: 2; }
+  .chart-bars .balance-dot:hover { transform: translate(-50%, -50%) scale(1.35); }
+  .chart-bars .balance-dot.current { width: 11px; height: 11px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 22%, transparent); }
   .chart-bars .bar-axis-label { flex: 1; text-align: center; font-size: 10px; color: var(--on-surface-variant); font-weight: 600; }
-  .chart-bars .bar-current { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 700; color: var(--on-surface); white-space: nowrap; }
-  /* ponytail: líneas del grid a lo largo de todo el plot; label anclado a la izquierda */
+  /* ponytail: balance del mes actual sobre la última columna */
+  .chart-bars .bars-current-chip { position: absolute; transform: translate(-50%, -160%); font-size: 11px; font-weight: 700; color: var(--on-primary-container); background: var(--primary-container); padding: 2px 8px; border-radius: var(--r-full); white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.15); z-index: 3; pointer-events: none; }
   .chart-bars .bars-grid { position: absolute; inset: 0; pointer-events: none; }
   .chart-bars .grid-line { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--on-surface-variant); opacity: 0.4; }
   .chart-bars .grid-line.zero { border-top-style: solid; opacity: 0.6; }
-  .chart-bars .grid-label { position: absolute; right: 100%; top: 50%; transform: translateY(-50%); padding-right: 6px; font-size: 9px; color: var(--on-surface-variant); white-space: nowrap; background: var(--surface); }
+  /* ponytail: líneas de referencia del eje derecho (balance), tintadas como la línea
+     para que las etiquetas balMax/balMin queden claramente ancladas a la serie. */
+  .chart-bars .grid-line.bal-ref { border-top: 1px dashed var(--primary); opacity: 0.32; }
+  /* ponytail: etiquetas de dos ejes. Izquierda = escala de barras (ingresos/gastos),
+     derecha = escala del balance (coloreada como la línea). Cada una se ancla por top. */
+  .chart-bars .grid-label { position: absolute; transform: translateY(-50%); font-size: 9px; color: var(--on-surface-variant); white-space: nowrap; background: var(--surface); }
+  .chart-bars .grid-label.grid-left { right: 100%; padding-right: 8px; text-align: right; }
+  .chart-bars .grid-label.grid-right { left: 100%; padding-left: 8px; }
+  .chart-bars .grid-label.bal { color: var(--primary); font-weight: 600; }
   .chart-bars .bars-tooltip { position: fixed; background: var(--surface-container-highest); color: var(--on-surface); padding: 6px 10px; border-radius: 6px; font-size: 12px; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.18); z-index: 1000; white-space: nowrap; opacity: 0; transition: opacity 0.15s; }
 
   /* === Progress === */
@@ -1479,8 +1505,9 @@
           <div class="card-h">
             <h2>Evolución Mensual</h2>
             <div class="legend">
-              <span><span class="dot" style="background: var(--primary);"></span>Balance positivo</span>
-              <span><span class="dot" style="background: var(--error);"></span>Balance negativo</span>
+              <span><span class="dot" style="background: var(--tertiary);"></span>Ingresos</span>
+              <span><span class="dot" style="background: var(--amber);"></span>Gastos</span>
+              <span><span class="dot" style="background: var(--primary);"></span>Balance</span>
             </div>
           </div>
           <div class="bars" id="dashBars"></div>
@@ -3167,10 +3194,15 @@ function calcularResumenLocal_(anio, mes) {
     const d = new Date(a, m - 1 - i, 1);
     const k = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     const b = porMes[k];
+    // ponytail: ingresos/gastos = flujo real (gasto − devolución). ingresosPresupuesto/
+    // gastosPresupuesto añaden las transferencias que la sección Presupuesto cuenta como
+    // gasto/ingreso, para que el gráfico de Evolución cuadre con esas tarjetas.
     evol.push({
       mes: k,
       ingresos: b ? b.ingresos : 0,
-      gastos: (b ? b.gastos : 0) - (b ? b.devoluciones : 0)
+      gastos: (b ? b.gastos : 0) - (b ? b.devoluciones : 0),
+      ingresosPresupuesto: b ? b.ingresos + b.tIngreso : 0,
+      gastosPresupuesto: b ? (b.gastos - b.devoluciones) + b.tGasto : 0
     });
   }
   // ponytail: balance global al final de cada mes. Saldo actual menos la
@@ -4517,86 +4549,127 @@ function renderDashboard() {
     : fmtMoneda(presTotal - gastoPres) + ' restantes';
   $('#dashPresRest').style.color = colorPres;
 
-  // Bar chart — Evolución Mensual: balance global al final de cada mes.
-  // La barra crece hacia arriba si el balance es positivo, hacia abajo si es
-  // negativo. Líneas de referencia cada 25% para leer la escala; hover muestra
-  // el detalle del mes. Cuando todos los balances son ≥ 0, el cero cae al
-  // fondo y se oculta el área negativa (y viceversa si todos son ≤ 0).
-  const evol = resumen.evol || [];
-  const balances = evol.map(e => Number(e.balance != null ? e.balance : (Number(e.ingresos || 0) - Number(e.gastos || 0))));
-  const maxAbs = Math.max(1, ...balances.map(v => Math.abs(v)));
-  const hayNegativo = balances.some(v => v < 0);
-  const hayPositivo = balances.some(v => v > 0);
-  const modo = !hayNegativo ? 'all-positive' : (!hayPositivo ? 'all-negative' : '');
-  // ponytail: en all-positive/all-negative, el cero está en el borde y la altura
-  // de la barra se calcula contra el 100% del plot. En mixto, contra el 50%
-  // (cero en el centro). Mínimo visual de 4% para que un balance ~0 no desaparezca.
+  // Bar chart — Evolución Mensual: ingresos y gastos como barras paralelas hacia
+  // arriba desde cero (eje izquierdo), balance (patrimonio acumulado) como línea
+  // con su propio eje derecho. Últimos 6 meses.
+  const evolFull = resumen.evol || [];
+  const evol = evolFull.slice(-6);
+  const ingresosArr = evol.map(e => Number(e.ingresosPresupuesto != null ? e.ingresosPresupuesto : (e.ingresos || 0)));
+  const egresosArr = evol.map(e => Number(e.gastosPresupuesto != null ? e.gastosPresupuesto : (e.gastos || 0))); // presupuesto: gasto − devolución + transferencias de gasto
+  const balances = evol.map(e => Number(e.balance != null ? e.balance : 0));
+  // ponytail: el mes en curso del gráfico debe coincidir EXACTAMENTE con los KPIs de
+  // arriba (tarjetas "Gasto actual" e ingresos de Presupuesto). El agregado top-level del
+  // resumen y el bucket del evol pueden diferir por zona horaria en el backend (txs del
+  // día 1), así que fijamos el último mes a los valores del resumen cuando corresponde.
+  if (evol.length) {
+    const last = evol.length - 1;
+    const curKey = `${resumen.anio}-${String(resumen.mes).padStart(2, '0')}`;
+    if (evol[last].mes === curKey) {
+      const ingCur = resumen.ingresosPresupuesto != null ? resumen.ingresosPresupuesto : resumen.ingresos;
+      const gasCur = resumen.gastosPresupuesto != null ? resumen.gastosPresupuesto : resumen.gastos;
+      if (ingCur != null) ingresosArr[last] = Number(ingCur);
+      if (gasCur != null) egresosArr[last] = Number(gasCur);
+    }
+  }
+  // ponytail: el último punto (mes en curso) se fija al patrimonio real actual —el
+  // mismo número que la tarjeta "Balance total" de arriba— para que la referencia
+  // del mes actual coincida siempre con el balance mostrado y no se desvíe por
+  // transacciones con fecha futura.
+  if (balances.length) balances[balances.length - 1] = balance;
+  // ponytail: DOS escalas independientes. Ingresos y gastos son flujos mensuales
+  // (eje izquierdo, cero en el suelo). El balance es patrimonio acumulado y suele
+  // ser de una magnitud muy distinta: si compartiera escala con las barras, éstas
+  // quedaban aplastadas y la línea pegada al techo, haciendo ilegible (incorrecta)
+  // la información. Por eso el balance usa su propio eje derecho, con margen para
+  // que la línea no toque los bordes.
+  const maxBar = Math.max(1, ...ingresosArr, ...egresosArr);
+  let balMin = balances.length ? Math.min(...balances) : 0;
+  let balMax = balances.length ? Math.max(...balances) : 0;
+  if (balMin === balMax) { balMin -= 1; balMax += 1; } // serie plana → banda mínima
+  const balPad = (balMax - balMin) * 0.15;
+  const balLo = balMin - balPad;
+  const balHi = balMax + balPad;
+  const balanceY = (b) => Math.max(0, Math.min(100, 100 - ((b - balLo) / (balHi - balLo)) * 100));
   const barsHtml = evol.map((m, idx) => {
-    const bal = balances[idx];
-    const neg = bal < 0;
-    const factor = modo === 'all-positive' || modo === 'all-negative' ? 100 : 50;
-    const h = Math.max(4, Math.round((Math.abs(bal) / maxAbs) * factor));
-    const tip = `${fmtMesCorto(m.mes)} · Balance: ${fmtMoneda(bal)}`;
-    const esActual = idx === evol.length - 1;
-    const currentLabel = esActual ? `<div class="bar-current">${fmtMoneda(bal)}</div>` : '';
-    return `<div class="bar" data-tip="${escape(tip)}">
-      ${currentLabel}
-      <div class="bar-stack">
-        <div class="bar-fill${neg ? ' pasivo' : ''} ${neg ? 'negativo' : 'positivo'}" style="height: ${h}%;"></div>
-      </div>
+    const ing = ingresosArr[idx];
+    const egr = egresosArr[idx];
+    const hIng = Math.max(0, Math.round((ing / maxBar) * 100));
+    const hEgr = Math.max(0, Math.round((egr / maxBar) * 100));
+    const tipIng = `${fmtMesCorto(m.mes)} · ${fmtMoneda(ing)}`;
+    const tipEgr = `${fmtMesCorto(m.mes)} · ${fmtMoneda(egr)}`;
+    return `<div class="bar-group">
+      <div class="bar bar-ingreso" data-tip="${escape(tipIng)}"><div class="bar-stack"><div class="bar-fill ingreso" style="height: ${hIng}%;"></div></div></div>
+      <div class="bar bar-egreso" data-tip="${escape(tipEgr)}"><div class="bar-stack"><div class="bar-fill egreso" style="height: ${hEgr}%;"></div></div></div>
     </div>`;
   }).join('');
-  // ponytail: las líneas del grid se extienden a lo largo de todo el plot
-  // (left:0 right:0); el label va dentro del padding-left del .bars y se ancla
-  // a la derecha de la línea. En all-positive el cero cae al fondo y solo
-  // mostramos 4 líneas positivas; en all-negative el cero arriba y 4 negativas.
-  const line = (top, label, zero) => `<span class="grid-line${zero ? ' zero' : ''}" style="top:${top}"><span class="grid-label">${label}</span></span>`;
-  let gridHtml;
-  if (modo === 'all-positive') {
-    gridHtml = '<div class="bars-grid">' + [
-      line('0%', fmtMoneda(maxAbs)),
-      line('25%', ''),
-      line('50%', ''),
-      line('75%', ''),
-      line('100%', '0 €', true)
-    ].join('') + '</div>';
-  } else if (modo === 'all-negative') {
-    gridHtml = '<div class="bars-grid">' + [
-      line('0%', '0 €', true),
-      line('25%', ''),
-      line('50%', ''),
-      line('75%', ''),
-      line('100%', fmtMoneda(-maxAbs))
-    ].join('') + '</div>';
-  } else {
-    gridHtml = '<div class="bars-grid">' + [
-      line('0%', fmtMoneda(maxAbs)),
-      line('25%', ''),
-      line('50%', '0 €', true),
-      line('75%', ''),
-      line('100%', fmtMoneda(-maxAbs))
-    ].join('') + '</div>';
-  }
+  // ponytail: balance como línea + puntos, escalado en su eje derecho (balanceY).
+  // La polilínea vive en un SVG estirado (preserveAspectRatio none + non-scaling-stroke,
+  // así el grosor no se deforma), pero los puntos son nodos DOM circulares posicionados
+  // en %, para que nunca se distorsionen en óvalos al variar el ancho de la tarjeta.
+  const N = balances.length;
+  const ptXY = balances.map((b, i) => {
+    const x = N <= 1 ? 50 : ((i + 0.5) / N) * 100;
+    const y = balanceY(b);
+    return { x, y };
+  });
+  const lineSvg = N >= 2
+    ? `<svg class="balance-line" viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${ptXY.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ')}"/></svg>`
+    : '';
+  const dotsHtml = ptXY.map((p, i) => {
+    const tip = `${fmtMesCorto(evol[i].mes)} · ${fmtMoneda(balances[i])}`;
+    return `<span class="balance-dot${i === N - 1 ? ' current' : ''}" style="left:${p.x.toFixed(2)}%;top:${p.y.toFixed(2)}%;" data-tip="${escape(tip)}"></span>`;
+  }).join('');
+  const currentChip = N
+    ? `<span class="bars-current-chip" style="left:${ptXY[N - 1].x.toFixed(2)}%;top:${ptXY[N - 1].y.toFixed(2)}%;transform:${ptXY[N - 1].y < 24 ? 'translate(-50%, 60%)' : 'translate(-50%, -160%)'};">${fmtMoneda(balances[N - 1])}</span>`
+    : '';
+  // ponytail: grid horizontal de referencia + etiquetas de dos ejes. Izquierda =
+  // escala de barras (maxBar arriba, 0 abajo). Derecha = escala del balance
+  // (balMax y balMin en su posición real dentro de la banda).
+  const gridLines = ['0%', '25%', '50%', '75%', '100%'].map(top =>
+    `<span class="grid-line${top === '100%' ? ' zero' : ''}" style="top:${top}"></span>`
+  ).join('');
+  // ponytail: líneas de referencia del balance (eje derecho) en su balMax/balMin,
+  // para que las etiquetas de la derecha no queden flotando desalineadas.
+  const balRefLines = N
+    ? `<span class="grid-line bal-ref" style="top:${balanceY(balMax).toFixed(2)}%"></span>`
+      + (balMin !== balMax ? `<span class="grid-line bal-ref" style="top:${balanceY(balMin).toFixed(2)}%"></span>` : '')
+    : '';
+  const leftLabels = `<span class="grid-label grid-left" style="top:0%">${fmtMoneda(maxBar)}</span>`
+    + `<span class="grid-label grid-left" style="top:100%">${fmtMoneda(0)}</span>`;
+  const rightLabels = N
+    ? `<span class="grid-label grid-right bal" style="top:${balanceY(balMax).toFixed(2)}%">${fmtMoneda(balMax)}</span>`
+      + (balMin !== balMax ? `<span class="grid-label grid-right bal" style="top:${balanceY(balMin).toFixed(2)}%">${fmtMoneda(balMin)}</span>` : '')
+    : '';
+  const gridHtml = `<div class="bars-grid">${gridLines}${balRefLines}${leftLabels}${rightLabels}</div>`;
   const axisHtml = '<div class="bars-axis">' + evol.map(m =>
     `<div class="bar-axis-label">${fmtMesCorto(m.mes)}</div>`
   ).join('') + '</div>';
   const barsEl = $('#dashBars');
-  barsEl.className = 'chart-bars' + (modo ? ' ' + modo : '');
-  barsEl.innerHTML = `<div class="bars-plot">${gridHtml}${barsHtml}</div>${axisHtml}`;
-  // ponytail: tooltip único reutilizado; delegación de eventos sobre el contenedor
-  const tip = document.createElement('div');
-  tip.className = 'bars-tooltip';
-  tip.id = 'dashBarsTip';
-  barsEl.appendChild(tip);
-  barsEl.onmousemove = (ev) => {
-    const bar = ev.target.closest('.bar');
-    if (!bar) { tip.style.opacity = 0; return; }
-    tip.textContent = bar.dataset.tip || '';
-    tip.style.opacity = 1;
-    tip.style.left = (ev.clientX + 12) + 'px';
-    tip.style.top = (ev.clientY - 28) + 'px';
-  };
-  barsEl.onmouseleave = () => { tip.style.opacity = 0; };
+  if (!evol.length) {
+    barsEl.className = '';
+    barsEl.innerHTML = emptyHtml('Sin datos de evolución', 'Registra movimientos para ver tu tendencia mensual.');
+    barsEl.onmousemove = null;
+    barsEl.onmouseleave = null;
+  } else {
+    barsEl.className = 'chart-bars';
+    barsEl.innerHTML = `<div class="bars-plot">${gridHtml}${barsHtml}${lineSvg}${dotsHtml}${currentChip}</div>${axisHtml}`;
+    // ponytail: tooltip único reutilizado; delegación de eventos sobre el contenedor.
+    // Cada .bar (ingreso/gasto) y cada .balance-dot lleva su propio data-tip, así
+    // cada elemento de cada serie responde individualmente al hover.
+    const tip = document.createElement('div');
+    tip.className = 'bars-tooltip';
+    tip.id = 'dashBarsTip';
+    barsEl.appendChild(tip);
+    barsEl.onmousemove = (ev) => {
+      const target = ev.target.closest('.bar, .balance-dot');
+      if (!target) { tip.style.opacity = 0; return; }
+      tip.textContent = target.dataset.tip || '';
+      tip.style.opacity = 1;
+      tip.style.left = (ev.clientX + 12) + 'px';
+      tip.style.top = (ev.clientY - 28) + 'px';
+    };
+    barsEl.onmouseleave = () => { tip.style.opacity = 0; };
+  }
 
   // Cuentas preview
   const preview = cuentas.slice(0, 3);
