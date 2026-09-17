@@ -7,6 +7,8 @@
 <meta name="theme-color" content="#00613e">
 <title id="docTitle">Finanzas Familia</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='30' fill='%2300613e'/><circle cx='32' cy='32' r='24' fill='none' stroke='%2397f6c2' stroke-width='2.5'/><text x='32' y='44' font-family='Arial Black,Helvetica,sans-serif' font-size='34' font-weight='900' text-anchor='middle' fill='%2397f6c2'>$</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
   /* === Sistema de diseño Finanzas Familia === */
@@ -2774,6 +2776,24 @@ function toast(msg) {
 
 const API_URL = 'https://finanzas-cors-proxy.marquezhh.workers.dev';
 
+// Preconexión al origen de la API: arranca DNS+TLS en paralelo con el parseo
+// de la página y ahorra el handshake del primer fetch (bootstrap/login).
+// Se deriva de API_URL para no quedar obsoleto al reescribir el deploy.
+(function() {
+  try {
+    const origin = new URL(API_URL).origin;
+    const pre = document.createElement('link');
+    pre.rel = 'preconnect';
+    pre.href = origin;
+    pre.crossOrigin = 'anonymous';
+    document.head.appendChild(pre);
+    const dns = document.createElement('link');
+    dns.rel = 'dns-prefetch';
+    dns.href = origin;
+    document.head.appendChild(dns);
+  } catch (_) { /* ignore */ }
+})();
+
 const AUTH_LAST_USER_KEY = 'ff_last_user';
 const AUTH_IS_LOGGED_KEY = 'ff_is_logged';
 const AUTH_TOKEN_KEY = 'ff_auth_token';
@@ -2859,6 +2879,34 @@ function clearApiReadCache_() {
   } catch (_) {
     // ignore
   }
+}
+
+// ponytail: cada login emite un token (UUID) nuevo y los cachés se namespacian
+// con él (bootstrapCacheKey_ etc.). Sin esta purga, las entradas de sesiones
+// anteriores quedan huérfanas para siempre en localStorage: acumulan tokens
+// ya inservibles y gastan cuota. Se barre cualquier clave de caché cuyo UUID
+// embebido NO sea el token actual (o ninguna si no hay sesión).
+function purgeStaleSessionCache_() {
+  const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+  try {
+    const tokenActual = localStorage.getItem(AUTH_TOKEN_KEY) || '';
+    const prefixes = [
+      BOOTSTRAP_CACHE_KEY + ':',
+      TX_RECENT_CACHE_KEY + ':',
+      SALDOS_CACHE_KEY + ':',
+      API_READ_CACHE_PREFIX + ':'
+    ];
+    const stale = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !prefixes.some(p => k.indexOf(p) === 0)) continue;
+      const m = UUID_RE.exec(k);
+      if (m && m[0] !== tokenActual) stale.push(k);
+    }
+    stale.forEach(k => localStorage.removeItem(k));
+    // El barrido puede haber eliminado entradas del caché en memoria de lectura.
+    _apiReadCacheMem.clear();
+  } catch (_) { /* ignore */ }
 }
 
 async function rawCall(fn, ...args) {
@@ -3791,15 +3839,18 @@ function pintarAppAutenticada_(primeraVez, sincronizarTx) {
 }
 
 function descartarSesionLocal_() {
+  // ponytail: capturar el token ANTES de borrarlo: las claves namespaceadas
+  // (bootstrapCacheKey_ etc.) se resuelven con él y, si se borra primero,
+  // quedan apuntando a ':anon' y las entradas reales quedan huérfanas.
+  const token = localStorage.getItem(AUTH_TOKEN_KEY) || '';
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(AUTH_IS_LOGGED_KEY);
-  // ponytail: limpiamos tanto la clave base como las namespace por sesión,
-  // por si quedó alguna entrada huérfana de un usuario anterior del mismo
-  // navegador.
   localStorage.removeItem(BOOTSTRAP_CACHE_KEY);
   localStorage.removeItem(TX_RECENT_CACHE_KEY);
-  localStorage.removeItem(bootstrapCacheKey_());
-  localStorage.removeItem(txRecentCacheKey_());
+  if (token) {
+    localStorage.removeItem(BOOTSTRAP_CACHE_KEY + ':' + token);
+    localStorage.removeItem(TX_RECENT_CACHE_KEY + ':' + token);
+  }
   clearSaldosCache_();
   clearApiReadCache_();
 }
@@ -8354,17 +8405,16 @@ $('#authForm').addEventListener('submit', async (e) => {
   try {
     const r = await call('loginUsuario', user, pass);
     clearApiReadCache_();
-    // ponytail: limpiamos cualquier cache de un usuario previo del mismo
-    // navegador antes de fijar el nuevo token. La escritura posterior usará
-    // la clave namespaceada por el token actual, así que no contamina.
+    // ponytail: limpiamos las claves base sin namespace y, tras fijar el nuevo
+    // token, barremos todos los cachés de sesiones anteriores (tokens viejos
+    // huérfanos) con purgeStaleSessionCache_.
     localStorage.removeItem(BOOTSTRAP_CACHE_KEY);
     localStorage.removeItem(TX_RECENT_CACHE_KEY);
-    localStorage.removeItem(bootstrapCacheKey_());
-    localStorage.removeItem(txRecentCacheKey_());
     localStorage.setItem(AUTH_LAST_USER_KEY, r.user || user);
     if (r.token) localStorage.setItem(AUTH_TOKEN_KEY, r.token);
     else localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.setItem(AUTH_IS_LOGGED_KEY, '1');
+    purgeStaleSessionCache_();
     await iniciarAppAutenticada();
   } catch (err) {
     localStorage.removeItem(AUTH_TOKEN_KEY);
@@ -8774,6 +8824,9 @@ window.addEventListener('hashchange', () => {
     }
     const token = localStorage.getItem(AUTH_TOKEN_KEY) || '';
     const sesionExpirada = !!localStorage.getItem(AUTH_IS_LOGGED_KEY);
+    // ponytail: barrido de arranque — elimina entradas de caché ligadas a
+    // tokens que ya no se usan (sesiones anteriores del mismo navegador).
+    purgeStaleSessionCache_();
 
     // ponytail: ping solo sirve para detectar que falta el spreadsheet maestro.
     // Si ya hay token, la instalacion esta configurada: nos ahorramos el
