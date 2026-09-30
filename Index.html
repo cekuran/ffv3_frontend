@@ -651,6 +651,35 @@
   .chart-bars .grid-label.bal { color: var(--primary); font-weight: 600; }
   .chart-bars .bars-tooltip { position: fixed; background: var(--surface-container-highest); color: var(--on-surface); padding: 6px 10px; border-radius: 6px; font-size: 12px; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.18); z-index: 1000; white-space: nowrap; opacity: 0; transition: opacity 0.15s; }
 
+  /* === Gráficos (evolución mensual por categoría/cuenta/establecimiento) === */
+  .graf-controls { display: flex; flex-direction: column; gap: var(--s-4); margin-bottom: var(--s-4); }
+  .graf-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-3); }
+  .graf-row .field { min-width: 150px; }
+  .graf-row .field .input, .graf-row .field .select { padding: 10px 12px; font-size: 14px; }
+  .graf-controls .seg-control { flex-wrap: wrap; }
+  .graf-presets { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+  .graf-chart { position: relative; width: 100%; min-height: 320px; }
+  .graf-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .graf-chart text { fill: var(--on-surface-variant); font-size: 11px; }
+  .graf-chart .g-grid { stroke: var(--outline-variant); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.6; }
+  .graf-chart .g-zero { stroke: var(--on-surface-variant); stroke-width: 1; opacity: 0.6; }
+  .graf-chart .g-guide { stroke: var(--on-surface-variant); stroke-width: 1; opacity: 0.5; pointer-events: none; }
+  .graf-chart .g-line { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .graf-tooltip { position: absolute; top: 0; left: 0; background: var(--surface-container-highest); color: var(--on-surface); padding: 8px 10px; border-radius: 6px; font-size: 12px; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.18); z-index: 5; white-space: nowrap; opacity: 0; transition: opacity 0.12s; }
+  .graf-tooltip.is-on { opacity: 1; }
+  .graf-tooltip .gt-row { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+  .graf-tooltip .gt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .graf-tooltip .gt-val { margin-left: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .graf-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .graf-table th { text-align: right; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--on-surface-variant); padding: 8px; }
+  .graf-table th:first-child, .graf-table td:first-child { text-align: left; }
+  .graf-table td { text-align: right; padding: 8px; border-top: 1px solid var(--surface-container); font-variant-numeric: tabular-nums; }
+  .graf-table tr[data-graf-serie] { cursor: pointer; }
+  .graf-table tr[data-graf-serie]:hover td { background: var(--surface-container-low); }
+  .graf-table tr.is-off td { opacity: 0.4; }
+  .graf-table .g-name { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+  .graf-table .g-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
   /* === Progress === */
   .progress { width: 100%; height: 8px; background: var(--surface-container-high); border-radius: var(--r-full); overflow: hidden; }
   .progress-fill { height: 100%; background: var(--primary); border-radius: inherit; transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
@@ -1438,6 +1467,7 @@
     <div class="nav-item" data-route="movimientos"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v3H4zm0 5h16v2H4zm0 4h10v2H4z"/></svg> Movimientos</div>
     <div class="nav-item" data-route="presupuesto"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M5 21V8l7-5 7 5v13h-4v-7H9v7z"/></svg> Presupuesto</div>
     <div class="nav-item" data-route="reportes"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v2H4zm0 4h16v2H4zm0 4h10v2H4zm0 4h10v2H4zm12-5h4v2h-4zm0 4h4v2h-4z"/></svg> Reportes</div>
+    <div class="nav-item" data-route="graficos"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z"/></svg> Gráficos</div>
     <div class="nav-item" data-route="recurrentes"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l5-4-5-4v3H5v6h2zm10 10H7v-3l-5 4 5 4v-3h12v-6h-2z"/></svg> Recurrentes</div>
     <div class="nav-item" data-route="establecimientos"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16l-1 5h-3v2h-2V9h-4v2H8V9H5zm1 7h14v10H5z"/></svg> Establecimientos</div>
     <div class="nav-item" data-route="viajes"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg> Viajes</div>
@@ -1738,6 +1768,86 @@
       </div>
       <div id="repCuentas"></div>
       <div id="repStatus" class="body-sm" role="status" aria-live="polite" style="padding: var(--s-4) 0;"></div>
+    </section>
+
+    <!-- Gráficos -->
+    <section class="view" data-view="graficos">
+      <div class="section-h">
+        <div>
+          <h2 style="font-size: 24px;">Gráficos</h2>
+          <div class="card-sub" id="grafPeriodo">—</div>
+        </div>
+      </div>
+
+      <div class="card graf-controls">
+        <div class="graf-row">
+          <div class="field">
+            <label>Ver evolución de</label>
+            <div class="seg-control" id="grafVista">
+              <button type="button" data-graf-vista="categorias" class="is-on">Categorías</button>
+              <button type="button" data-graf-vista="cuentas">Cuentas</button>
+              <button type="button" data-graf-vista="flujo">Ingresos y gastos</button>
+              <button type="button" data-graf-vista="establecimientos">Establecimientos</button>
+            </div>
+          </div>
+          <div class="field" id="grafMedidaWrap">
+            <label>Medida</label>
+            <div class="seg-control" id="grafMedida">
+              <button type="button" data-graf-medida="gasto" class="is-on">Gastos</button>
+              <button type="button" data-graf-medida="ingreso">Ingresos</button>
+            </div>
+          </div>
+        </div>
+        <div class="graf-row">
+          <div class="field">
+            <label for="grafDesde">Desde</label>
+            <input type="month" class="input" id="grafDesde">
+          </div>
+          <div class="field">
+            <label for="grafHasta">Hasta</label>
+            <input type="month" class="input" id="grafHasta">
+          </div>
+          <div class="field">
+            <label>Rango rápido</label>
+            <div class="graf-presets" id="grafPresets">
+              <button type="button" class="chip" data-graf-rango="6">6 meses</button>
+              <button type="button" class="chip" data-graf-rango="12">12 meses</button>
+              <button type="button" class="chip" data-graf-rango="24">24 meses</button>
+              <button type="button" class="chip" data-graf-rango="anio">Este año</button>
+              <button type="button" class="chip" data-graf-rango="todo">Todo</button>
+            </div>
+          </div>
+        </div>
+        <div class="graf-row">
+          <div class="field">
+            <label>Tipo de gráfico</label>
+            <div class="seg-control" id="grafTipo">
+              <button type="button" data-graf-tipo="lineas" class="is-on">Líneas</button>
+              <button type="button" data-graf-tipo="barras">Barras</button>
+            </div>
+          </div>
+          <div class="field" id="grafTopWrap">
+            <label for="grafTop">Series visibles</label>
+            <select class="select" id="grafTop">
+              <option value="5">Top 5</option>
+              <option value="8" selected>Top 8</option>
+              <option value="12">Top 12</option>
+              <option value="0">Todas</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card col-12">
+        <div class="card-h"><h2 id="grafTitulo">—</h2><span class="label-md" id="grafResumen"></span></div>
+        <div class="graf-chart" id="grafChart"></div>
+      </div>
+
+      <div class="card col-12" style="margin-top: var(--s-4); overflow-x: auto;">
+        <div class="card-h"><h2>Detalle</h2><span class="label-md" style="color: var(--on-surface-variant);">Toca una fila para mostrar u ocultar la serie</span></div>
+        <div id="grafTabla"></div>
+      </div>
+      <div id="grafStatus" class="body-sm" role="status" aria-live="polite" style="padding: var(--s-4) 0;"></div>
     </section>
 
     <!-- Recurrentes -->
@@ -2048,6 +2158,10 @@
         <button class="more-dropdown-item" type="button" data-route="reportes" role="menuitem">
           <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16v2H4zm0 4h16v2H4zm0 4h10v2H4zm0 4h10v2H4zm12-5h4v2h-4zm0 4h4v2h-4z"/></svg>
           Reportes
+        </button>
+        <button class="more-dropdown-item" type="button" data-route="graficos" role="menuitem">
+          <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 20V10h4v10zm6 0V4h4v16zm6 0v-7h4v7z"/></svg>
+          Gráficos
         </button>
         <button class="more-dropdown-item" type="button" data-route="recurrentes" role="menuitem">
           <svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l5-4-5-4v3H5v6h2zm10 10H7v-3l-5 4 5 4v-3h12v-6h-2z"/></svg>
@@ -2746,6 +2860,7 @@ const Estado = {
   pres: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1, asignado: {} },
   estMes: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1 },
   repMes: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1 },
+  graf: { vista: 'categorias', medida: 'gasto', tipo: 'lineas', top: 8, desde: '', hasta: '', ocultas: new Set() },
   txTipo: 'gasto',
   txRepartoDest: [],
   repRecDest: [],
@@ -4323,7 +4438,7 @@ function closeMoreMenu() {
 function updateMoreMenuActive(route) {
   const wrap = $('.more-wrap');
   if (!wrap) return;
-  wrap.classList.toggle('is-active', ['conciliar', 'reportes', 'recurrentes', 'categorias', 'establecimientos', 'admin'].includes(route));
+  wrap.classList.toggle('is-active', ['conciliar', 'reportes', 'graficos', 'recurrentes', 'categorias', 'establecimientos', 'admin'].includes(route));
 }
 
 let _txSyncToken = 0;
@@ -4595,7 +4710,7 @@ function bindVisibilitySync_() {
 }
 
 // === Rutas ===
-const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'reportes', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'divisas', 'viajes', 'admin', 'configuracion', 'sinHojas'];
+const ROUTES = ['dashboard', 'cuentas', 'movimientos', 'presupuesto', 'reportes', 'graficos', 'recurrentes', 'conciliar', 'categorias', 'establecimientos', 'divisas', 'viajes', 'admin', 'configuracion', 'sinHojas'];
 
 function usuarioSinHojas_() {
   const b = Estado.bootstrap || {};
@@ -4622,6 +4737,7 @@ function go(route) {
   }
   if (route === 'presupuesto') renderPresupuesto();
   if (route === 'reportes') renderReportes();
+  if (route === 'graficos') renderGraficos();
   if (route === 'cuentas') renderCuentas();
   if (route === 'movimientos') renderMovimientos();
   if (route === 'recurrentes') renderRecurrentes();
@@ -6691,6 +6807,452 @@ $$('[data-rep-nav]').forEach(b => b.addEventListener('click', () => {
   Estado.repMes.mes = mes;
   renderReportes();
 }));
+
+// === Gráficos: evolución mensual (categorías, cuentas, ingresos/gastos, establecimientos) ===
+// Todo se calcula en cliente con las transacciones en memoria (mismas reglas que
+// calcularResumenLocal_: importe_en_defecto, gasto − devolución).
+const GRAF_PALETA = ['#00613e', '#0050af', '#d32f2f', '#f57c00', '#7b1fa2', '#00838f', '#c2185b', '#689f38', '#5d4037', '#455a64', '#fbc02d', '#3949ab'];
+const GRAF_COLOR_OTROS = '#9e9e9e';
+const GRAF_MAX_MESES = 120;
+
+function grafMesKey_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+
+function grafMeses_(desde, hasta) {
+  const out = [];
+  let [y, m] = desde.split('-').map(Number);
+  const [y2, m2] = hasta.split('-').map(Number);
+  while ((y < y2 || (y === y2 && m <= m2)) && out.length < GRAF_MAX_MESES) {
+    out.push(y + '-' + String(m).padStart(2, '0'));
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return out;
+}
+
+function grafColor_(c, i) {
+  return /^#[0-9a-f]{3,8}$/i.test(String(c || '')) ? c : GRAF_PALETA[i % GRAF_PALETA.length];
+}
+
+function grafFmtEje_(v) {
+  return new Intl.NumberFormat('es-ES', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
+}
+
+function grafNiceTicks_(min, max, n) {
+  if (max - min < 1e-9) max = min + 1;
+  const rawStep = (max - min) / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const norm = rawStep / mag;
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
+  const lo = Math.floor(min / step + 1e-9) * step;
+  const hi = Math.ceil(max / step - 1e-9) * step;
+  const count = Math.round((hi - lo) / step);
+  const ticks = [];
+  for (let i = 0; i <= count; i++) ticks.push(lo + i * step);
+  return { lo, hi, ticks };
+}
+
+// Variación de saldo de una transacción sobre una cuenta (misma regla que deltaCuenta_ del backend).
+function grafDeltaCuenta_(t, cuentaId) {
+  const imp = Number(t.importe || 0);
+  if (t.cuenta_id === cuentaId) {
+    if (t.tipo === 'devolucion' && t.cuenta_destino_id) return -imp;
+    if (t.tipo === 'ingreso' || t.tipo === 'devolucion') return imp;
+    if (t.tipo === 'gasto' || t.tipo === 'transferencia') return -imp;
+    return 0;
+  }
+  if (t.cuenta_destino_id === cuentaId && (t.tipo === 'transferencia' || t.tipo === 'devolucion')) {
+    return Number(t.importe_destino || t.importe || 0);
+  }
+  return 0;
+}
+
+function grafRangoPreset_(p) {
+  const g = Estado.graf;
+  const hoy = new Date();
+  g.hasta = grafMesKey_(hoy);
+  if (p === 'anio') {
+    g.desde = hoy.getFullYear() + '-01';
+  } else if (p === 'todo') {
+    let min = g.hasta;
+    (Estado.bootstrap.transacciones || []).forEach(t => {
+      const k = String(t.fecha || '').slice(0, 7);
+      if (/^\d{4}-\d{2}$/.test(k) && k < min) min = k;
+    });
+    g.desde = min;
+  } else {
+    g.desde = grafMesKey_(new Date(hoy.getFullYear(), hoy.getMonth() - (Number(p) - 1), 1));
+  }
+}
+
+function grafDatosCuentas_(meses) {
+  const txs = Estado.bootstrap.transacciones || [];
+  const nowKey = grafMesKey_(new Date());
+  const series = (Estado.bootstrap.cuentas || []).map((c, i) => {
+    const dm = {};
+    txs.forEach(t => {
+      const d = grafDeltaCuenta_(t, c.id);
+      if (!d) return;
+      const k = String(t.fecha || '').slice(0, 7);
+      if (k) dm[k] = (dm[k] || 0) + d;
+    });
+    const ev = (c.evolucion || []).filter(e => e && e.mes).slice().sort((a, b) => a.mes < b.mes ? -1 : 1);
+    const evMap = {};
+    ev.forEach(e => { evMap[e.mes] = Number(e.saldo || 0); });
+    const valores = meses.map(k => {
+      if (k in evMap) return evMap[k];
+      // Ancla: primer/último punto de evolución (o saldo actual si no hay) + deltas de movimientos.
+      const anchor = ev.length
+        ? (k < ev[0].mes ? { mes: ev[0].mes, saldo: Number(ev[0].saldo || 0) } : { mes: ev[ev.length - 1].mes, saldo: Number(ev[ev.length - 1].saldo || 0) })
+        : { mes: nowKey, saldo: Number(c.saldo || 0) };
+      let s = anchor.saldo;
+      Object.keys(dm).forEach(m => {
+        if (k > anchor.mes) { if (m > anchor.mes && m <= k) s += dm[m]; }
+        else if (m > k && m <= anchor.mes) s -= dm[m];
+      });
+      return s;
+    });
+    return { id: String(c.id), nombre: c.nombre || 'Cuenta', color: grafColor_('', i), valores };
+  });
+  return { series, stock: true, modo: 'apilado', titulo: 'Saldo de cuentas a fin de mes', totalFila: true, porcentaje: false };
+}
+
+function grafDatosFlujo_(meses) {
+  const idx = {};
+  meses.forEach((k, i) => { idx[k] = i; });
+  const ing = new Array(meses.length).fill(0);
+  const gas = new Array(meses.length).fill(0);
+  (Estado.bootstrap.transacciones || []).forEach(t => {
+    const i = idx[String(t.fecha || '').slice(0, 7)];
+    if (i === undefined) return;
+    if (t.tipo === 'ingreso') ing[i] += impDefLocal_(t);
+    else if (t.tipo === 'gasto') gas[i] += impDefLocal_(t);
+    else if (t.tipo === 'devolucion') gas[i] -= impDefLocal_(t);
+  });
+  return {
+    series: [
+      { id: 'ing', nombre: 'Ingresos', color: '#00613e', valores: ing },
+      { id: 'gas', nombre: 'Gastos', color: '#d32f2f', valores: gas },
+      { id: 'net', nombre: 'Neto', color: '#0050af', valores: ing.map((v, i) => v - gas[i]) }
+    ],
+    stock: false, modo: 'agrupado', titulo: 'Ingresos, gastos y neto por mes', totalFila: false, porcentaje: false
+  };
+}
+
+function grafDatosAgrupados_(meses) {
+  const g = Estado.graf;
+  const esCat = g.vista === 'categorias';
+  const idx = {};
+  meses.forEach((k, i) => { idx[k] = i; });
+  const entidades = {};
+  (esCat ? Estado.bootstrap.categorias : Estado.bootstrap.establecimientos || []).forEach(e => { entidades[e.id] = e; });
+  const mapa = new Map();
+  (Estado.bootstrap.transacciones || []).forEach(t => {
+    const i = idx[String(t.fecha || '').slice(0, 7)];
+    if (i === undefined) return;
+    let v;
+    if (g.medida === 'gasto') {
+      if (t.tipo === 'gasto') v = impDefLocal_(t);
+      else if (t.tipo === 'devolucion') v = -impDefLocal_(t);
+      else return;
+    } else {
+      if (t.tipo !== 'ingreso') return;
+      v = impDefLocal_(t);
+    }
+    const id = String((esCat ? t.categoria_id : t.establecimiento_id) || '');
+    let s = mapa.get(id);
+    if (!s) {
+      const ent = entidades[id];
+      s = {
+        id: id || '__sin__',
+        nombre: ent ? ent.nombre : (esCat ? 'Sin categoría' : 'Sin establecimiento'),
+        color: esCat && ent ? ent.color : '',
+        valores: new Array(meses.length).fill(0)
+      };
+      mapa.set(id, s);
+    }
+    s.valores[i] += v;
+  });
+  const total = s => s.valores.reduce((a, v) => a + v, 0);
+  let series = [...mapa.values()].filter(s => s.valores.some(v => v !== 0));
+  series.sort((a, b) => Math.abs(total(b)) - Math.abs(total(a)));
+  if (g.top > 0 && series.length > g.top) {
+    const resto = series.slice(g.top);
+    const otros = { id: '__otros__', nombre: 'Otros (' + resto.length + ')', color: GRAF_COLOR_OTROS, valores: new Array(meses.length).fill(0) };
+    resto.forEach(s => s.valores.forEach((v, i) => { otros.valores[i] += v; }));
+    series = series.slice(0, g.top).concat(otros);
+  }
+  series.forEach((s, i) => { if (s.id !== '__otros__') s.color = grafColor_(s.color, i); });
+  const que = g.medida === 'gasto' ? 'Gastos' : 'Ingresos';
+  return {
+    series, stock: false, modo: 'apilado', totalFila: true, porcentaje: true,
+    titulo: que + (esCat ? ' por categoría' : ' por establecimiento')
+  };
+}
+
+function grafConstruirDatos_(meses) {
+  const v = Estado.graf.vista;
+  if (v === 'cuentas') return grafDatosCuentas_(meses);
+  if (v === 'flujo') return grafDatosFlujo_(meses);
+  return grafDatosAgrupados_(meses);
+}
+
+function grafSvg_(meses, series, datos, tipo, W) {
+  const H = W < 520 ? 260 : 320;
+  const L = 52, R = 12, T = 12, B = 28;
+  const pw = W - L - R, ph = H - T - B;
+  const n = meses.length;
+  const band = pw / n;
+  const barras = tipo === 'barras';
+  const agrupado = barras && datos.modo === 'agrupado';
+  let min = Infinity, max = -Infinity;
+  if (barras && !agrupado) {
+    for (let i = 0; i < n; i++) {
+      let pos = 0, neg = 0;
+      series.forEach(s => { const v = s.valores[i]; if (v >= 0) pos += v; else neg += v; });
+      max = Math.max(max, pos);
+      min = Math.min(min, neg);
+    }
+  } else {
+    series.forEach(s => s.valores.forEach(v => { if (v < min) min = v; if (v > max) max = v; }));
+  }
+  if (!isFinite(min) || !isFinite(max)) { min = 0; max = 1; }
+  // Barras y flujos parten de cero; los saldos en líneas usan su propio rango.
+  if (barras || !datos.stock) { min = Math.min(min, 0); max = Math.max(max, 0); }
+  const sc = grafNiceTicks_(min, max, 5);
+  const y = v => T + ph - ((v - sc.lo) / (sc.hi - sc.lo)) * ph;
+  const x = i => L + band * (i + 0.5);
+  const parts = [];
+  sc.ticks.forEach(t => {
+    const yy = y(t).toFixed(1);
+    parts.push('<line class="g-grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '"/>');
+    parts.push('<text x="' + (L - 6) + '" y="' + (Number(yy) + 4) + '" text-anchor="end">' + escape(grafFmtEje_(t)) + '</text>');
+  });
+  if (sc.lo < 0 && sc.hi > 0) parts.push('<line class="g-zero" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) + '"/>');
+  const paso = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / 54))));
+  meses.forEach((k, i) => {
+    if (i % paso !== 0) return;
+    parts.push('<text x="' + x(i).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle">' + escape(fmtMesCorto(k)) + '</text>');
+  });
+  if (barras) {
+    for (let i = 0; i < n; i++) {
+      if (agrupado) {
+        const bw = (band * 0.8) / series.length;
+        series.forEach((s, j) => {
+          const v = s.valores[i];
+          const y0 = y(0), y1 = y(v);
+          const h = Math.abs(y1 - y0);
+          if (h < 0.5) return;
+          parts.push('<rect x="' + (x(i) - band * 0.4 + j * bw).toFixed(1) + '" y="' + Math.min(y0, y1).toFixed(1) + '" width="' + Math.max(1, bw - 1).toFixed(1) + '" height="' + h.toFixed(1) + '" fill="' + s.color + '" rx="2"/>');
+        });
+      } else {
+        const bw = band * 0.7;
+        let pos = 0, neg = 0;
+        series.forEach(s => {
+          const v = s.valores[i];
+          let a, b;
+          if (v >= 0) { a = y(pos); b = y(pos + v); pos += v; }
+          else { a = y(neg); b = y(neg + v); neg += v; }
+          const h = Math.abs(b - a);
+          if (h < 0.5) return;
+          parts.push('<rect x="' + (x(i) - bw / 2).toFixed(1) + '" y="' + Math.min(a, b).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" fill="' + s.color + '"/>');
+        });
+      }
+    }
+  } else {
+    series.forEach(s => {
+      const d = s.valores.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
+      parts.push('<path class="g-line" d="' + d + '" stroke="' + s.color + '"/>');
+      if (n <= 36) s.valores.forEach((v, i) => parts.push('<circle cx="' + x(i).toFixed(1) + '" cy="' + y(v).toFixed(1) + '" r="3" fill="' + s.color + '"/>'));
+    });
+  }
+  parts.push('<line class="g-guide" id="grafGuide" x1="0" x2="0" y1="' + T + '" y2="' + (T + ph) + '" style="display:none"/>');
+  parts.push('<rect class="g-overlay" x="' + L + '" y="' + T + '" width="' + pw + '" height="' + ph + '" fill="transparent" style="touch-action: pan-y;"/>');
+  return {
+    html: '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escape(datos.titulo) + '">' + parts.join('') + '</svg><div class="graf-tooltip" role="status"></div>',
+    geom: { W, L, band, n }
+  };
+}
+
+function grafActivarTooltip_(meses, series, geom) {
+  const cont = $('#grafChart');
+  const svg = cont.querySelector('svg');
+  const ov = svg && svg.querySelector('.g-overlay');
+  const guide = svg && svg.querySelector('#grafGuide');
+  const tip = cont.querySelector('.graf-tooltip');
+  if (!ov || !guide || !tip) return;
+  const mover = ev => {
+    const r = svg.getBoundingClientRect();
+    if (!r.width) return;
+    const px = (ev.clientX - r.left) * (geom.W / r.width);
+    const i = Math.max(0, Math.min(geom.n - 1, Math.floor((px - geom.L) / geom.band)));
+    const gx = geom.L + geom.band * (i + 0.5);
+    guide.setAttribute('x1', gx);
+    guide.setAttribute('x2', gx);
+    guide.style.display = '';
+    tip.innerHTML = '<div style="font-weight:700; margin-bottom:4px;">' + escape(fmtMesCorto(meses[i])) + '</div>'
+      + series.map(s => '<div class="gt-row"><span style="display:flex; align-items:center; gap:6px;"><span class="gt-dot" style="background:' + s.color + '"></span>' + escape(s.nombre) + '</span><span class="gt-val">' + escape(fmtMoneda(s.valores[i])) + '</span></div>').join('');
+    tip.classList.add('is-on');
+    const cr = cont.getBoundingClientRect();
+    let left = ev.clientX - cr.left + 14;
+    if (left + tip.offsetWidth > cr.width) left = ev.clientX - cr.left - tip.offsetWidth - 14;
+    const top = Math.min(Math.max(0, ev.clientY - cr.top - tip.offsetHeight / 2), Math.max(0, cr.height - tip.offsetHeight));
+    tip.style.left = Math.max(0, left) + 'px';
+    tip.style.top = top + 'px';
+  };
+  const ocultar = () => { guide.style.display = 'none'; tip.classList.remove('is-on'); };
+  ov.addEventListener('pointermove', mover);
+  ov.addEventListener('pointerdown', mover);
+  ov.addEventListener('pointerleave', ocultar);
+}
+
+function grafTabla_(datos) {
+  const g = Estado.graf;
+  const n = datos.series.length ? datos.series[0].valores.length : 1;
+  const suma = v => v.reduce((a, x) => a + x, 0);
+  const visibles = datos.series.filter(s => !g.ocultas.has(s.id));
+  const colsStock = datos.stock;
+  const totalGlobal = visibles.reduce((a, s) => a + suma(s.valores), 0);
+  const celdas = vals => vals.map(c => '<td>' + c + '</td>').join('');
+  const valoresFila = s => {
+    if (colsStock) {
+      const ini = s.valores[0] || 0, fin = s.valores[s.valores.length - 1] || 0;
+      return [fmtMoneda(ini), fmtMoneda(fin), fmtMoneda(fin - ini)];
+    }
+    const tot = suma(s.valores);
+    const v = [fmtMoneda(tot), fmtMoneda(tot / n)];
+    if (datos.porcentaje) v.push(totalGlobal ? Math.round(tot / totalGlobal * 100) + '%' : '—');
+    return v;
+  };
+  const cab = colsStock ? ['Inicial', 'Final', 'Variación'] : ['Total', 'Promedio / mes'].concat(datos.porcentaje ? ['%'] : []);
+  const filas = datos.series.map(s => {
+    const off = g.ocultas.has(s.id);
+    return '<tr data-graf-serie="' + escape(s.id) + '" class="' + (off ? 'is-off' : '') + '" role="button" tabindex="0" aria-pressed="' + (!off) + '">'
+      + '<td><span class="g-name"><span class="g-dot" style="background:' + s.color + '"></span><span>' + escape(s.nombre) + '</span></span></td>'
+      + celdas(valoresFila(s)) + '</tr>';
+  }).join('');
+  let pie = '';
+  if (datos.totalFila && visibles.length) {
+    const agg = { nombre: 'Total', valores: new Array(n).fill(0) };
+    visibles.forEach(s => s.valores.forEach((v, i) => { agg.valores[i] += v; }));
+    const fila = valoresFila(agg);
+    if (datos.porcentaje) fila[fila.length - 1] = '';
+    pie = '<tr style="font-weight:700;"><td>Total</td>' + celdas(fila) + '</tr>';
+  }
+  return '<table class="graf-table"><thead><tr><th>Serie</th>' + cab.map(c => '<th>' + c + '</th>').join('') + '</tr></thead><tbody>' + filas + pie + '</tbody></table>';
+}
+
+function grafSyncControles_() {
+  const g = Estado.graf;
+  $$('[data-graf-vista]').forEach(b => b.classList.toggle('is-on', b.dataset.grafVista === g.vista));
+  $$('[data-graf-medida]').forEach(b => b.classList.toggle('is-on', b.dataset.grafMedida === g.medida));
+  $$('[data-graf-tipo]').forEach(b => b.classList.toggle('is-on', b.dataset.grafTipo === g.tipo));
+  const agrupable = g.vista === 'categorias' || g.vista === 'establecimientos';
+  $('#grafMedidaWrap').style.display = agrupable ? '' : 'none';
+  $('#grafTopWrap').style.display = agrupable ? '' : 'none';
+  $('#grafDesde').value = g.desde;
+  $('#grafHasta').value = g.hasta;
+  $('#grafTop').value = String(g.top);
+}
+
+function grafDibujar_() {
+  const g = Estado.graf;
+  if (!g.desde || !g.hasta) grafRangoPreset_('12');
+  if (g.desde > g.hasta) { const t = g.desde; g.desde = g.hasta; g.hasta = t; }
+  grafSyncControles_();
+  const meses = grafMeses_(g.desde, g.hasta);
+  const datos = grafConstruirDatos_(meses);
+  $('#grafPeriodo').textContent = fmtMesCorto(meses[0]) + ' – ' + fmtMesCorto(meses[meses.length - 1]) + ' · ' + meses.length + (meses.length === 1 ? ' mes' : ' meses') + ' · moneda ' + (Estado.bootstrap.moneda_por_defecto || 'EUR');
+  $('#grafTitulo').textContent = datos.titulo;
+  $('#grafStatus').textContent = meses.length >= GRAF_MAX_MESES ? 'Se muestran como máximo ' + GRAF_MAX_MESES + ' meses.' : '';
+  const cont = $('#grafChart');
+  if (!datos.series.length) {
+    cont.innerHTML = emptyHtml('Sin datos', 'No hay movimientos para el rango seleccionado.');
+    $('#grafTabla').innerHTML = '';
+    $('#grafResumen').textContent = '';
+    return;
+  }
+  const visibles = datos.series.filter(s => !g.ocultas.has(s.id));
+  $('#grafResumen').textContent = visibles.length + ' de ' + datos.series.length + ' series';
+  $('#grafTabla').innerHTML = grafTabla_(datos);
+  if (!visibles.length) {
+    cont.innerHTML = emptyHtml('Todas las series ocultas', 'Toca una fila del detalle para mostrarla.');
+    return;
+  }
+  const W = Math.max(320, cont.clientWidth || 640);
+  const svg = grafSvg_(meses, visibles, datos, g.tipo, W);
+  cont.innerHTML = svg.html;
+  grafActivarTooltip_(meses, visibles, svg.geom);
+}
+
+async function grafAsegurarTxs_() {
+  if (transaccionesCompletasEnMemoria_()) return;
+  $('#grafChart').innerHTML = loadingBlockHtml('Cargando movimientos...');
+  await sincronizarTransacciones({ render: false, showLoading: false, toastOnError: true });
+}
+
+async function renderGraficos() {
+  await grafAsegurarTxs_();
+  if (getActiveRoute() !== 'graficos') return;
+  grafDibujar_();
+}
+
+$('#grafVista').addEventListener('click', e => {
+  const b = e.target.closest('[data-graf-vista]');
+  if (!b) return;
+  Estado.graf.vista = b.dataset.grafVista;
+  Estado.graf.ocultas.clear();
+  grafDibujar_();
+});
+$('#grafMedida').addEventListener('click', e => {
+  const b = e.target.closest('[data-graf-medida]');
+  if (!b) return;
+  Estado.graf.medida = b.dataset.grafMedida;
+  Estado.graf.ocultas.clear();
+  grafDibujar_();
+});
+$('#grafTipo').addEventListener('click', e => {
+  const b = e.target.closest('[data-graf-tipo]');
+  if (!b) return;
+  Estado.graf.tipo = b.dataset.grafTipo;
+  grafDibujar_();
+});
+$('#grafTop').addEventListener('change', e => {
+  Estado.graf.top = Number(e.target.value) || 0;
+  Estado.graf.ocultas.clear();
+  grafDibujar_();
+});
+['#grafDesde', '#grafHasta'].forEach(sel => $(sel).addEventListener('change', e => {
+  if (!/^\d{4}-\d{2}$/.test(e.target.value)) { grafSyncControles_(); return; }
+  Estado.graf[sel === '#grafDesde' ? 'desde' : 'hasta'] = e.target.value;
+  grafDibujar_();
+}));
+$('#grafPresets').addEventListener('click', async e => {
+  const b = e.target.closest('[data-graf-rango]');
+  if (!b) return;
+  if (b.dataset.grafRango === 'todo') await grafAsegurarTxs_();
+  grafRangoPreset_(b.dataset.grafRango);
+  grafDibujar_();
+});
+function grafToggleSerie_(tr) {
+  if (!tr) return;
+  const id = tr.dataset.grafSerie;
+  const o = Estado.graf.ocultas;
+  if (o.has(id)) o.delete(id); else o.add(id);
+  grafDibujar_();
+}
+$('#grafTabla').addEventListener('click', e => grafToggleSerie_(e.target.closest('[data-graf-serie]')));
+$('#grafTabla').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const tr = e.target.closest('[data-graf-serie]');
+  if (!tr) return;
+  e.preventDefault();
+  grafToggleSerie_(tr);
+});
+let _grafResizeT = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(_grafResizeT);
+  _grafResizeT = setTimeout(() => { if (getActiveRoute() === 'graficos' && !usuarioSinHojas_()) grafDibujar_(); }, 150);
+});
 
 function openReportAccountTx_(id, nombre) {
   return openMonthTxList_(Estado.repMes, nombre || 'Cuenta', t => repAccountTxMatch_(t, id));
