@@ -1638,6 +1638,10 @@
           <div class="field"><label>Desde</label><input class="input" type="date" id="filtroDesde"></div>
           <div class="field"><label>Hasta</label><input class="input" type="date" id="filtroHasta"></div>
         </div>
+        <div class="field-row" style="margin-bottom: var(--s-3);">
+          <div class="field"><label>Monto mínimo</label><input class="input" type="number" inputmode="decimal" min="0" step="0.01" id="filtroMontoMin" placeholder="0,00"></div>
+          <div class="field"><label>Monto máximo</label><input class="input" type="number" inputmode="decimal" min="0" step="0.01" id="filtroMontoMax" placeholder="Sin límite"></div>
+        </div>
         <div class="field"><label>Búsqueda</label><input class="input" type="text" id="filtroQ" placeholder="Buscar por descripción o notas…"></div>
       </div>
 
@@ -2913,7 +2917,7 @@ const Estado = {
   viajeDiaIdx: 0,
   viajeTxSeleccion: null,
   viajeDetalleCache: null,
-  filtros: { cuenta_id: '', subcuenta_id: '', tipo: '', categoria_id: '', desde: '', hasta: '', q: '' },
+  filtros: { cuenta_id: '', subcuenta_id: '', tipo: '', categoria_id: '', desde: '', hasta: '', monto_min: '', monto_max: '', q: '' },
   movOrden: { campo: 'fecha', direccion: 'desc' },
   movSel: new Set(),
   movVisibles: [],
@@ -5042,6 +5046,7 @@ function renderDashTx_() {
   });
   if (f.desde) lista = lista.filter(t => String(t.fecha) >= f.desde);
   if (f.hasta) lista = lista.filter(t => String(t.fecha) <= f.hasta);
+  lista = filtrarPorMonto_(lista, f);
   if (f.q) {
     const q = f.q.toLowerCase();
     lista = lista.filter(t => String(t.descripcion || '').toLowerCase().includes(q) || String(t.notas || '').toLowerCase().includes(q));
@@ -5328,6 +5333,7 @@ function renderMovimientos() {
   });
   if (f.desde) lista = lista.filter(t => String(t.fecha) >= f.desde);
   if (f.hasta) lista = lista.filter(t => String(t.fecha) <= f.hasta);
+  lista = filtrarPorMonto_(lista, f);
   if (f.q) {
     const q = f.q.toLowerCase();
     lista = lista.filter(t => String(t.descripcion || '').toLowerCase().includes(q) || String(t.notas || '').toLowerCase().includes(q));
@@ -9033,6 +9039,8 @@ function poblarFiltros() {
   ).join('');
   $('#filtroDesde').value = Estado.filtros.desde;
   $('#filtroHasta').value = Estado.filtros.hasta;
+  $('#filtroMontoMin').value = Estado.filtros.monto_min;
+  $('#filtroMontoMax').value = Estado.filtros.monto_max;
   $('#filtroQ').value = Estado.filtros.q;
   actualizarFiltroSubcuenta();
 }
@@ -9043,8 +9051,21 @@ const FILTRO_KEY = {
   filtroCategoria: 'categoria_id',
   filtroDesde: 'desde',
   filtroHasta: 'hasta',
+  filtroMontoMin: 'monto_min',
+  filtroMontoMax: 'monto_max',
   filtroQ: 'q'
 };
+// Filtra por rango de monto sobre el importe mostrado (t.importe, en la moneda de la transacción).
+function filtrarPorMonto_(lista, f) {
+  const parse = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
+  const min = parse(f.monto_min);
+  const max = parse(f.monto_max);
+  if (min === null && max === null) return lista;
+  return lista.filter(t => {
+    const m = Math.abs(Number(t.importe) || 0);
+    return (min === null || m >= min) && (max === null || m <= max);
+  });
+}
 function actualizarFiltroSubcuenta() {
   const ctaId = $('#filtroCuenta').value;
   const cta = Estado.bootstrap.cuentas.find(c => c.id === ctaId);
@@ -9149,7 +9170,7 @@ $('#dashFilter')?.addEventListener('click', e => {
 });
 $('#dashFilterPop')?.addEventListener('click', e => e.stopPropagation());
 $('#dashFilterClear')?.addEventListener('click', () => {
-  ['cuenta_id', 'subcuenta_id', 'tipo', 'categoria_id', 'desde', 'hasta', 'q'].forEach(k => { Estado.filtros[k] = ''; });
+  ['cuenta_id', 'subcuenta_id', 'tipo', 'categoria_id', 'desde', 'hasta', 'monto_min', 'monto_max', 'q'].forEach(k => { Estado.filtros[k] = ''; });
   poblarDashFiltros_();
   renderMovimientos();
   renderDashTx_();
