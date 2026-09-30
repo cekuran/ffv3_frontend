@@ -491,6 +491,8 @@
   .table .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
   .table .actions { text-align: right; width: 48px; }
   .table .icon-cell { width: 44px; }
+  #movBody td.actions { white-space: nowrap; }
+  #movBody td.actions input[type="checkbox"], #movBulkBar input[type="checkbox"] { width: 18px; height: 18px; vertical-align: middle; margin-right: 6px; accent-color: var(--primary); cursor: pointer; }
   .table-wrap { overflow-x: auto; border-radius: var(--r-xl); border: 1px solid var(--surface-container); background: var(--surface-container-lowest); }
 
   /* Tabla de movimientos: en móvil se reorganiza como tarjetas apiladas
@@ -1639,6 +1641,17 @@
         <div class="field"><label>Búsqueda</label><input class="input" type="text" id="filtroQ" placeholder="Buscar por descripción o notas…"></div>
       </div>
 
+      <div class="card card-pad-md" id="movBulkBar" style="margin-bottom: var(--s-4); display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" id="movSelAll" aria-label="Seleccionar todos los movimientos filtrados">
+          <span>Seleccionar todos</span>
+        </label>
+        <span class="body-sm" id="movSelCount" style="color: var(--on-surface-variant);">0 seleccionadas</span>
+        <span style="flex: 1;"></span>
+        <button class="btn btn-outline btn-sm" id="movSelClear" type="button" disabled>Limpiar selección</button>
+        <button class="btn btn-primary btn-sm" id="movSelEdit" type="button" disabled>Editar selección</button>
+      </div>
+
       <div class="card" style="padding: 0;">
         <div class="table-wrap" style="border: none; border-radius: 0;">
           <table class="table">
@@ -2252,6 +2265,34 @@
   </form>
 </div>
 
+<!-- Sheet: edición en lote de transacciones -->
+<div class="sheet bottom" id="sheetTxLote" role="dialog" aria-modal="true" aria-labelledby="sheetTxLoteTitle">
+  <div class="sheet-handle"></div>
+  <h3 id="sheetTxLoteTitle">Editar transacciones</h3>
+  <div class="card-sub" id="txLoteSub" style="margin-bottom: var(--s-3);"></div>
+  <form id="formTxLote" style="display: flex; flex-direction: column; gap: var(--s-2);">
+    <div class="field"><label>Fecha</label><input class="input" type="date" id="txLoteFecha"></div>
+    <div class="field"><label>Categoría</label><select class="select" id="txLoteCategoria"></select></div>
+    <div class="field"><label>Establecimiento</label><select class="select" id="txLoteEstablecimiento"></select></div>
+    <div class="field"><label>Estado</label>
+      <select class="select" id="txLoteEstado">
+        <option value="">— Sin cambios —</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="pagado">Pagado</option>
+        <option value="vencido">Vencido</option>
+        <option value="conciliado">Conciliado</option>
+      </select>
+    </div>
+    <div class="field"><label>Descripción</label><input class="input" type="text" id="txLoteDesc" placeholder="Vacío = sin cambios"></div>
+    <div class="field"><label>Notas</label><textarea class="textarea" id="txLoteNotas" placeholder="Vacío = sin cambios"></textarea></div>
+    <div class="body-sm" style="color: var(--on-surface-variant);">Solo se modifican los campos que rellenes. Las categorías y el establecimiento no aplican a transferencias con reparto ni (establecimiento) a transferencias.</div>
+    <div style="display: flex; gap: var(--s-2); margin-top: var(--s-3);">
+      <button type="button" class="btn btn-secondary" id="txLoteCancel" style="flex: 1;">Cancelar</button>
+      <button type="submit" class="btn btn-primary" id="txLoteOk" style="flex: 2;">Aplicar</button>
+    </div>
+  </form>
+</div>
+
 <!-- Sheet: nueva cuenta -->
 <div class="sheet bottom" id="sheetCuenta" role="dialog" aria-modal="true">
   <div class="sheet-handle"></div>
@@ -2857,6 +2898,8 @@ const Estado = {
   viajeDetalleCache: null,
   filtros: { cuenta_id: '', subcuenta_id: '', tipo: '', categoria_id: '', desde: '', hasta: '', q: '' },
   movOrden: { campo: 'fecha', direccion: 'desc' },
+  movSel: new Set(),
+  movVisibles: [],
   pres: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1, asignado: {} },
   estMes: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1 },
   repMes: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1 },
@@ -5275,6 +5318,7 @@ function renderMovimientos() {
   // — los gastos recién agregados quedan arriba y no debajo de los ya existentes.
   ordenarMovimientosLista_(lista);
   actualizarOrdenMovimientos();
+  Estado.movVisibles = lista.map(t => t.id);
   $('#movCount').textContent = lista.length;
   $('#movBody').innerHTML = lista.length ? lista.map(t => {
     const cat = Estado.bootstrap.categorias.find(c => c.id === t.categoria_id);
@@ -5332,6 +5376,7 @@ function renderMovimientos() {
         ${renderImporteDefectoHtml_(t)}
       </td>
       <td class="actions">
+        <input type="checkbox" data-tx-sel="${escape(t.id)}" ${Estado.movSel.has(t.id) ? 'checked' : ''} aria-label="Seleccionar movimiento">
         <button class="icon-btn" data-tx-edit="${t.id}">${ICONOS.edit}</button>
         <button class="icon-btn" data-tx-del="${t.id}">${ICONOS.delete}</button>
       </td>
@@ -5339,6 +5384,123 @@ function renderMovimientos() {
   }).join('') : `<tr><td colspan="8">${emptyHtml('Sin movimientos', 'Crea tu primer gasto o ingreso.')}</td></tr>`;
   $$('[data-tx-edit]').forEach(b => b.addEventListener('click', () => openTx(b.dataset.txEdit)));
   $$('[data-tx-del]').forEach(b => b.addEventListener('click', () => borrarTx(b.dataset.txDel)));
+  $$('#movBody [data-tx-sel]').forEach(cb => cb.addEventListener('change', () => {
+    if (cb.checked) Estado.movSel.add(cb.dataset.txSel); else Estado.movSel.delete(cb.dataset.txSel);
+    actualizarBarraSeleccionMov_();
+  }));
+  actualizarBarraSeleccionMov_();
+}
+
+function actualizarBarraSeleccionMov_() {
+  // Descartar ids que ya no existen (borradas/sincronizadas).
+  const existentes = new Set((Estado.bootstrap.transacciones || []).map(t => t.id));
+  Estado.movSel.forEach(id => { if (!existentes.has(id)) Estado.movSel.delete(id); });
+  const n = Estado.movSel.size;
+  const visibles = Estado.movVisibles || [];
+  const selVisibles = visibles.filter(id => Estado.movSel.has(id)).length;
+  const all = $('#movSelAll');
+  if (!all) return;
+  all.checked = visibles.length > 0 && selVisibles === visibles.length;
+  all.indeterminate = selVisibles > 0 && selVisibles < visibles.length;
+  all.disabled = visibles.length === 0;
+  $('#movSelCount').textContent = n + (n === 1 ? ' seleccionada' : ' seleccionadas');
+  $('#movSelEdit').disabled = n === 0;
+  $('#movSelClear').disabled = n === 0;
+}
+
+$('#movSelAll').addEventListener('change', e => {
+  (Estado.movVisibles || []).forEach(id => { if (e.target.checked) Estado.movSel.add(id); else Estado.movSel.delete(id); });
+  $$('#movBody [data-tx-sel]').forEach(cb => { cb.checked = Estado.movSel.has(cb.dataset.txSel); });
+  actualizarBarraSeleccionMov_();
+});
+$('#movSelClear').addEventListener('click', () => {
+  Estado.movSel.clear();
+  $$('#movBody [data-tx-sel]').forEach(cb => { cb.checked = false; });
+  actualizarBarraSeleccionMov_();
+});
+$('#movSelEdit').addEventListener('click', () => abrirEdicionLote_());
+
+function abrirEdicionLote_() {
+  const ids = Array.from(Estado.movSel);
+  if (!ids.length) return;
+  const txs = (Estado.bootstrap.transacciones || []).filter(t => Estado.movSel.has(t.id));
+  const tipos = new Set(txs.map(t => t.tipo));
+  $('#txLoteSub').textContent = ids.length + (ids.length === 1 ? ' transacción seleccionada' : ' transacciones seleccionadas');
+  $('#txLoteFecha').value = '';
+  $('#txLoteEstado').value = '';
+  $('#txLoteDesc').value = '';
+  $('#txLoteNotas').value = '';
+  // Categorías compatibles con los tipos seleccionados (devolución usa categorías de gasto).
+  const tiposCat = new Set();
+  tipos.forEach(tp => { if (tp === 'gasto' || tp === 'devolucion') tiposCat.add('gasto'); else if (tp === 'ingreso') tiposCat.add('ingreso'); });
+  const cats = Estado.bootstrap.categorias.filter(c => tiposCat.has(c.tipo));
+  const grupo = (titulo, tipo) => {
+    const items = catsAlfabetico_(cats.filter(c => c.tipo === tipo));
+    return items.length ? `<optgroup label="${titulo}">${items.map(c => `<option value="${escape(c.id)}">${escape(c.nombre)}</option>`).join('')}</optgroup>` : '';
+  };
+  $('#txLoteCategoria').innerHTML = '<option value="__keep__">— Sin cambios —</option><option value="">— Quitar categoría —</option>'
+    + grupo('Gasto', 'gasto') + grupo('Ingreso', 'ingreso');
+  $('#txLoteCategoria').disabled = tiposCat.size === 0;
+  $('#txLoteEstablecimiento').innerHTML = '<option value="__keep__">— Sin cambios —</option><option value="">— Quitar establecimiento —</option>'
+    + Estado.bootstrap.establecimientos.map(e => `<option value="${escape(e.id)}">${escape(e.nombre)}</option>`).join('');
+  openSheet('sheetTxLote');
+}
+
+$('#txLoteCancel').addEventListener('click', closeAllSheets);
+$('#formTxLote').addEventListener('submit', async e => {
+  e.preventDefault();
+  const ids = Array.from(Estado.movSel);
+  if (!ids.length) return;
+  const cambios = {};
+  if ($('#txLoteFecha').value) cambios.fecha = $('#txLoteFecha').value;
+  if ($('#txLoteEstado').value) cambios.estado = $('#txLoteEstado').value;
+  if ($('#txLoteCategoria').value !== '__keep__' && !$('#txLoteCategoria').disabled) cambios.categoria_id = $('#txLoteCategoria').value;
+  if ($('#txLoteEstablecimiento').value !== '__keep__') cambios.establecimiento_id = $('#txLoteEstablecimiento').value;
+  if ($('#txLoteDesc').value.trim()) cambios.descripcion = $('#txLoteDesc').value.trim();
+  if ($('#txLoteNotas').value.trim()) cambios.notas = $('#txLoteNotas').value.trim();
+  if (!Object.keys(cambios).length) { toast('No hay cambios que aplicar'); return; }
+  const btn = $('#txLoteOk');
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Aplicando...';
+  try {
+    const res = await call('guardarTransaccionesLote', ids, cambios);
+    aplicarResultadoLote_(res);
+    closeAllSheets();
+    const ok = (res.actualizadas || []).length;
+    const ko = (res.errores || []).length;
+    if (ko) {
+      const primero = res.errores[0].error;
+      toast(ok + ' actualizadas, ' + ko + ' con error: ' + primero);
+    } else {
+      toast(ok + (ok === 1 ? ' transacción actualizada' : ' transacciones actualizadas'));
+    }
+  } catch (err) {
+    toast('Error: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+});
+
+function aplicarResultadoLote_(res) {
+  if (!res) return;
+  const txs = Estado.bootstrap.transacciones || [];
+  (res.actualizadas || []).forEach(fila => {
+    const idx = txs.findIndex(t => t.id === fila.id);
+    const anterior = idx >= 0 ? txs[idx] : null;
+    if (idx >= 0) txs[idx] = Object.assign({}, anterior, fila);
+    else txs.unshift(Object.assign({}, fila));
+    actualizarSaldosLocalesTrasTx_(anterior, txs[idx >= 0 ? idx : 0]);
+    Estado.movSel.delete(fila.id);
+  });
+  Estado.bootstrap.transacciones = txs;
+  cacheTransaccionesRecientes_(txs);
+  if (res.data_version) aplicarDataVersion_(res.data_version);
+  refrescarDependientesRecurrentes_();
+  if (!transaccionesCompletasEnMemoria_()) {
+    sincronizarTransacciones({ render: true, toastOnError: false });
+  }
+  if (location.hash.startsWith('#/')) go(location.hash.slice(2));
+  else renderDashboard();
 }
 
 async function borrarTx(id) {
