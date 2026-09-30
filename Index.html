@@ -3278,6 +3278,15 @@ function calcularResumenLocal_(anio, mes) {
   }
   for (let i = 0; i < evol.length; i++) {
     evol[i].balance = currentBalance - (futureNet[evol[i].mes] || 0);
+    // ponytail: el saldo real al cierre de cada mes sale de cuenta.evolucion (snapshots +
+    // deltas, incluye transferencias y devoluciones con destino). La resta de flujos
+    // solo queda como respaldo si alguna cuenta no trae ese mes.
+    let suma = 0, completo = cuentasAll.length > 0;
+    for (let j = 0; j < cuentasAll.length && completo; j++) {
+      const ev = (cuentasAll[j].evolucion || []).find(e => e.mes === evol[i].mes);
+      if (ev) suma += Number(ev.saldo || 0); else completo = false;
+    }
+    if (completo) evol[i].balance = suma;
   }
   return {
     anio: a,
