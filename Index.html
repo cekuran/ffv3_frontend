@@ -2231,8 +2231,24 @@
       <div id="repartoDestTotal" class="body-sm" style="margin-top: 6px; color: var(--on-surface-variant);">Total: 0,00 / 0,00 €</div>
     </div>
     <div class="field" id="wrapSubcuentaDest" style="display: none;"><label>Subcuenta destino</label><select class="select" name="subcuenta_destino_id" id="txSubcuentaDest"><option value="">— Ninguna —</option></select></div>
-    <div class="field" id="wrapCategoria"><label>Categoría</label><select class="select" name="categoria_id" id="txCategoria"></select></div>
-    <div class="field" id="wrapEstablecimiento"><label>Establecimiento (opcional)</label><select class="select" name="establecimiento_id" id="txEstablecimiento"><option value="">— Ninguno —</option></select></div>
+    <div class="field" id="wrapCategoria">
+      <div style="display: flex; justify-content: space-between; align-items: center;"><label>Categoría</label><button type="button" class="btn btn-ghost btn-sm" id="btnQuickCat" style="padding: 2px 8px;">+ Nueva</button></div>
+      <select class="select" name="categoria_id" id="txCategoria"></select>
+      <div id="quickCatRow" style="display: none; gap: var(--s-2); align-items: center;">
+        <input class="input" type="text" id="quickCatNombre" placeholder="Nombre de la nueva categoría" maxlength="60" style="flex: 1; min-width: 0;">
+        <button type="button" class="btn btn-primary btn-sm" id="quickCatOk">Crear</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="quickCatCancel">×</button>
+      </div>
+    </div>
+    <div class="field" id="wrapEstablecimiento">
+      <div style="display: flex; justify-content: space-between; align-items: center;"><label>Establecimiento (opcional)</label><button type="button" class="btn btn-ghost btn-sm" id="btnQuickEst" style="padding: 2px 8px;">+ Nuevo</button></div>
+      <select class="select" name="establecimiento_id" id="txEstablecimiento"><option value="">— Ninguno —</option></select>
+      <div id="quickEstRow" style="display: none; gap: var(--s-2); align-items: center;">
+        <input class="input" type="text" id="quickEstNombre" placeholder="Nombre del nuevo establecimiento" maxlength="80" style="flex: 1; min-width: 0;">
+        <button type="button" class="btn btn-primary btn-sm" id="quickEstOk">Crear</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="quickEstCancel">×</button>
+      </div>
+    </div>
     <div class="field"><label>Descripción</label><input class="input" type="text" name="descripcion" id="txDesc" placeholder="Ej. Compra semanal"></div>
     <div class="field-row" id="wrapConversion" style="display: none;">
       <div class="field"><label>Importe destino</label><input class="input" type="number" step="0.01" name="importe_destino" id="txImporteDest"></div>
@@ -7474,6 +7490,8 @@ function openTx(id, copiar) {
   Estado.editing = copiar ? null : origen;
   $('#sheetTxTitle').textContent = copiar ? 'Copiar transacción' : (id ? 'Editar transacción' : 'Nueva transacción');
   $('#txId').value = copiar ? '' : (id || '');
+  quickRow_('Cat', false);
+  quickRow_('Est', false);
   const f = copiar && origen
     ? Object.assign({}, origen, { id: '', recurrente_id: '', fecha: new Date().toISOString().slice(0, 10), fecha_ultima_edicion: '' })
     : (Estado.editing || {});
@@ -7566,6 +7584,90 @@ function setTipoTx(tipo) {
   actualizarTotalReparto();
 }
 $$('[data-tx-tipo]').forEach(b => b.addEventListener('click', () => setTipoTx(b.dataset.txTipo)));
+
+// === Alta rápida (on the fly) de categoría / establecimiento desde la tx ===
+function quickRow_(kind, visible) {
+  $('#quick' + kind + 'Row').style.display = visible ? 'flex' : 'none';
+  $('#btnQuick' + (kind === 'Cat' ? 'Cat' : 'Est')).style.display = visible ? 'none' : '';
+  const inp = $('#quick' + kind + 'Nombre');
+  inp.value = '';
+  if (visible) inp.focus();
+}
+// Tipo de la categoría nueva según el tipo de tx en edición.
+function tipoCategoriaNuevaTx_() {
+  if (Estado.txTipo === 'ingreso') return 'ingreso';
+  if (Estado.txTipo === 'transferencia') {
+    const t = tipoTransferenciaPresupuestoUI_($('#txCuenta').value, $('#txCuentaDest').value);
+    return t === 'ingreso' ? 'ingreso' : 'gasto';
+  }
+  return 'gasto';
+}
+async function crearCategoriaRapida_() {
+  const nombre = $('#quickCatNombre').value.trim();
+  if (!nombre) { $('#quickCatNombre').focus(); return; }
+  const tipo = tipoCategoriaNuevaTx_();
+  const existente = Estado.bootstrap.categorias.find(c => c.tipo === tipo && String(c.nombre || '').trim().toLowerCase() === nombre.toLowerCase());
+  let nuevoId = existente ? existente.id : '';
+  const btn = $('#quickCatOk');
+  btn.disabled = true;
+  try {
+    if (!existente) {
+      const idsPrevios = new Set(Estado.bootstrap.categorias.map(c => c.id));
+      Estado.bootstrap.categorias = await call('guardarCategoria', { id: '', nombre, tipo });
+      const nueva = Estado.bootstrap.categorias.find(c => !idsPrevios.has(c.id));
+      nuevoId = nueva ? nueva.id : '';
+      poblarFiltros();
+      toast('Categoría creada');
+    }
+    if (Estado.txTipo === 'transferencia') {
+      syncCategoriasTransferenciaTx_(nuevoId);
+    } else {
+      const catTipo = Estado.txTipo === 'devolucion' ? 'gasto' : Estado.txTipo;
+      poblarSelect('#txCategoria', catsAlfabetico_(Estado.bootstrap.categorias.filter(c => c.tipo === catTipo)), nuevoId, c => c.nombre);
+    }
+    quickRow_('Cat', false);
+  } catch (err) {
+    toast('Error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+async function crearEstablecimientoRapido_() {
+  const nombre = $('#quickEstNombre').value.trim();
+  if (!nombre) { $('#quickEstNombre').focus(); return; }
+  const existente = Estado.bootstrap.establecimientos.find(e => String(e.nombre || '').trim().toLowerCase() === nombre.toLowerCase());
+  let nuevoId = existente ? existente.id : '';
+  const btn = $('#quickEstOk');
+  btn.disabled = true;
+  try {
+    if (!existente) {
+      const idsPrevios = new Set(Estado.bootstrap.establecimientos.map(e => e.id));
+      Estado.bootstrap.establecimientos = await call('guardarEstablecimiento', { id: '', nombre, web: '' });
+      const nuevo = Estado.bootstrap.establecimientos.find(e => !idsPrevios.has(e.id));
+      nuevoId = nuevo ? nuevo.id : '';
+      toast('Establecimiento creado');
+    }
+    poblarSelect('#txEstablecimiento', Estado.bootstrap.establecimientos, nuevoId, e => e.nombre);
+    quickRow_('Est', false);
+  } catch (err) {
+    toast('Error: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+$('#btnQuickCat').addEventListener('click', () => quickRow_('Cat', true));
+$('#quickCatCancel').addEventListener('click', () => quickRow_('Cat', false));
+$('#quickCatOk').addEventListener('click', crearCategoriaRapida_);
+$('#quickCatNombre').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); crearCategoriaRapida_(); }
+});
+$('#btnQuickEst').addEventListener('click', () => quickRow_('Est', true));
+$('#quickEstCancel').addEventListener('click', () => quickRow_('Est', false));
+$('#quickEstOk').addEventListener('click', crearEstablecimientoRapido_);
+$('#quickEstNombre').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); crearEstablecimientoRapido_(); }
+});
+
 const txMonedaSel = $('#txMoneda');
 if (txMonedaSel) txMonedaSel.addEventListener('change', actualizarHintMoneda_);
 const txImporteEl = $('#txImporte');
