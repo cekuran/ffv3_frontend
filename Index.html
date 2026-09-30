@@ -2810,6 +2810,7 @@ const API_READ_CACHE_TTL_BY_ACTION = {
 const API_READ_ACTIONS = new Set([
   'bootstrap',
   'bootstrapBase',
+  'sincronizarEstado',
   'obtenerTransacciones',
   'obtenerCuentas',
   'obtenerResumen',
@@ -3874,21 +3875,30 @@ async function iniciarAppAutenticada() {
     // del navegador, cuota llena, etc.) sincronizamos igual que antes.
     const usarTxCache = !!(txCache && cache.fresco);
     if (usarTxCache) Estado.bootstrap.transacciones = txCache.data;
-    pintarAppAutenticada_(true, !usarTxCache);
-    if (cache.fresco) return;
-    call('bootstrapBase').then(b => {
+    if (cache.fresco) {
+      // Bootstrap fresco: solo faltan las transacciones completas (si no hay
+      // cache acotado con que pintar).
+      pintarAppAutenticada_(true, !usarTxCache);
+      return;
+    }
+    // Bootstrap vencido: se pinta con el cache y se revalida con UNA sola
+    // llamada (bootstrap = base + transacciones). Antes eran dos ejecuciones
+    // paralelas (bootstrapBase + obtenerTransacciones/obtenerCuentas) que
+    // releian las mismas hojas.
+    pintarAppAutenticada_(true, false);
+    mostrarCargandoTxSync_();
+    call('bootstrap').then(b => {
       cacheBootstrap_(b);
-      // ponytail: bootstrapBase nunca trae transacciones (bootstrap "ligero").
-      // Si las pisamos aqui con normalizarBootstrap(b) se vacian de golpe las
-      // que ya estaban pintadas (por sincronizarTransacciones o por el cache
-      // acotado). Las preservamos y dejamos que sincronizarTransacciones sea
-      // la unica fuente que las actualiza.
-      const txActuales = Estado.bootstrap.transacciones;
       Estado.bootstrap = normalizarBootstrap(b);
-      Estado.bootstrap.transacciones = txActuales;
+      cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
+      Estado.lastTxSyncAt = Date.now();
       pintarAppAutenticada_(false);
     }).catch(err => {
-      if (!esErrorAutenticacion(err)) return;
+      if (!esErrorAutenticacion(err)) {
+        toast('Error al cargar movimientos: ' + ((err && err.message) || err));
+        pintarAppAutenticada_(false);
+        return;
+      }
       descartarSesionLocal_();
       mostrarLogin();
       showAuthError('Tu sesión expiró. Inicia sesión de nuevo.');
@@ -4443,6 +4453,42 @@ function manejarConflictoGuardado_(conflict, contexto) {
   });
 }
 
+// Ventana en la que basta con verificar la data_version (sin descargar el
+// listado completo). Pasado este tiempo se fuerza una descarga completa como
+// red de seguridad frente a escrituras concurrentes de otros usuarios.
+const SYNC_VERIFICAR_MAX_AGE_MS = 10 * 60 * 1000;
+// true si el backend desplegado aún no expone sincronizarEstado.
+let _sincronizarEstadoNoDisponible = false;
+
+// Una sola llamada devuelve transacciones + cuentas (o { sin_cambios } si la
+// versión del cliente sigue vigente). Si el backend es anterior, cae al par
+// legacy obtenerTransacciones + obtenerCuentas.
+async function pedirEstadoServidor_(versionCliente) {
+  if (!_sincronizarEstadoNoDisponible) {
+    try {
+      return await call('sincronizarEstado', versionCliente || '');
+    } catch (e) {
+      if (!/Acci[oó]n no permitida/i.test(String((e && e.message) || e))) throw e;
+      _sincronizarEstadoNoDisponible = true;
+    }
+  }
+  const txs = await call('obtenerTransacciones', {});
+  return { sin_cambios: false, data_version: '', transacciones: txs, cuentas: null };
+}
+
+function mostrarCargandoTxSync_() {
+  if (usuarioSinHojas_()) return;
+  const route = getActiveRoute();
+  if (route === 'dashboard') {
+    const el = $('#dashTx');
+    if (el) el.innerHTML = loadingBlockHtml('Actualizando movimientos...');
+  }
+  if (route === 'movimientos') {
+    $('#movCount').textContent = '...';
+    $('#movBody').innerHTML = loadingTableRowHtml('Actualizando movimientos...', 8);
+  }
+}
+
 async function sincronizarTransacciones(opciones) {
   const opts = opciones || {};
   // Defensa: si el usuario no tiene hojas y no es admin, no tiene sentido
@@ -4454,27 +4500,38 @@ async function sincronizarTransacciones(opciones) {
   // Coalescer llamadas concurrentes (p. ej. focus + route change).
   if (_syncInFlight && !opts.force) return _syncInFlight;
   const token = ++_txSyncToken;
-  if (opts.showLoading !== false) {
-    const route = getActiveRoute();
-    if (route === 'dashboard') $('#dashTx').innerHTML = loadingBlockHtml('Actualizando movimientos...');
-    if (route === 'movimientos') {
-      $('#movCount').textContent = '...';
-      $('#movBody').innerHTML = loadingTableRowHtml('Actualizando movimientos...', 8);
-    }
-  }
+  if (opts.showLoading !== false) mostrarCargandoTxSync_();
   const run = (async () => {
   try {
       const locales = Estado.bootstrap.transacciones || [];
-    const txs = await call('obtenerTransacciones', {});
+    // Con el listado completo en memoria y una versión reciente, el servidor
+    // responde solo { sin_cambios } si nada cambió (sin leer ni enviar datos).
+    const puedeVerificar = !opts.force && !opts.forceSaldos
+      && !!Estado.lastTxSyncAt && !!Estado.dataVersion
+      && (Date.now() - Estado.lastTxSyncAt) < SYNC_VERIFICAR_MAX_AGE_MS
+      && transaccionesCompletasEnMemoria_();
+    const res = await pedirEstadoServidor_(puedeVerificar ? Estado.dataVersion : '');
     if (token !== _txSyncToken) return false;
-      const servidor = Array.isArray(txs) ? txs : [];
+    if (res && res.sin_cambios) {
+      Estado.lastTxSyncAt = Date.now();
+      if (opts.render !== false) {
+        renderDashboard();
+        renderMovimientos();
+      }
+      return true;
+    }
+      const servidor = Array.isArray(res && res.transacciones) ? res.transacciones : [];
       const diff = resumenDiffTxs_(locales, servidor);
       Estado.bootstrap.transacciones = servidor;
       cacheTransaccionesRecientes_(servidor);
       Estado.lastTxSyncAt = Date.now();
-      if (diff.dirty || opts.forceSaldos) {
+      if (res && Array.isArray(res.cuentas)) {
+        // Saldos autoritativos en la misma respuesta: sin segunda llamada.
+        setCuentasLocales_(res.cuentas);
+      } else if (diff.dirty || opts.forceSaldos) {
         await reconciliarSaldosSiHaceFalta_(diff.dirty ? diff : { dirty: true }, opts);
       }
+      if (res && res.data_version) aplicarDataVersion_(res.data_version);
       // Resúmenes del mes actual en cliente: el dashboard no necesita otro
       // round-trip a obtenerResumen tras cada sync.
       // ponytail: DEBE ir después de reconciliarSaldosSiHaceFalta_, porque
@@ -5535,7 +5592,10 @@ async function doConciliar() {
     $('#conDif').textContent = (r.diferencia >= 0 ? '+' : '') + fmtMoneda(r.diferencia);
     $('#conDif').style.color = r.diferencia === 0 ? 'var(--primary)' : 'var(--error)';
     $('#conEstado').textContent = r.diferencia === 0 ? 'Cuadra perfecto.' : 'Hay ' + fmtMoneda(Math.abs(r.diferencia)) + ' de diferencia. Revisa movimientos pendientes.';
-    await recargar();
+    // Solo cambian estados de transacciones y el historial: basta con
+    // resincronizar transacciones+cuentas (antes era un bootstrap completo).
+    await sincronizarTransacciones({ render: true, force: true, showLoading: false, toastOnError: true });
+    renderConciliar();
     toast('Conciliación registrada');
   } catch (e) { toast('Error: ' + e.message); }
   finally { btn.disabled = false; }
@@ -5558,8 +5618,11 @@ function renderCategorias() {
   $$('[data-cat-edit]').forEach(b => b.addEventListener('click', () => openCat(b.dataset.catEdit)));
   $$('[data-cat-del]').forEach(b => b.addEventListener('click', async () => {
     if (!confirm('¿Eliminar categoría?')) return;
-    await call('eliminarCategoria', b.dataset.catDel);
-    await recargar(); toast('Categoría eliminada');
+    Estado.bootstrap.categorias = await call('eliminarCategoria', b.dataset.catDel);
+    poblarFiltros();
+    renderCategorias();
+    renderMovimientos();
+    toast('Categoría eliminada');
   }));
   aplicarFiltroLista_($('#catSearch'), $('#catList'));
   wireCategoryDragReorder();
@@ -5752,8 +5815,15 @@ $('#sheetCuentasDetalleClose').addEventListener('click', closeAllSheets);
 // servidor añadió/quító monedas (o cambió el default) actualizamos
 // Estado.bootstrap y repintamos. Llamada al entrar a la vista.
 async function renderDivisas() {
-  const div = await call('obtenerDivisas');
-  const tcs = await call('obtenerTiposCambio');
+  // Pintar al instante con lo que ya trae el bootstrap y revalidar en paralelo
+  // (antes: pantalla vacía hasta completar dos llamadas secuenciales).
+  const local = Estado.bootstrap.divisas;
+  if (local && Array.isArray(local.items)) {
+    $('#divisasDefaultLabel').textContent = Estado.bootstrap.moneda_por_defecto || String(local.default_codigo || 'EUR').toUpperCase();
+    paintDivisas(local);
+    paintTiposCambio(Array.isArray(Estado.bootstrap.tiposCambio) ? Estado.bootstrap.tiposCambio : []);
+  }
+  const [div, tcs] = await Promise.all([call('obtenerDivisas'), call('obtenerTiposCambio')]);
   Estado.bootstrap.divisas = div;
   Estado.bootstrap.tiposCambio = tcs;
   Estado.bootstrap.moneda_por_defecto = String(div.default_codigo || 'EUR').toUpperCase();
@@ -5840,13 +5910,11 @@ function openTipoCambio() {
 }
 
 function refrescarDivisasDespuesDeOperacion_() {
-  return call('obtenerDivisas').then(div => {
+  return Promise.all([call('obtenerDivisas'), call('obtenerTiposCambio')]).then(([div, tcs]) => {
     Estado.bootstrap.divisas = div;
     Estado.bootstrap.moneda_por_defecto = String(div.default_codigo || 'EUR').toUpperCase();
     $('#divisasDefaultLabel').textContent = Estado.bootstrap.moneda_por_defecto;
     paintDivisas(div);
-    return call('obtenerTiposCambio');
-  }).then(tcs => {
     Estado.bootstrap.tiposCambio = tcs;
     paintTiposCambio(tcs);
   });
@@ -8334,6 +8402,7 @@ async function recargar() {
   cacheTransaccionesRecientes_(Estado.bootstrap.transacciones);
   cacheSaldos_(Estado.bootstrap.cuentas, Estado.bootstrap.hojaActivaId);
   Estado.lastTxSyncAt = Date.now();
+  aplicarDataVersion_(boot.data_version);
   const sinHojas = usuarioSinHojas_();
   aplicarRolesUI();
   aplicarRestriccionSinHojas();
