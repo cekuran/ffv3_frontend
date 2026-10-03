@@ -1628,11 +1628,9 @@
       <div class="card card-pad-md" style="margin-bottom: var(--s-4);">
         <div class="field-row" style="margin-bottom: var(--s-3);">
           <div class="field"><label>Cuenta</label><select class="select" id="filtroCuenta"><option value="">Todas</option></select></div>
-          <div class="field"><label>Tipo</label><select class="select" id="filtroTipo"><option value="">Todos</option><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option><option value="transferencia">Transferencia</option><option value="devolucion">Devolución</option></select></div>
+          <div class="field" id="wrapFiltroSubcuenta" style="display: none;"><label>Subcuenta</label><select class="select" id="filtroSubcuenta"><option value="">Todas</option></select></div>
           <div class="field"><label>Categoría</label><select class="select" id="filtroCategoria"><option value="">Todas</option></select></div>
-        </div>
-        <div class="field-row" id="wrapFiltroSubcuenta" style="display: none; margin-bottom: var(--s-3);">
-          <div class="field"><label>Subcuenta</label><select class="select" id="filtroSubcuenta"><option value="">Todas</option></select></div>
+          <div class="field"><label>Tipo de movimiento</label><select class="select" id="filtroTipo"><option value="">Todos</option><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option><option value="transferencia">Transferencia</option><option value="devolucion">Devolución</option></select></div>
         </div>
         <div class="field-row" style="margin-bottom: var(--s-3);">
           <div class="field"><label>Desde</label><input class="input" type="date" id="filtroDesde"></div>
