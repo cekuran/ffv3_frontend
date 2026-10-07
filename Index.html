@@ -2960,6 +2960,7 @@ const Estado = {
   txRepartoDest: [],
   repRecDest: [],
   cuentasExpandidas: new Set(),
+  cuentasBusqueda: {},
   editing: null,
   recPlantillaId: '',
   // Guards anti doble-envío mientras un guardado está en vuelo.
@@ -5240,9 +5241,12 @@ function renderCuentas() {
   $('#cuentasList').innerHTML = cuentas.length ? cuentas.map(c => {
     const estCta = Estado.bootstrap.establecimientos.find(e => e.id === c.establecimiento_id);
     const icoCta = faviconHostEst_(estCta) ? faviconImgEst_(estCta, 36) : (ICONOS[c.icono] || ICONOS.account_balance_wallet);
-    const subs = subsAlfabetico_(c.subcuentas);
+    const todasSubs = subsAlfabetico_(c.subcuentas);
+    const conBusqueda = todasSubs.length > 5;
+    const termino = conBusqueda ? (Estado.cuentasBusqueda[c.id] || '').trim().toLowerCase() : '';
+    const subs = termino ? todasSubs.filter(s => String(s.nombre || '').toLowerCase().includes(termino)) : todasSubs;
     const expanded = Estado.cuentasExpandidas.has(c.id);
-    const visSubs = (subs.length > 5 && !expanded) ? subs.slice(0, 5) : subs;
+    const visSubs = (!termino && subs.length > 5 && !expanded) ? subs.slice(0, 5) : subs;
     const oculto = subs.length - visSubs.length;
     return `
     <div class="card col-4 acct" draggable="true" data-cta-id="${c.id}" style="flex-direction: column; align-items: stretch; gap: var(--s-3);">
@@ -5254,6 +5258,8 @@ function renderCuentas() {
         </div>
       </div>
       ${evolucionCuentaHtml_(c)}
+      ${conBusqueda ? `<input class="input" type="search" data-cta-search="${c.id}" placeholder="Buscar subcuenta…" aria-label="Buscar subcuenta en ${escape(c.nombre)}" value="${escape(Estado.cuentasBusqueda[c.id] || '')}" draggable="false">` : ''}
+      ${termino && !subs.length ? '<div class="body-sm" style="color: var(--on-surface-variant); text-align: center;">Sin resultados.</div>' : ''}
       ${subs.length ? `<div class="subcuentas" data-subcuentas-parent="${c.id}">${visSubs.map(s => `
         <div class="subcta-row" draggable="true" data-sub-id="${s.id}">
           <div class="subcta-top">
@@ -5267,7 +5273,7 @@ function renderCuentas() {
               <button class="icon-btn" data-sub-del="${s.id}" data-sub-parent="${c.id}" title="Eliminar subcuenta">${ICONOS.delete}</button>
             </div>
           </div>
-        </div>`).join('')}${subs.length > 5 ? `<div class="subcta-more">${expanded ? `<button class="btn-link" data-toggle-subcuentas="${c.id}" style="background: none; border: none; color: var(--primary); cursor: pointer; font: inherit; padding: 0 4px;">Ver menos</button>` : `··· +${subs.length - 5} más <button class="btn-link" data-toggle-subcuentas="${c.id}" style="background: none; border: none; color: var(--primary); cursor: pointer; font: inherit; padding: 0 4px;">Ver todas</button>`}</div>` : ''}</div>` : ''}
+        </div>`).join('')}${(!termino && subs.length > 5) ? `<div class="subcta-more">${expanded ? `<button class="btn-link" data-toggle-subcuentas="${c.id}" style="background: none; border: none; color: var(--primary); cursor: pointer; font: inherit; padding: 0 4px;">Ver menos</button>` : `··· +${subs.length - 5} más <button class="btn-link" data-toggle-subcuentas="${c.id}" style="background: none; border: none; color: var(--primary); cursor: pointer; font: inherit; padding: 0 4px;">Ver todas</button>`}</div>` : ''}</div>` : ''}
       <div style="display: flex; justify-content: space-between; align-items: center; gap: 4px;">
         <button class="btn btn-sm btn-ghost subcta-add" data-cta-add-sub="${c.id}">+ Subcuenta</button>
         <div style="display: flex; gap: 4px;">
@@ -5285,6 +5291,17 @@ function renderCuentas() {
     Estado.cuentasExpandidas.has(b.dataset.toggleSubcuentas) ? Estado.cuentasExpandidas.delete(b.dataset.toggleSubcuentas) : Estado.cuentasExpandidas.add(b.dataset.toggleSubcuentas);
     renderCuentas();
   }));
+  $$('[data-cta-search]').forEach(inp => {
+    inp.addEventListener('mousedown', e => e.stopPropagation());
+    inp.addEventListener('input', () => {
+      const id = inp.dataset.ctaSearch;
+      const pos = inp.selectionStart;
+      Estado.cuentasBusqueda[id] = inp.value;
+      renderCuentas();
+      const nuevo = document.querySelector(`[data-cta-search="${id}"]`);
+      if (nuevo) { nuevo.focus(); try { nuevo.setSelectionRange(pos, pos); } catch (_) {} }
+    });
+  });
   $$('[data-sub-edit]').forEach(b => b.addEventListener('click', () => openCuenta(b.dataset.subEdit, b.dataset.subParent)));
   $$('[data-sub-del]').forEach(b => b.addEventListener('click', () => borrarSubcuenta(b.dataset.subDel, b.dataset.subParent)));
   wireDragReorder();
