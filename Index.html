@@ -5184,6 +5184,39 @@ function syncCategoriasTransferenciaTx_(categoriaPreferida) {
   }
 }
 
+// Evolución del saldo al cierre de cada mes (últimos 6), escalada entre el
+// mínimo y el máximo del periodo para que la variación real sea visible.
+function evolucionCuentaHtml_(c) {
+  const pts = (c.evolucion || []).filter(e => e && e.mes)
+    .slice().sort((a, b) => a.mes < b.mes ? -1 : 1).slice(-6)
+    .map(e => ({ mes: e.mes, saldo: Number(e.saldo || 0) }));
+  if (!pts.length) return '';
+  const color = c.tipo === 'pasivo' ? 'var(--error)' : 'var(--primary)';
+  const W = 300, H = 72, pad = 6;
+  const vals = pts.map(p => p.saldo);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const rango = max - min;
+  const xs = pts.map((_, i) => pts.length === 1 ? W / 2 : (i / (pts.length - 1)) * W);
+  const ys = pts.map(p => rango === 0 ? H / 2 : pad + ((max - p.saldo) / rango) * (H - 2 * pad));
+  const linea = xs.map((x, i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${ys[i].toFixed(1)}`).join(' ');
+  const area = `${linea} L${xs[xs.length - 1].toFixed(1)} ${H} L${xs[0].toFixed(1)} ${H} Z`;
+  const delta = pts[pts.length - 1].saldo - pts[0].saldo;
+  const deltaTxt = pts.length > 1
+    ? `<span style="color: ${delta === 0 ? 'var(--on-surface-variant)' : (delta > 0) === (c.tipo !== 'pasivo') ? 'var(--primary)' : 'var(--error)'};">${delta > 0 ? '+' : ''}${fmtMoneda(delta, c.moneda)}</span> en ${pts.length} meses`
+    : '';
+  return `
+      <div class="acct-evol" aria-label="Evolución del saldo de ${escape(c.nombre)}">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width: 100%; height: 72px; display: block; overflow: visible;">
+          <path d="${area}" style="fill: ${color}; opacity: 0.12;"/>
+          <path d="${linea}" style="fill: none; stroke: ${color}; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke;"/>
+        </svg>
+        <div style="display: flex; justify-content: space-between; gap: 2px; margin-top: 4px;">
+          ${pts.map(p => `<span class="bar-label" title="${escape(fmtMesCorto(p.mes))}: ${escape(fmtMoneda(p.saldo, c.moneda))}" style="flex: 1; text-align: center;">${fmtMesCorto(p.mes)}</span>`).join('')}
+        </div>
+        ${deltaTxt ? `<div class="body-sm" style="color: var(--on-surface-variant); margin-top: 2px;">${deltaTxt}</div>` : ''}
+      </div>`;
+}
+
 function renderCuentas() {
   const cuentas = Estado.bootstrap.cuentas;
   $('#cuentasList').innerHTML = cuentas.length ? cuentas.map(c => {
@@ -5202,13 +5235,7 @@ function renderCuentas() {
           <div class="acct-balance" style="color: ${c.tipo === 'pasivo' ? 'var(--error)' : 'var(--on-surface)'};">${fmtMoneda(c.saldo, c.moneda)}</div>
         </div>
       </div>
-      <div class="bars" style="height: 80px;">
-        ${(c.evolucion || []).map(p => {
-          const max = Math.max(1, ...((c.evolucion || []).map(x => Math.abs(Number(x.saldo || 0)))));
-          const h = Math.round((Math.abs(Number(p.saldo || 0)) / max) * 100);
-          return `<div class="bar"><div class="bar-stack" style="height: ${Math.max(6, h)}%;"><div class="bar-fill" style="height: 100%; background: ${c.tipo === 'pasivo' ? 'var(--error)' : 'var(--primary)'};"></div></div><div class="bar-label">${fmtMesCorto(p.mes)}</div></div>`;
-        }).join('')}
-      </div>
+      ${evolucionCuentaHtml_(c)}
       ${subs.length ? `<div class="subcuentas" data-subcuentas-parent="${c.id}">${visSubs.map(s => `
         <div class="subcta-row" draggable="true" data-sub-id="${s.id}">
           <div class="subcta-top">
