@@ -5187,6 +5187,7 @@ function syncCategoriasTransferenciaTx_(categoriaPreferida) {
 // Evolución del saldo al cierre de cada mes (últimos 6), escalada entre el
 // mínimo y el máximo del periodo para que la variación real sea visible.
 function evolucionCuentaHtml_(c) {
+  const fmtCompacto = v => new Intl.NumberFormat('es-ES', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(v || 0));
   const pts = (c.evolucion || []).filter(e => e && e.mes)
     .slice().sort((a, b) => a.mes < b.mes ? -1 : 1).slice(-6)
     .map(e => ({ mes: e.mes, saldo: Number(e.saldo || 0) }));
@@ -5206,12 +5207,21 @@ function evolucionCuentaHtml_(c) {
     : '';
   return `
       <div class="acct-evol" aria-label="Evolución del saldo de ${escape(c.nombre)}">
-        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width: 100%; height: 72px; display: block; overflow: visible;">
-          <path d="${area}" style="fill: ${color}; opacity: 0.12;"/>
-          <path d="${linea}" style="fill: none; stroke: ${color}; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke;"/>
-        </svg>
+        <div style="position: relative;">
+          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width: 100%; height: 72px; display: block; overflow: visible;">
+            <line x1="0" y1="${pad}" x2="${W}" y2="${pad}" style="stroke: var(--outline-variant); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke;"/>
+            <line x1="0" y1="${H - pad}" x2="${W}" y2="${H - pad}" style="stroke: var(--outline-variant); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke;"/>
+            <path d="${area}" style="fill: ${color}; opacity: 0.12;"/>
+            <path d="${linea}" style="fill: none; stroke: ${color}; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke;"/>
+          </svg>
+          <span class="bar-label" style="position: absolute; left: 0; top: -2px; background: var(--surface, transparent); padding: 0 2px; font-weight: 500;" title="Máximo: ${escape(fmtMoneda(max, c.moneda))}">${escape(fmtCompacto(max))}</span>
+          ${rango === 0 ? '' : `<span class="bar-label" style="position: absolute; left: 0; bottom: -2px; background: var(--surface, transparent); padding: 0 2px; font-weight: 500;" title="Mínimo: ${escape(fmtMoneda(min, c.moneda))}">${escape(fmtCompacto(min))}</span>`}
+        </div>
         <div style="display: flex; justify-content: space-between; gap: 2px; margin-top: 4px;">
-          ${pts.map(p => `<span class="bar-label" title="${escape(fmtMesCorto(p.mes))}: ${escape(fmtMoneda(p.saldo, c.moneda))}" style="flex: 1; text-align: center;">${fmtMesCorto(p.mes)}</span>`).join('')}
+          ${pts.map(p => `<div style="flex: 1; min-width: 0; text-align: center;" title="${escape(fmtMesCorto(p.mes))}: ${escape(fmtMoneda(p.saldo, c.moneda))}">
+            <div class="bar-label">${fmtMesCorto(p.mes)}</div>
+            <div class="bar-label" style="font-weight: 400; color: var(--on-surface); white-space: nowrap;">${escape(fmtCompacto(p.saldo))}</div>
+          </div>`).join('')}
         </div>
         ${deltaTxt ? `<div class="body-sm" style="color: var(--on-surface-variant); margin-top: 2px;">${deltaTxt}</div>` : ''}
       </div>`;
