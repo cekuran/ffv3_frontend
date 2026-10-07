@@ -959,11 +959,11 @@
   .reset-sub-row { display: flex; gap: 6px; align-items: center; }
   .reset-sub-row .input { flex: 1 1 120px; min-width: 120px; }
   .reset-cat-head .input { flex: 1 1 140px; min-width: 140px; }
-  // ponytail: loader visible por defecto para que la pagina nunca quede en
-  // blanco mientras corre bootstrapBase (Apps Script cold start ~2-5s). El
-  // skeleton imita el dashboard (la unica vista visible durante el cold
-  // bootstrap); las demas vistas no necesitan skeleton porque el usuario no
-  // llega a ellas hasta despues de cargar.
+  /* ponytail: loader visible por defecto para que la pagina nunca quede en
+     blanco mientras corre bootstrapBase (Apps Script cold start ~2-5s). El
+     skeleton imita el dashboard (la unica vista visible durante el cold
+     bootstrap); las demas vistas no necesitan skeleton porque el usuario no
+     llega a ellas hasta despues de cargar. */
   .boot-loader {
     min-height: 100dvh;
     display: grid;
@@ -1646,6 +1646,7 @@
           <div class="field"><label>Cuenta</label><select class="select" id="filtroCuenta"><option value="">Todas</option></select></div>
           <div class="field" id="wrapFiltroSubcuenta" style="display: none;"><label>Subcuenta</label><select class="select" id="filtroSubcuenta"><option value="">Todas</option></select></div>
           <div class="field"><label>Categoría</label><select class="select" id="filtroCategoria"><option value="">Todas</option></select></div>
+          <div class="field"><label>Establecimiento</label><select class="select" id="filtroEstablecimiento"><option value="">Todos</option></select></div>
           <div class="field"><label>Tipo de movimiento</label><select class="select" id="filtroTipo"><option value="">Todos</option><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option><option value="transferencia">Transferencia</option><option value="devolucion">Devolución</option></select></div>
         </div>
         <div class="field-row" style="margin-bottom: var(--s-3);">
@@ -1657,6 +1658,9 @@
           <div class="field"><label>Monto máximo</label><input class="input" type="number" inputmode="decimal" min="0" step="0.01" id="filtroMontoMax" placeholder="Sin límite"></div>
         </div>
         <div class="field"><label>Búsqueda</label><input class="input" type="text" id="filtroQ" placeholder="Buscar por descripción o notas…"></div>
+        <div style="display: flex; justify-content: flex-end; margin-top: var(--s-3);">
+          <button class="btn btn-outline btn-sm" id="filtroLimpiar" type="button">Limpiar filtros</button>
+        </div>
       </div>
 
       <div class="card card-pad-md" id="movBulkBar" style="margin-bottom: var(--s-4); display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;">
@@ -2934,7 +2938,8 @@ const Estado = {
   viajeDiaIdx: 0,
   viajeTxSeleccion: null,
   viajeDetalleCache: null,
-  filtros: { cuenta_id: '', subcuenta_id: '', tipo: '', categoria_id: '', desde: '', hasta: '', monto_min: '', monto_max: '', q: '' },
+  filtros: { cuenta_id: '', subcuenta_id: '', tipo: '', categoria_id: '', establecimiento_id: '', desde: '', hasta: '', monto_min: '', monto_max: '', q: '' },
+  dashFiltros: { cuenta_id: '', tipo: '', categoria_id: '', q: '' },
   movOrden: { campo: 'fecha', direccion: 'desc' },
   movSel: new Set(),
   movVisibles: [],
@@ -5047,24 +5052,15 @@ function renderDashboard() {
 }
 
 function renderDashTx_() {
-  const f = Estado.filtros;
+  const f = Estado.dashFiltros;
   let lista = Estado.bootstrap.transacciones.slice();
   if (f.cuenta_id) lista = lista.filter(t => t.cuenta_id === f.cuenta_id || t.cuenta_destino_id === f.cuenta_id);
-  if (f.subcuenta_id) lista = lista.filter(t => {
-    if (t.subcuenta_id === f.subcuenta_id) return true;
-    if (t.subcuenta_destino_id === f.subcuenta_id) return true;
-    const rep = parseRepartoFromTx_(t);
-    return rep ? rep.some(r => r.subcuenta_id === f.subcuenta_id) : false;
-  });
   if (f.tipo) lista = lista.filter(t => t.tipo === f.tipo);
   if (f.categoria_id) lista = lista.filter(t => {
     if (t.categoria_id === f.categoria_id) return true;
     const rep = parseRepartoFromTx_(t);
     return rep ? rep.some(r => r.categoria_id === f.categoria_id) : false;
   });
-  if (f.desde) lista = lista.filter(t => String(t.fecha) >= f.desde);
-  if (f.hasta) lista = lista.filter(t => String(t.fecha) <= f.hasta);
-  lista = filtrarPorMonto_(lista, f);
   if (f.q) {
     const q = f.q.toLowerCase();
     lista = lista.filter(t => String(t.descripcion || '').toLowerCase().includes(q) || String(t.notas || '').toLowerCase().includes(q));
@@ -5349,6 +5345,7 @@ function renderMovimientos() {
     const reparto = parseRepartoFromTx_(t);
     return reparto ? reparto.some(r => r.categoria_id === f.categoria_id) : false;
   });
+  lista = filtrarPorEstablecimiento_(lista, f);
   if (f.desde) lista = lista.filter(t => String(t.fecha) >= f.desde);
   if (f.hasta) lista = lista.filter(t => String(t.fecha) <= f.hasta);
   lista = filtrarPorMonto_(lista, f);
@@ -6016,6 +6013,8 @@ async function borrarEstablecimiento(id) {
   if (!est || !confirm('¿Eliminar "' + est.nombre + '"?')) return;
   try {
     Estado.bootstrap.establecimientos = await call('eliminarEstablecimiento', id);
+    limpiarFiltrosInvalidos();
+    poblarFiltroEstablecimiento_();
     await renderEstablecimientos();
     toast('Establecimiento eliminado');
   } catch (e) { toast('Error: ' + e.message); }
@@ -7769,6 +7768,7 @@ async function crearEstablecimientoRapido_() {
       const nuevo = Estado.bootstrap.establecimientos.find(e => !idsPrevios.has(e.id));
       nuevoId = nuevo ? nuevo.id : '';
       toast('Establecimiento creado');
+      poblarFiltroEstablecimiento_();
     }
     poblarSelect('#txEstablecimiento', Estado.bootstrap.establecimientos, nuevoId, e => e.nombre);
     quickRow_('Est', false);
@@ -8552,6 +8552,7 @@ $('#formEst').addEventListener('submit', async (e) => {
       web: f.get('web') || ''
     });
     closeAllSheets();
+    poblarFiltroEstablecimiento_();
     await renderEstablecimientos();
     toast('Establecimiento guardado');
   } catch (err) { toast('Error: ' + err.message); }
@@ -9154,6 +9155,7 @@ function poblarFiltros() {
   $('#filtroCategoria').innerHTML = '<option value="">Todas</option>' + catsAlfabetico_(Estado.bootstrap.categorias).map(c =>
     `<option value="${c.id}" ${c.id === Estado.filtros.categoria_id ? 'selected' : ''}>${escape(c.nombre)}</option>`
   ).join('');
+  poblarFiltroEstablecimiento_();
   $('#filtroDesde').value = Estado.filtros.desde;
   $('#filtroHasta').value = Estado.filtros.hasta;
   $('#filtroMontoMin').value = Estado.filtros.monto_min;
@@ -9166,12 +9168,28 @@ const FILTRO_KEY = {
   filtroSubcuenta: 'subcuenta_id',
   filtroTipo: 'tipo',
   filtroCategoria: 'categoria_id',
+  filtroEstablecimiento: 'establecimiento_id',
   filtroDesde: 'desde',
   filtroHasta: 'hasta',
   filtroMontoMin: 'monto_min',
   filtroMontoMax: 'monto_max',
   filtroQ: 'q'
 };
+// Filtra por establecimiento; '__ninguno__' = movimientos sin establecimiento.
+function filtrarPorEstablecimiento_(lista, f) {
+  const id = f.establecimiento_id;
+  if (!id) return lista;
+  if (id === '__ninguno__') return lista.filter(t => !t.establecimiento_id);
+  return lista.filter(t => t.establecimiento_id === id);
+}
+function poblarFiltroEstablecimiento_() {
+  const el = $('#filtroEstablecimiento');
+  if (!el) return;
+  const ests = (Estado.bootstrap.establecimientos || []).slice().sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es', { sensitivity: 'base' }));
+  const val = Estado.filtros.establecimiento_id;
+  el.innerHTML = '<option value="">Todos</option><option value="__ninguno__"' + (val === '__ninguno__' ? ' selected' : '') + '>Sin establecimiento</option>'
+    + ests.map(e => `<option value="${escape(e.id)}" ${e.id === val ? 'selected' : ''}>${escape(e.nombre)}</option>`).join('');
+}
 // Filtra por rango de monto sobre el importe mostrado (t.importe, en la moneda de la transacción).
 function filtrarPorMonto_(lista, f) {
   const parse = v => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : null; };
@@ -9210,11 +9228,14 @@ Object.keys(FILTRO_KEY).forEach(id => {
     Estado.filtros[FILTRO_KEY[id]] = e.target.value;
     if (id === 'filtroCuenta') actualizarFiltroSubcuenta();
     renderMovimientos();
-    renderDashTx_();
-    updateDashFilterActive_();
   });
 });
 $$('[data-mov-sort]').forEach(b => b.addEventListener('click', () => ordenarMovimientos(b.dataset.movSort)));
+$('#filtroLimpiar')?.addEventListener('click', () => {
+  Object.keys(Estado.filtros).forEach(k => { Estado.filtros[k] = ''; });
+  poblarFiltros();
+  renderMovimientos();
+});
 
 const DASH_FILTRO_KEY = {
   dashFiltroTipo: 'tipo',
@@ -9223,15 +9244,15 @@ const DASH_FILTRO_KEY = {
   dashFiltroQ: 'q'
 };
 function poblarDashFiltros_() {
-  $('#dashFiltroTipo').value = Estado.filtros.tipo;
-  poblarSelect('#dashFiltroCuenta', Estado.bootstrap.cuentas, Estado.filtros.cuenta_id, c => c.nombre);
+  $('#dashFiltroTipo').value = Estado.dashFiltros.tipo;
+  poblarSelect('#dashFiltroCuenta', Estado.bootstrap.cuentas, Estado.dashFiltros.cuenta_id, c => c.nombre);
   $('#dashFiltroCategoria').innerHTML = '<option value="">Todas</option>' + catsAlfabetico_(Estado.bootstrap.categorias).map(c =>
-    `<option value="${c.id}" ${c.id === Estado.filtros.categoria_id ? 'selected' : ''}>${escape(c.nombre)}</option>`
+    `<option value="${c.id}" ${c.id === Estado.dashFiltros.categoria_id ? 'selected' : ''}>${escape(c.nombre)}</option>`
   ).join('');
-  $('#dashFiltroQ').value = Estado.filtros.q;
+  $('#dashFiltroQ').value = Estado.dashFiltros.q;
 }
 function filtrosActivosCount_() {
-  const f = Estado.filtros;
+  const f = Estado.dashFiltros;
   return [f.cuenta_id, f.tipo, f.categoria_id, f.q].filter(v => String(v || '').trim() !== '').length;
 }
 function updateDashFilterActive_() {
@@ -9243,8 +9264,7 @@ Object.keys(DASH_FILTRO_KEY).forEach(id => {
   const el = $('#' + id);
   if (!el) return;
   el.addEventListener('input', e => {
-    Estado.filtros[DASH_FILTRO_KEY[id]] = e.target.value;
-    renderMovimientos();
+    Estado.dashFiltros[DASH_FILTRO_KEY[id]] = e.target.value;
     renderDashTx_();
     updateDashFilterActive_();
   });
@@ -9287,9 +9307,8 @@ $('#dashFilter')?.addEventListener('click', e => {
 });
 $('#dashFilterPop')?.addEventListener('click', e => e.stopPropagation());
 $('#dashFilterClear')?.addEventListener('click', () => {
-  ['cuenta_id', 'subcuenta_id', 'tipo', 'categoria_id', 'desde', 'hasta', 'monto_min', 'monto_max', 'q'].forEach(k => { Estado.filtros[k] = ''; });
+  ['cuenta_id', 'tipo', 'categoria_id', 'q'].forEach(k => { Estado.dashFiltros[k] = ''; });
   poblarDashFiltros_();
-  renderMovimientos();
   renderDashTx_();
   updateDashFilterActive_();
 });
@@ -9316,6 +9335,12 @@ function limpiarFiltrosInvalidos() {
   if (Estado.filtros.categoria_id && !catIds.has(Estado.filtros.categoria_id)) {
     Estado.filtros.categoria_id = '';
   }
+  const estIds = new Set((Estado.bootstrap.establecimientos || []).map(e => e.id));
+  if (Estado.filtros.establecimiento_id && Estado.filtros.establecimiento_id !== '__ninguno__' && !estIds.has(Estado.filtros.establecimiento_id)) {
+    Estado.filtros.establecimiento_id = '';
+  }
+  if (Estado.dashFiltros.cuenta_id && !ctaIds.has(Estado.dashFiltros.cuenta_id)) Estado.dashFiltros.cuenta_id = '';
+  if (Estado.dashFiltros.categoria_id && !catIds.has(Estado.dashFiltros.categoria_id)) Estado.dashFiltros.categoria_id = '';
   updateDashFilterActive_();
 }
 
