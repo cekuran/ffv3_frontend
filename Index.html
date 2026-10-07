@@ -661,6 +661,7 @@
   .graf-controls .seg-control { flex-wrap: wrap; }
   .graf-presets { display: flex; flex-wrap: wrap; gap: var(--s-2); }
   .graf-chart { position: relative; width: 100%; min-height: 320px; }
+  .graf-empty { height: 100%; min-height: 0; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-2); text-align: center; color: var(--on-surface-variant); border: 1px dashed var(--outline-variant); border-radius: 16px; background: var(--surface-container-low); padding: var(--s-4); overflow: hidden; }
   .graf-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
   .graf-chart text { fill: var(--on-surface-variant); font-size: 11px; }
   .graf-chart .g-grid { stroke: var(--outline-variant); stroke-width: 1; stroke-dasharray: 3 4; opacity: 0.6; }
@@ -1882,7 +1883,14 @@
       </div>
 
       <div class="card col-12" style="margin-top: var(--s-4); overflow-x: auto;">
-        <div class="card-h"><h2>Detalle</h2><span class="label-md" style="color: var(--on-surface-variant);">Toca una fila para mostrar u ocultar la serie</span></div>
+        <div class="card-h" style="flex-wrap: wrap; gap: var(--s-2);">
+          <h2>Detalle</h2>
+          <span class="label-md" style="color: var(--on-surface-variant);">Toca una fila para mostrar u ocultar la serie</span>
+          <span style="display: inline-flex; gap: var(--s-2);">
+            <button type="button" class="btn btn-secondary btn-sm" id="grafMarcarTodas">Marcar todas</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="grafDesmarcarTodas">Desmarcar todas</button>
+          </span>
+        </div>
         <div id="grafTabla"></div>
       </div>
       <div id="grafStatus" class="body-sm" role="status" aria-live="polite" style="padding: var(--s-4) 0;"></div>
@@ -7274,19 +7282,7 @@ function grafDatosAgrupados_(meses) {
   const entidades = {};
   (esCat ? Estado.bootstrap.categorias : Estado.bootstrap.establecimientos || []).forEach(e => { entidades[e.id] = e; });
   const mapa = new Map();
-  (Estado.bootstrap.transacciones || []).forEach(t => {
-    const i = idx[String(t.fecha || '').slice(0, 7)];
-    if (i === undefined) return;
-    let v;
-    if (g.medida === 'gasto') {
-      if (t.tipo === 'gasto') v = impDefLocal_(t);
-      else if (t.tipo === 'devolucion') v = -impDefLocal_(t);
-      else return;
-    } else {
-      if (t.tipo !== 'ingreso') return;
-      v = impDefLocal_(t);
-    }
-    const id = String((esCat ? t.categoria_id : t.establecimiento_id) || '');
+  const acumular = (id, i, v) => {
     let s = mapa.get(id);
     if (!s) {
       const ent = entidades[id];
@@ -7299,6 +7295,36 @@ function grafDatosAgrupados_(meses) {
       mapa.set(id, s);
     }
     s.valores[i] += v;
+  };
+  const cuentasById = cuentasByIdLocal_();
+  (Estado.bootstrap.transacciones || []).forEach(t => {
+    const i = idx[String(t.fecha || '').slice(0, 7)];
+    if (i === undefined) return;
+    let v;
+    if (t.tipo === 'transferencia') {
+      // Misma regla que Presupuesto: solo cuentan las transferencias activo->pasivo (gasto) o
+      // pasivo->activo (ingreso), repartidas por la categoría de cada destino.
+      if (!esCat) return;
+      if (tipoTransferenciaPresupuestoLocal_(t, cuentasById) !== g.medida) return;
+      const rep = parseRepartoDestinoLocal_(t.reparto_destino);
+      const totalRep = rep.reduce((a, x) => a + x.importe, 0);
+      if (!(totalRep > 0)) return;
+      rep.forEach(r => {
+        const cat = entidades[r.categoria_id];
+        if (!cat || cat.tipo !== g.medida) return;
+        acumular(String(r.categoria_id), i, impDefLocal_(t) * r.importe / totalRep);
+      });
+      return;
+    }
+    if (g.medida === 'gasto') {
+      if (t.tipo === 'gasto') v = impDefLocal_(t);
+      else if (t.tipo === 'devolucion') v = -impDefLocal_(t);
+      else return;
+    } else {
+      if (t.tipo !== 'ingreso') return;
+      v = impDefLocal_(t);
+    }
+    acumular(String((esCat ? t.categoria_id : t.establecimiento_id) || ''), i, v);
   });
   const total = s => s.valores.reduce((a, v) => a + v, 0);
   let series = [...mapa.values()].filter(s => s.valores.some(v => v !== 0));
@@ -7493,8 +7519,14 @@ function grafDibujar_() {
   $('#grafTitulo').textContent = datos.titulo;
   $('#grafStatus').textContent = meses.length >= GRAF_MAX_MESES ? 'Se muestran como máximo ' + GRAF_MAX_MESES + ' meses.' : '';
   const cont = $('#grafChart');
+  const altoGraf = (cont.clientWidth || 640) < 520 ? 260 : 320;
+  cont.style.minHeight = '0';
+  cont.style.height = altoGraf + 'px';
   if (!datos.series.length) {
-    cont.innerHTML = emptyHtml('Sin datos', 'No hay movimientos para el rango seleccionado.');
+    cont.innerHTML = '<div class="graf-empty">'
+      + '<div class="title-sm">Sin datos</div>'
+      + '<div class="body-sm">No hay movimientos para el rango seleccionado.</div>'
+      + '</div>';
     $('#grafTabla').innerHTML = '';
     $('#grafResumen').textContent = '';
     return;
@@ -7503,7 +7535,10 @@ function grafDibujar_() {
   $('#grafResumen').textContent = visibles.length + ' de ' + datos.series.length + ' series';
   $('#grafTabla').innerHTML = grafTabla_(datos);
   if (!visibles.length) {
-    cont.innerHTML = emptyHtml('Todas las series ocultas', 'Toca una fila del detalle para mostrarla.');
+    cont.innerHTML = '<div class="graf-empty">'
+      + '<div class="title-sm">Todas las series están ocultas</div>'
+      + '<div class="body-sm">Toca una fila del detalle para mostrarla.</div>'
+      + '</div>';
     return;
   }
   const W = Math.max(320, cont.clientWidth || 640);
@@ -7568,6 +7603,14 @@ function grafToggleSerie_(tr) {
   if (o.has(id)) o.delete(id); else o.add(id);
   grafDibujar_();
 }
+function grafMarcarTodas_(marcar) {
+  const o = Estado.graf.ocultas;
+  if (marcar) o.clear();
+  else $$('#grafTabla [data-graf-serie]').forEach(tr => o.add(tr.dataset.grafSerie));
+  grafDibujar_();
+}
+$('#grafMarcarTodas').addEventListener('click', () => grafMarcarTodas_(true));
+$('#grafDesmarcarTodas').addEventListener('click', () => grafMarcarTodas_(false));
 $('#grafTabla').addEventListener('click', e => grafToggleSerie_(e.target.closest('[data-graf-serie]')));
 $('#grafTabla').addEventListener('keydown', e => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
