@@ -7663,7 +7663,8 @@ function grafToggleSerie_(tr) {
 function grafMarcarTodas_(marcar) {
   if (!_grafDatos) return;
   const o = Estado.graf.ocultas;
-  grafSeriesFiltradas_(_grafDatos).forEach(s => { if (marcar) o.delete(s.id); else o.add(s.id); });
+  if (marcar) o.clear();
+  else _grafDatos.series.forEach(s => o.add(s.id));
   grafDibujar_();
 }
 $('#grafBuscar').addEventListener('input', e => {
