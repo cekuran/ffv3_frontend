@@ -682,6 +682,12 @@
   .graf-table tr.is-off td { opacity: 0.4; }
   .graf-table .g-name { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
   .graf-table .g-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  .graf-table th.sort-head { padding: 0; }
+  .graf-table .table-sort { padding: 8px; background: none; border: 0; font: inherit; cursor: pointer; color: inherit; width: 100%; text-align: inherit; }
+  .graf-table .table-sort:hover, .graf-table .table-sort.is-active { color: var(--primary); }
+  .graf-table .graf-empty-row td { text-align: center; color: var(--on-surface-variant); }
+  .graf-table .g-ico { width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0; display: grid; place-items: center; background: var(--surface); box-sizing: border-box; border: 2px solid var(--outline-variant); overflow: hidden; }
+  .graf-table .g-ico svg, .graf-table .g-ico img { width: 16px; height: 16px; }
 
   /* === Progress === */
   .progress { width: 100%; height: 8px; background: var(--surface-container-high); border-radius: var(--r-full); overflow: hidden; }
@@ -1865,15 +1871,6 @@
               <button type="button" data-graf-tipo="barras">Barras</button>
             </div>
           </div>
-          <div class="field" id="grafTopWrap">
-            <label for="grafTop">Series visibles</label>
-            <select class="select" id="grafTop">
-              <option value="5">Top 5</option>
-              <option value="8" selected>Top 8</option>
-              <option value="12">Top 12</option>
-              <option value="0">Todas</option>
-            </select>
-          </div>
         </div>
       </div>
 
@@ -1891,6 +1888,7 @@
             <button type="button" class="btn btn-secondary btn-sm" id="grafDesmarcarTodas">Desmarcar todas</button>
           </span>
         </div>
+        <input class="input" type="search" id="grafBuscar" placeholder="Buscar serie…" aria-label="Buscar serie en el detalle" autocomplete="off" style="margin-bottom: var(--s-3);">
         <div id="grafTabla"></div>
       </div>
       <div id="grafStatus" class="body-sm" role="status" aria-live="polite" style="padding: var(--s-4) 0;"></div>
@@ -2955,7 +2953,7 @@ const Estado = {
   estMes: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1 },
   repMes: { anio: new Date().getFullYear(), mes: new Date().getMonth() + 1 },
   repData: null,
-  graf: { vista: 'categorias', medida: 'gasto', tipo: 'lineas', top: 8, desde: '', hasta: '', ocultas: new Set() },
+  graf: { vista: 'categorias', medida: 'gasto', tipo: 'lineas', desde: '', hasta: '', ocultas: new Set(), busca: '', orden: { col: '', dir: 'asc' } },
   txTipo: 'gasto',
   txRepartoDest: [],
   repRecDest: [],
@@ -7165,7 +7163,6 @@ $$('[data-rep-nav]').forEach(b => b.addEventListener('click', () => {
 // Todo se calcula en cliente con las transacciones en memoria (mismas reglas que
 // calcularResumenLocal_: importe_en_defecto, gasto − devolución).
 const GRAF_PALETA = ['#00613e', '#0050af', '#d32f2f', '#f57c00', '#7b1fa2', '#00838f', '#c2185b', '#689f38', '#5d4037', '#455a64', '#fbc02d', '#3949ab'];
-const GRAF_COLOR_OTROS = '#9e9e9e';
 const GRAF_MAX_MESES = 120;
 
 function grafMesKey_(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
@@ -7264,7 +7261,9 @@ function grafDatosCuentas_(meses) {
       });
       return s;
     });
-    return { id: String(c.id), nombre: c.nombre || 'Cuenta', color: grafColor_('', i), valores };
+    const estCta = (Estado.bootstrap.establecimientos || []).find(e => e.id === c.establecimiento_id);
+    const icono = faviconHostEst_(estCta) ? faviconImgEst_(estCta, 16) : (ICONOS[c.icono] || ICONOS.account_balance_wallet);
+    return { id: String(c.id), nombre: c.nombre || 'Cuenta', color: grafColor_('', i), icono, valores };
   });
   return { series, stock: true, modo: 'apilado', titulo: 'Saldo de cuentas a fin de mes', totalFila: true, porcentaje: false };
 }
@@ -7307,6 +7306,7 @@ function grafDatosAgrupados_(meses) {
         id: id || '__sin__',
         nombre: ent ? ent.nombre : (esCat ? 'Sin categoría' : 'Sin establecimiento'),
         color: esCat && ent ? ent.color : '',
+        icono: !esCat && faviconHostEst_(ent) ? faviconImgEst_(ent, 16) : '',
         valores: new Array(meses.length).fill(0)
       };
       mapa.set(id, s);
@@ -7346,13 +7346,7 @@ function grafDatosAgrupados_(meses) {
   const total = s => s.valores.reduce((a, v) => a + v, 0);
   let series = [...mapa.values()].filter(s => s.valores.some(v => v !== 0));
   series.sort((a, b) => Math.abs(total(b)) - Math.abs(total(a)));
-  if (g.top > 0 && series.length > g.top) {
-    const resto = series.slice(g.top);
-    const otros = { id: '__otros__', nombre: 'Otros (' + resto.length + ')', color: GRAF_COLOR_OTROS, valores: new Array(meses.length).fill(0) };
-    resto.forEach(s => s.valores.forEach((v, i) => { otros.valores[i] += v; }));
-    series = series.slice(0, g.top).concat(otros);
-  }
-  series.forEach((s, i) => { if (s.id !== '__otros__') s.color = grafColor_(s.color, i); });
+  series.forEach((s, i) => { s.color = grafColor_(s.color, i); });
   const que = g.medida === 'gasto' ? 'Gastos' : 'Ingresos';
   return {
     series, stock: false, modo: 'apilado', totalFila: true, porcentaje: true,
@@ -7464,16 +7458,57 @@ function grafActivarTooltip_(meses, series, geom) {
       + series.map(s => '<div class="gt-row"><span style="display:flex; align-items:center; gap:6px;"><span class="gt-dot" style="background:' + s.color + '"></span>' + escape(s.nombre) + '</span><span class="gt-val">' + escape(fmtMoneda(s.valores[i])) + '</span></div>').join('');
     tip.classList.add('is-on');
     const cr = cont.getBoundingClientRect();
-    let left = ev.clientX - cr.left + 14;
-    if (left + tip.offsetWidth > cr.width) left = ev.clientX - cr.left - tip.offsetWidth - 14;
-    const top = Math.min(Math.max(0, ev.clientY - cr.top - tip.offsetHeight / 2), Math.max(0, cr.height - tip.offsetHeight));
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    const fx = ev.clientX - cr.left, fy = ev.clientY - cr.top;
+    let left, top;
+    if (ev.pointerType === 'touch' || ev.pointerType === 'pen') {
+      // Táctil: el dedo tapa lo que tiene debajo, así que el mensaje va en el lado opuesto,
+      // arriba del gráfico; si aun así choca con el dedo, se coloca encima del punto de toque.
+      left = Math.max(0, fx > cr.width / 2 ? 4 : cr.width - w - 4);
+      top = 4;
+      const chocaX = left < fx + 40 && left + w > fx - 40;
+      const chocaY = top < fy + 80 && top + h > fy - 20;
+      if (chocaX && chocaY) top = Math.max(0, fy - 24 - h);
+    } else {
+      left = ev.clientX - cr.left + 14;
+      if (left + w > cr.width) left = fx - w - 14;
+      top = Math.min(Math.max(0, fy - h / 2), Math.max(0, cr.height - h));
+    }
     tip.style.left = Math.max(0, left) + 'px';
     tip.style.top = top + 'px';
   };
   const ocultar = () => { guide.style.display = 'none'; tip.classList.remove('is-on'); };
   ov.addEventListener('pointermove', mover);
   ov.addEventListener('pointerdown', mover);
-  ov.addEventListener('pointerleave', ocultar);
+  // Con ratón se oculta al salir; en táctil permanece tras levantar el dedo para poder leerlo
+  // y se cierra al tocar fuera del área del gráfico.
+  ov.addEventListener('pointerleave', ev => { if (ev.pointerType === 'mouse') ocultar(); });
+  if (_grafDocPointerDown) document.removeEventListener('pointerdown', _grafDocPointerDown);
+  _grafDocPointerDown = ev => { if (!ev.target.closest || !ev.target.closest('.g-overlay')) ocultar(); };
+  document.addEventListener('pointerdown', _grafDocPointerDown);
+}
+let _grafDocPointerDown = null;
+
+function grafSeriesFiltradas_(datos) {
+  const g = Estado.graf;
+  const q = repNormalizar_(g.busca);
+  const lista = q ? datos.series.filter(s => repNormalizar_(s.nombre).includes(q)) : datos.series.slice();
+  const col = g.orden.col;
+  if (!col) return lista;
+  const n = datos.series.length ? datos.series[0].valores.length : 1;
+  const suma = v => v.reduce((a, x) => a + x, 0);
+  const num = s => {
+    if (datos.stock) {
+      const ini = s.valores[0] || 0, fin = s.valores[s.valores.length - 1] || 0;
+      return [ini, fin, fin - ini][Number(col.slice(1))];
+    }
+    const tot = suma(s.valores);
+    return Number(col.slice(1)) === 1 ? tot / n : tot;
+  };
+  const dir = g.orden.dir === 'desc' ? -1 : 1;
+  return lista.sort((a, b) => dir * (col === 'nombre'
+    ? String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es')
+    : num(a) - num(b)));
 }
 
 function grafTabla_(datos) {
@@ -7495,12 +7530,15 @@ function grafTabla_(datos) {
     return v;
   };
   const cab = colsStock ? ['Inicial', 'Final', 'Variación'] : ['Total', 'Promedio / mes'].concat(datos.porcentaje ? ['%'] : []);
-  const filas = datos.series.map(s => {
+  const mostradas = grafSeriesFiltradas_(datos);
+  const filas = mostradas.map(s => {
     const off = g.ocultas.has(s.id);
     return '<tr data-graf-serie="' + escape(s.id) + '" class="' + (off ? 'is-off' : '') + '" role="button" tabindex="0" aria-pressed="' + (!off) + '">'
-      + '<td><span class="g-name"><span class="g-dot" style="background:' + s.color + '"></span><span>' + escape(s.nombre) + '</span></span></td>'
+      + '<td><span class="g-name">' + (s.icono
+        ? '<span class="g-ico" style="border-color:' + s.color + '">' + s.icono + '</span>'
+        : '<span class="g-dot" style="background:' + s.color + '"></span>') + '<span>' + escape(s.nombre) + '</span></span></td>'
       + celdas(valoresFila(s)) + '</tr>';
-  }).join('');
+  }).join('') || '<tr class="graf-empty-row"><td colspan="' + (cab.length + 1) + '">Ninguna serie coincide.</td></tr>';
   let pie = '';
   if (datos.totalFila && visibles.length) {
     const agg = { nombre: 'Total', valores: new Array(n).fill(0) };
@@ -7509,7 +7547,12 @@ function grafTabla_(datos) {
     if (datos.porcentaje) fila[fila.length - 1] = '';
     pie = '<tr style="font-weight:700;"><td>Total</td>' + celdas(fila) + '</tr>';
   }
-  return '<table class="graf-table"><thead><tr><th>Serie</th>' + cab.map(c => '<th>' + c + '</th>').join('') + '</tr></thead><tbody>' + filas + pie + '</tbody></table>';
+  const th = (col, texto, num) => {
+    const act = g.orden.col === col;
+    return '<th class="sort-head" aria-sort="' + (act ? (g.orden.dir === 'desc' ? 'descending' : 'ascending') : 'none') + '">'
+      + '<button type="button" class="table-sort' + (act ? ' is-active' : '') + '" data-graf-sort="' + col + '"' + (act ? ' data-direction="' + g.orden.dir + '"' : '') + ' aria-label="Ordenar por ' + escape(texto) + '">' + texto + '</button></th>';
+  };
+  return '<table class="graf-table"><thead><tr>' + th('nombre', 'Serie') + cab.map((c, i) => th('c' + i, c)).join('') + '</tr></thead><tbody>' + filas + pie + '</tbody></table>';
 }
 
 function grafSyncControles_() {
@@ -7519,12 +7562,11 @@ function grafSyncControles_() {
   $$('[data-graf-tipo]').forEach(b => b.classList.toggle('is-on', b.dataset.grafTipo === g.tipo));
   const agrupable = g.vista === 'categorias' || g.vista === 'establecimientos';
   $('#grafMedidaWrap').style.display = agrupable ? '' : 'none';
-  $('#grafTopWrap').style.display = agrupable ? '' : 'none';
   $('#grafDesde').value = g.desde;
   $('#grafHasta').value = g.hasta;
-  $('#grafTop').value = String(g.top);
 }
 
+let _grafDatos = null;
 function grafDibujar_() {
   const g = Estado.graf;
   if (!g.desde || !g.hasta) grafRangoPreset_('12');
@@ -7546,8 +7588,10 @@ function grafDibujar_() {
       + '</div>';
     $('#grafTabla').innerHTML = '';
     $('#grafResumen').textContent = '';
+    _grafDatos = null;
     return;
   }
+  _grafDatos = datos;
   const visibles = datos.series.filter(s => !g.ocultas.has(s.id));
   $('#grafResumen').textContent = visibles.length + ' de ' + datos.series.length + ' series';
   $('#grafTabla').innerHTML = grafTabla_(datos);
@@ -7581,6 +7625,7 @@ $('#grafVista').addEventListener('click', e => {
   if (!b) return;
   Estado.graf.vista = b.dataset.grafVista;
   Estado.graf.ocultas.clear();
+  Estado.graf.orden = { col: '', dir: 'asc' };
   grafDibujar_();
 });
 $('#grafMedida').addEventListener('click', e => {
@@ -7594,11 +7639,6 @@ $('#grafTipo').addEventListener('click', e => {
   const b = e.target.closest('[data-graf-tipo]');
   if (!b) return;
   Estado.graf.tipo = b.dataset.grafTipo;
-  grafDibujar_();
-});
-$('#grafTop').addEventListener('change', e => {
-  Estado.graf.top = Number(e.target.value) || 0;
-  Estado.graf.ocultas.clear();
   grafDibujar_();
 });
 ['#grafDesde', '#grafHasta'].forEach(sel => $(sel).addEventListener('change', e => {
@@ -7621,11 +7661,23 @@ function grafToggleSerie_(tr) {
   grafDibujar_();
 }
 function grafMarcarTodas_(marcar) {
+  if (!_grafDatos) return;
   const o = Estado.graf.ocultas;
-  if (marcar) o.clear();
-  else $$('#grafTabla [data-graf-serie]').forEach(tr => o.add(tr.dataset.grafSerie));
+  grafSeriesFiltradas_(_grafDatos).forEach(s => { if (marcar) o.delete(s.id); else o.add(s.id); });
   grafDibujar_();
 }
+$('#grafBuscar').addEventListener('input', e => {
+  Estado.graf.busca = e.target.value;
+  if (_grafDatos) $('#grafTabla').innerHTML = grafTabla_(_grafDatos);
+});
+$('#grafTabla').addEventListener('click', e => {
+  const b = e.target.closest('[data-graf-sort]');
+  if (!b || !_grafDatos) return;
+  const col = b.dataset.grafSort, o = Estado.graf.orden;
+  if (o.col === col) o.dir = o.dir === 'asc' ? 'desc' : 'asc';
+  else { o.col = col; o.dir = col === 'nombre' ? 'asc' : 'desc'; }
+  $('#grafTabla').innerHTML = grafTabla_(_grafDatos);
+});
 $('#grafMarcarTodas').addEventListener('click', () => grafMarcarTodas_(true));
 $('#grafDesmarcarTodas').addEventListener('click', () => grafMarcarTodas_(false));
 $('#grafTabla').addEventListener('click', e => grafToggleSerie_(e.target.closest('[data-graf-serie]')));
