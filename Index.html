@@ -5360,20 +5360,37 @@ function openCuentasDetalle(cuentaId) {
     </div>
   `).join('') || '<div class="body-sm" style="color: var(--on-surface-variant); padding: var(--s-3); text-align: center;">Esta cuenta no tiene subcuentas.</div>';
   $$('[data-detalle-sub-edit]').forEach(b => b.addEventListener('click', () => { closeSheet(); openCuenta(b.dataset.detalleSubEdit, b.dataset.detalleParent); }));
-  $$('[data-detalle-sub-arch]').forEach(b => b.addEventListener('click', async () => {
-    await archivarCuentaUI(b.dataset.detalleSubArch, b.dataset.detalleArchVal === '1');
-    openCuentasDetalle(cuentaId);
+  $$('[data-detalle-sub-arch]').forEach(b => b.addEventListener('click', () => {
+    archivarCuentaUI(b.dataset.detalleSubArch, b.dataset.detalleArchVal === '1', () => openCuentasDetalle(cuentaId));
   }));
   $$('[data-detalle-sub-del]').forEach(b => b.addEventListener('click', () => borrarSubcuenta(b.dataset.detalleSubDel, b.dataset.detalleParent)));
   openSheet('sheetCuentasDetalle');
 }
 
-async function archivarCuentaUI(id, archivar) {
-  try {
-    setCuentasLocales_(await call('archivarCuenta', id, !!archivar));
-    refrescarCuentas();
-    toast(archivar ? 'Archivada' : 'Restaurada');
-  } catch (e) { toast('Error: ' + e.message); }
+function archivarCuentaUI(id, archivar, onDone) {
+  let item = null, esSub = false;
+  for (const c of (Estado.bootstrap.cuentas || [])) {
+    if (c.id === id) { item = c; break; }
+    const s = (c.subcuentas || []).find(x => x.id === id);
+    if (s) { item = s; esSub = true; break; }
+  }
+  const tipo = esSub ? 'subcuenta' : 'cuenta';
+  const nombre = item ? item.nombre : '';
+  openConfirm({
+    title: archivar ? 'Archivar ' + tipo : 'Restaurar ' + tipo,
+    message: archivar
+      ? '¿Archivar la ' + tipo + ' "' + nombre + '"? Dejará de aparecer en los selectores y en el inicio, pero conservará sus movimientos y podrás restaurarla.'
+      : '¿Restaurar la ' + tipo + ' "' + nombre + '"? Volverá a estar disponible para nuevos movimientos.',
+    confirmLabel: archivar ? 'Archivar' : 'Restaurar',
+    onConfirm: async () => {
+      try {
+        setCuentasLocales_(await call('archivarCuenta', id, !!archivar));
+        refrescarCuentas();
+        toast(archivar ? 'Archivada' : 'Restaurada');
+        if (onDone) onDone();
+      } catch (e) { toast('Error: ' + e.message); }
+    }
+  });
 }
 
 async function borrarCuenta(id) {
