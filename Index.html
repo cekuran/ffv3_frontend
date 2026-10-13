@@ -565,6 +565,9 @@
   .acct-ico { width: 48px; height: 48px; border-radius: var(--r-full); background: var(--tertiary-container); color: var(--on-tertiary-container); display: grid; place-items: center; }
   .acct-body { flex: 1; min-width: 0; }
   .acct-name { font-size: 13px; color: var(--on-surface-variant); }
+  .acct.is-archived { opacity: 0.7; border-style: dashed; }
+  .subcta-row.is-archived .subcta-name, .subcta-row.is-archived .subcta-balance { opacity: 0.7; }
+  .pill-archivada { display: inline-block; margin-left: 6px; padding: 0 8px; border-radius: var(--r-full); border: 1px solid var(--outline-variant); color: var(--on-surface-variant); background: var(--surface-container-high, transparent); font-size: 11px; line-height: 18px; font-weight: 500; vertical-align: middle; }
   .acct-balance { font-size: 20px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .acct-actions { display: flex; gap: 4px; }
 
@@ -1633,7 +1636,10 @@
           <h2 style="font-size: 24px;">Cuentas</h2>
           <div class="card-sub">Activos y pasivos. Cada cuenta tiene su propia moneda.</div>
         </div>
-        <button class="btn btn-primary" id="btnNuevaCuenta"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg> Nueva cuenta</button>
+        <div style="display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;">
+          <label class="body-sm" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--on-surface-variant);"><input type="checkbox" id="chkCuentasArchivadas"> <span id="lblCuentasArchivadas">Mostrar archivadas</span></label>
+          <button class="btn btn-primary" id="btnNuevaCuenta"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg> Nueva cuenta</button>
+        </div>
       </div>
       <div class="bento" id="cuentasList" style="margin-top: var(--s-4);"></div>
     </section>
@@ -2756,6 +2762,8 @@ const ICONOS = {
   category: '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 4H4v6h6zm10 0h-6v6h6zM10 14H4v6h6zm10 0h-6v6h6z"/></svg>',
   edit: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 17.25V21h3.75l11-11-3.75-3.75z"/></svg>',
   delete: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 7h12v13H6zm3-3h6l1 2h4v2H4V6h4z"/></svg>',
+  archive: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></svg>',
+  unarchive: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M20.55 5.22l-1.39-1.68A1.51 1.51 0 0 0 18 3H6c-.47 0-.88.21-1.15.55L3.46 5.22C3.17 5.57 3 6.01 3 6.5V19a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6.5c0-.49-.17-.93-.45-1.28zM12 9.5l5.5 5.5H14v2h-4v-2H6.5L12 9.5zM5.12 5l.82-1h12l.94 1H5.12z"/></svg>',
   content_copy: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h11z"/></svg>',
   close: '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19 6 12 13 5 6l-1 1 7 7-7 7 1 1 7-7 7 7 1-1-7-7 7-7z"/></svg>',
   more_vert: '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/></svg>',
@@ -2856,6 +2864,18 @@ function subsAlfabetico_(subs) {
 }
 function catsAlfabetico_(cats) {
   return (cats || []).slice().sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
+}
+// Archivado: una subcuenta cuenta como archivada si lo está ella o su cuenta padre.
+function idsKeep_(keep) {
+  return (Array.isArray(keep) ? keep : [keep]).filter(Boolean);
+}
+function cuentasUsables_(keep) {
+  const ids = idsKeep_(keep);
+  return (Estado.bootstrap.cuentas || []).filter(c => !c.archivada || ids.includes(c.id));
+}
+function subsUsables_(cta, keep) {
+  const ids = idsKeep_(keep);
+  return subsAlfabetico_(cta && cta.subcuentas).filter(s => !(cta.archivada || s.archivada) || ids.includes(s.id));
 }
 function _assert_(cond, msg) { if (!cond) { try { console.error('[assert]', msg); } catch (_) {} } }
 // ponytail: prioriza el favicon del establecimiento sobre el icono de categoría.
@@ -2958,6 +2978,7 @@ const Estado = {
   txRepartoDest: [],
   repRecDest: [],
   cuentasExpandidas: new Set(),
+  cuentasMostrarArchivadas: false,
   cuentasBusqueda: {},
   editing: null,
   recPlantillaId: '',
@@ -5235,11 +5256,18 @@ function evolucionCuentaHtml_(c) {
 }
 
 function renderCuentas() {
-  const cuentas = Estado.bootstrap.cuentas;
+  const todasCuentas = Estado.bootstrap.cuentas;
+  const mostrarArch = Estado.cuentasMostrarArchivadas;
+  const nArch = todasCuentas.reduce((n, c) => n + (c.archivada ? 1 : 0) + (c.subcuentas || []).filter(s => s.archivada).length, 0);
+  const chkArch = $('#chkCuentasArchivadas');
+  if (chkArch) chkArch.checked = mostrarArch;
+  const lblArch = $('#lblCuentasArchivadas');
+  if (lblArch) lblArch.textContent = 'Mostrar archivadas' + (nArch ? ' (' + nArch + ')' : '');
+  const cuentas = mostrarArch ? todasCuentas : todasCuentas.filter(c => !c.archivada);
   $('#cuentasList').innerHTML = cuentas.length ? cuentas.map(c => {
     const estCta = Estado.bootstrap.establecimientos.find(e => e.id === c.establecimiento_id);
     const icoCta = faviconHostEst_(estCta) ? faviconImgEst_(estCta, 36) : (ICONOS[c.icono] || ICONOS.account_balance_wallet);
-    const todasSubs = subsAlfabetico_(c.subcuentas);
+    const todasSubs = subsAlfabetico_(mostrarArch ? c.subcuentas : (c.subcuentas || []).filter(s => !s.archivada));
     const conBusqueda = todasSubs.length > 5;
     const termino = conBusqueda ? (Estado.cuentasBusqueda[c.id] || '').trim().toLowerCase() : '';
     const subs = termino ? todasSubs.filter(s => String(s.nombre || '').toLowerCase().includes(termino)) : todasSubs;
@@ -5247,11 +5275,11 @@ function renderCuentas() {
     const visSubs = (!termino && subs.length > 5 && !expanded) ? subs.slice(0, 5) : subs;
     const oculto = subs.length - visSubs.length;
     return `
-    <div class="card col-4 acct" draggable="true" data-cta-id="${c.id}" style="flex-direction: column; align-items: stretch; gap: var(--s-3);">
+    <div class="card col-4 acct${c.archivada ? ' is-archived' : ''}" draggable="true" data-cta-id="${c.id}" style="flex-direction: column; align-items: stretch; gap: var(--s-3);">
       <div class="acct-header-clickable" data-cta-open="${c.id}" style="display: flex; align-items: center; gap: var(--s-3);">
         <div class="acct-ico" style="${c.tipo === 'pasivo' ? 'background: var(--error-container); color: var(--on-error-container);' : ''}">${icoCta}</div>
         <div class="acct-body">
-          <div class="acct-name">${escape(c.nombre)} · ${escape(c.moneda)}</div>
+          <div class="acct-name">${escape(c.nombre)} · ${escape(c.moneda)}${c.archivada ? '<span class="pill-archivada">Archivada</span>' : ''}</div>
           <div class="acct-balance" style="color: ${c.tipo === 'pasivo' ? 'var(--error)' : 'var(--on-surface)'};">${fmtMoneda(c.saldo, c.moneda)}</div>
         </div>
       </div>
@@ -5259,15 +5287,16 @@ function renderCuentas() {
       ${conBusqueda ? `<input class="input" type="search" data-cta-search="${c.id}" placeholder="Buscar subcuenta…" aria-label="Buscar subcuenta en ${escape(c.nombre)}" value="${escape(Estado.cuentasBusqueda[c.id] || '')}" draggable="false">` : ''}
       ${termino && !subs.length ? '<div class="body-sm" style="color: var(--on-surface-variant); text-align: center;">Sin resultados.</div>' : ''}
       ${subs.length ? `<div class="subcuentas" data-subcuentas-parent="${c.id}">${visSubs.map(s => `
-        <div class="subcta-row" draggable="true" data-sub-id="${s.id}">
+        <div class="subcta-row${s.archivada ? ' is-archived' : ''}" draggable="true" data-sub-id="${s.id}">
           <div class="subcta-top">
             <div class="subcta-grip" title="Arrastra para reordenar">≡</div>
-            <div class="subcta-name">${escape(s.nombre)}</div>
+            <div class="subcta-name">${escape(s.nombre)}${s.archivada ? '<span class="pill-archivada">Archivada</span>' : ''}</div>
           </div>
           <div class="subcta-bottom">
             <div class="subcta-balance" style="color: ${Number(s.saldo || 0) < 0 ? 'var(--error)' : 'inherit'};">${fmtMoneda(s.saldo, c.moneda)}</div>
             <div class="subcta-actions">
               <button class="icon-btn" data-sub-edit="${s.id}" data-sub-parent="${c.id}" title="Editar subcuenta">${ICONOS.edit}</button>
+              <button class="icon-btn" data-sub-arch="${s.id}" data-sub-arch-val="${s.archivada ? '0' : '1'}" title="${s.archivada ? 'Restaurar subcuenta' : 'Archivar subcuenta'}">${s.archivada ? ICONOS.unarchive : ICONOS.archive}</button>
               <button class="icon-btn" data-sub-del="${s.id}" data-sub-parent="${c.id}" title="Eliminar subcuenta">${ICONOS.delete}</button>
             </div>
           </div>
@@ -5276,12 +5305,15 @@ function renderCuentas() {
         <button class="btn btn-sm btn-ghost subcta-add" data-cta-add-sub="${c.id}">+ Subcuenta</button>
         <div style="display: flex; gap: 4px;">
           <button class="icon-btn" data-cta-edit="${c.id}">${ICONOS.edit}</button>
+          <button class="icon-btn" data-cta-arch="${c.id}" data-cta-arch-val="${c.archivada ? '0' : '1'}" title="${c.archivada ? 'Restaurar cuenta' : 'Archivar cuenta'}">${c.archivada ? ICONOS.unarchive : ICONOS.archive}</button>
           <button class="icon-btn" data-cta-del="${c.id}">${ICONOS.delete}</button>
         </div>
       </div>
     </div>
-  `}).join('') : emptyHtml('Sin cuentas', 'Crea tu primera cuenta.');
+  `}).join('') : emptyHtml('Sin cuentas', nArch ? 'Todas las cuentas están archivadas.' : 'Crea tu primera cuenta.');
   $$('[data-cta-edit]').forEach(b => b.addEventListener('click', () => openCuenta(b.dataset.ctaEdit)));
+  $$('[data-cta-arch]').forEach(b => b.addEventListener('click', () => archivarCuentaUI(b.dataset.ctaArch, b.dataset.ctaArchVal === '1')));
+  $$('[data-sub-arch]').forEach(b => b.addEventListener('click', () => archivarCuentaUI(b.dataset.subArch, b.dataset.subArchVal === '1')));
   $$('[data-cta-del]').forEach(b => b.addEventListener('click', () => borrarCuenta(b.dataset.ctaDel)));
   $$('[data-cta-add-sub]').forEach(b => b.addEventListener('click', () => openCuenta('', b.dataset.ctaAddSub)));
   $$('[data-cta-open]').forEach(b => b.addEventListener('click', () => openCuentasDetalle(b.dataset.ctaOpen)));
@@ -5313,22 +5345,35 @@ function openCuentasDetalle(cuentaId) {
   $('#sheetCuentasDetalleTitle').textContent = c.nombre + ' — Subcuentas';
   $('#sheetCuentasDetalleSub').textContent = `${subs.length} subcuenta${subs.length === 1 ? '' : 's'} · ${fmtMoneda(c.saldo, c.moneda)}`;
   $('#sheetCuentasDetalleList').innerHTML = subs.map(s => `
-    <div class="subcta-row subcta-row-lg">
+    <div class="subcta-row subcta-row-lg${s.archivada ? ' is-archived' : ''}">
       <div class="subcta-top">
-        <div class="subcta-name">${escape(s.nombre)}</div>
+        <div class="subcta-name">${escape(s.nombre)}${s.archivada ? '<span class="pill-archivada">Archivada</span>' : ''}</div>
       </div>
       <div class="subcta-bottom">
         <div class="subcta-balance" style="color: ${Number(s.saldo || 0) < 0 ? 'var(--error)' : 'inherit'};">${fmtMoneda(s.saldo, c.moneda)}</div>
         <div class="subcta-actions">
           <button class="icon-btn" data-detalle-sub-edit="${s.id}" data-detalle-parent="${c.id}" title="Editar subcuenta">${ICONOS.edit}</button>
+          <button class="icon-btn" data-detalle-sub-arch="${s.id}" data-detalle-arch-val="${s.archivada ? '0' : '1'}" title="${s.archivada ? 'Restaurar subcuenta' : 'Archivar subcuenta'}">${s.archivada ? ICONOS.unarchive : ICONOS.archive}</button>
           <button class="icon-btn" data-detalle-sub-del="${s.id}" data-detalle-parent="${c.id}" title="Eliminar subcuenta">${ICONOS.delete}</button>
         </div>
       </div>
     </div>
   `).join('') || '<div class="body-sm" style="color: var(--on-surface-variant); padding: var(--s-3); text-align: center;">Esta cuenta no tiene subcuentas.</div>';
   $$('[data-detalle-sub-edit]').forEach(b => b.addEventListener('click', () => { closeSheet(); openCuenta(b.dataset.detalleSubEdit, b.dataset.detalleParent); }));
+  $$('[data-detalle-sub-arch]').forEach(b => b.addEventListener('click', async () => {
+    await archivarCuentaUI(b.dataset.detalleSubArch, b.dataset.detalleArchVal === '1');
+    openCuentasDetalle(cuentaId);
+  }));
   $$('[data-detalle-sub-del]').forEach(b => b.addEventListener('click', () => borrarSubcuenta(b.dataset.detalleSubDel, b.dataset.detalleParent)));
   openSheet('sheetCuentasDetalle');
+}
+
+async function archivarCuentaUI(id, archivar) {
+  try {
+    setCuentasLocales_(await call('archivarCuenta', id, !!archivar));
+    refrescarCuentas();
+    toast(archivar ? 'Archivada' : 'Restaurada');
+  } catch (e) { toast('Error: ' + e.message); }
 }
 
 async function borrarCuenta(id) {
@@ -5831,7 +5876,7 @@ function renderConciliar() {
 }
 
 function poblarConCuenta() {
-  $('#conCuenta').innerHTML = Estado.bootstrap.cuentas.map(c => `<option value="${c.id}">${escape(c.nombre)} (${c.moneda})</option>`).join('');
+  $('#conCuenta').innerHTML = Estado.bootstrap.cuentas.filter(c => !c.archivada).map(c => `<option value="${c.id}">${escape(c.nombre)} (${c.moneda})</option>`).join('');
 }
 
 function actualizarResultadoConciliar() {
@@ -7771,8 +7816,8 @@ function openTx(id, copiar) {
   $('#txFecha').value = f.fecha || new Date().toISOString().slice(0, 10);
   Estado.txRepartoDest = [];
   Estado._lastCtaDestinoId = '';
-  poblarSelect('#txCuenta', Estado.bootstrap.cuentas, f.cuenta_id, c => c.nombre + ' (' + c.moneda + ')');
-  poblarSelect('#txCuentaDest', Estado.bootstrap.cuentas, f.cuenta_destino_id, c => c.nombre + ' (' + c.moneda + ')');
+  poblarSelect('#txCuenta', cuentasUsables_(f.cuenta_id), f.cuenta_id, c => c.nombre + ' (' + c.moneda + ')');
+  poblarSelect('#txCuentaDest', cuentasUsables_(f.cuenta_destino_id), f.cuenta_destino_id, c => c.nombre + ' (' + c.moneda + ')');
   // ponytail: selector de moneda. Default = la moneda por defecto del
   // bootstrap; si estamos editando, conservamos la que traía la tx.
   poblarSelectMoneda_('#txMoneda', f.moneda);
@@ -7959,7 +8004,7 @@ function actualizarSubcuentasTx(preferred) {
     $('#wrapCuentaDest').style.display = muestraDestino ? '' : 'none';
     $('#wrapConversion').style.display = muestraDestino ? '' : 'none';
   }
-  const subs = subsAlfabetico_(cta && cta.subcuentas);
+  const subs = subsUsables_(cta, preferred ? preferred.subcuenta_id : $('#txSubcuenta').value);
   const visOrigen = subs.length > 0;
   $('#wrapSubcuenta').style.display = visOrigen ? '' : 'none';
   const lblO = $('#wrapSubcuenta label');
@@ -7977,7 +8022,7 @@ function actualizarSubcuentasTx(preferred) {
 
   // Cuenta destino: permitir la misma cuenta para transferencias entre subcuentas.
   const sourceId = cta ? cta.id : '';
-  const destCtas = Estado.bootstrap.cuentas;
+  const destCtas = cuentasUsables_([preferred && preferred.cuenta_destino_id, $('#txCuentaDest').value]);
   const prevDest = preferred ? preferred.cuenta_destino_id : $('#txCuentaDest').value;
   const destVal = destCtas.some(c => c.id === prevDest) ? prevDest : '';
   $('#txCuentaDest').innerHTML = '<option value="">—</option>' + destCtas.map(c =>
@@ -7987,7 +8032,12 @@ function actualizarSubcuentasTx(preferred) {
   // Reparto destino: solo transferencias; si la cuenta destino tiene subcuentas,
   // se muestra la lista dinámica para repartir el importe entre varias.
   const ctaD = Estado.bootstrap.cuentas.find(c => c.id === $('#txCuentaDest').value);
-  const subsD = subsAlfabetico_(ctaD && ctaD.subcuentas);
+  const subsD = subsUsables_(ctaD, [
+    preferred && preferred.subcuenta_destino_id,
+    $('#txSubcuentaDest').value,
+    ...((parseRepartoFromTx_(preferred) || []).map(r => r.subcuenta_id)),
+    ...((Estado.txRepartoDest || []).map(r => r.subcuenta_id))
+  ]);
   // ponytail: misma cuenta → la subcuenta de origen no puede ser destino.
   const subOrigenId = $('#txSubcuenta').value;
   const sameParent = !!sourceId && sourceId === (ctaD && ctaD.id);
@@ -8192,7 +8242,7 @@ function buildRepartoRow(subsD, row, idx) {
 
 function addRepartoRow() {
   const ctaD = Estado.bootstrap.cuentas.find(c => c.id === $('#txCuentaDest').value);
-  const subsD = subsAlfabetico_(ctaD && ctaD.subcuentas);
+  const subsD = subsUsables_(ctaD, (Estado.txRepartoDest || []).map(r => r.subcuenta_id));
   if (!subsD.length) { toast('La cuenta destino no tiene subcuentas'); return; }
   Estado.txRepartoDest.push({ subcuenta_id: '', importe: 0, categoria_id: '', periodo_uso: Number($('#txRecPeriodoMeses').value || 1), monto_a_usar: 0 });
   renderRepartoRows(subsD, Estado.txRepartoDest);
@@ -8260,7 +8310,7 @@ $('#txRecurrenteSwitch').addEventListener('change', e => {
 $('#txRecPeriodoMeses').addEventListener('input', () => {
   if (!isTransferenciaRecurrenteTx_()) return;
   const ctaD = Estado.bootstrap.cuentas.find(c => c.id === $('#txCuentaDest').value);
-  const subsD = subsAlfabetico_(ctaD && ctaD.subcuentas);
+  const subsD = subsUsables_(ctaD, (Estado.txRepartoDest || []).map(r => r.subcuenta_id));
   syncImporteTxDesdeRepartoRecurrente_();
   renderRepartoRows(subsD, Estado.txRepartoDest);
   actualizarTotalReparto();
@@ -9057,9 +9107,9 @@ function actualizarDestinoRecurrente(preferred) {
   const cuentaOrigenId = $('#recCuenta').value || '';
   // ponytail: subcuenta origen visible en gasto/ingreso cuando la cuenta tiene.
   const ctaO = Estado.bootstrap.cuentas.find(c => c.id === cuentaOrigenId);
-  const subsO = subsAlfabetico_(ctaO && ctaO.subcuentas);
-  const wrapRecSubcuenta = $('#wrapRecSubcuenta');
   const recSubcuentaSel = $('#recSubcuenta');
+  const subsO = subsUsables_(ctaO, [preferred && preferred.subcuenta_id, recSubcuentaSel && recSubcuentaSel.value]);
+  const wrapRecSubcuenta = $('#wrapRecSubcuenta');
   const visSubOrigen = tipo !== 'transferencia' && subsO.length > 0;
   if (wrapRecSubcuenta) wrapRecSubcuenta.style.display = visSubOrigen ? '' : 'none';
   if (recSubcuentaSel && visSubOrigen) {
@@ -9073,7 +9123,7 @@ function actualizarDestinoRecurrente(preferred) {
   }
   // ponytail: permitimos misma cuenta para transferir entre subcuentas del
   // mismo padre; la UI excluye la subcuenta origen del dropdown de destino.
-  const cuentasDestino = Estado.bootstrap.cuentas;
+  const cuentasDestino = cuentasUsables_([preferred && preferred.cuenta_destino_id, $('#recCuentaDest').value]);
   const cuentaDestinoActual = preferred && preferred.keepCurrent
     ? $('#recCuentaDest').value
     : ((preferred && preferred.cuenta_destino_id) || $('#recCuentaDest').value || '');
@@ -9171,7 +9221,7 @@ function openRec(id) {
   const anioIni = r && r.anio_inicio != null ? r.anio_inicio : '';
   $('#recMesInicio').value = mesIni || '';
   $('#recAnioInicio').value = anioIni || '';
-  poblarSelect('#recCuenta', Estado.bootstrap.cuentas, p.cuenta_id || '', c => c.nombre + ' (' + c.moneda + ')');
+  poblarSelect('#recCuenta', cuentasUsables_(p.cuenta_id), p.cuenta_id || '', c => c.nombre + ' (' + c.moneda + ')');
   poblarSelect('#recEstablecimiento', Estado.bootstrap.establecimientos, p.tipo === 'transferencia' ? '' : (p.establecimiento_id || ''), e => e.nombre);
   // ponytail: selector de moneda para recurrentes. Mismo helper que en tx.
   poblarSelectMoneda_('#recMoneda', p.moneda);
@@ -9579,6 +9629,10 @@ async function recargar() {
 $('#btnNuevaTx').addEventListener('click', () => openTx());
 $('#fab').addEventListener('click', () => openTx());
 $('#btnNuevaCuenta').addEventListener('click', () => openCuenta());
+$('#chkCuentasArchivadas').addEventListener('change', e => {
+  Estado.cuentasMostrarArchivadas = e.target.checked;
+  renderCuentas();
+});
 $('#btnNuevaCat').addEventListener('click', () => openCat());
 $('#btnNuevoEst').addEventListener('click', () => openEstablecimiento());
 // ponytail: filtra en cliente por nombre. data-search-text se setea en cada
