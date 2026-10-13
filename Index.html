@@ -5024,7 +5024,7 @@ function renderDashboard() {
   }
 
   // Cuentas preview
-  const preview = cuentas.slice(0, 3);
+  const preview = cuentas.filter(c => !c.archivada).slice(0, 3);
   $('#dashCuentas').innerHTML = preview.map(c => {
     const estCta = Estado.bootstrap.establecimientos.find(e => e.id === c.establecimiento_id);
     const icoCta = faviconHostEst_(estCta) ? faviconImgEst_(estCta, 36) : (ICONOS[c.icono] || ICONOS.account_balance_wallet);
