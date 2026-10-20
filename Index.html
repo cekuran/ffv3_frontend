@@ -2276,6 +2276,15 @@
         <button type="button" class="btn btn-primary btn-sm" id="quickCatOk">Crear</button>
         <button type="button" class="btn btn-secondary btn-sm" id="quickCatCancel">×</button>
       </div>
+      <div class="field" id="wrapMulticatSwitch" style="display: none; flex-direction: row; justify-content: space-between; align-items: center; margin-top: 6px;">
+        <label for="txMulticatSwitch" style="margin: 0; padding-left: 0;">Dividir entre varias categorías</label>
+        <label class="switch"><input type="checkbox" id="txMulticatSwitch"><span class="track"><span class="knob"></span></span></label>
+      </div>
+      <div class="field" id="wrapMulticatRows" style="display: none; margin-top: 6px;">
+        <div id="multicatList" style="display: flex; flex-direction: column; gap: 4px;"></div>
+        <button type="button" class="btn btn-sm btn-outline" id="btnAddMulticat" style="margin-top: 6px; align-self: flex-start;">+ Añadir categoría</button>
+        <div id="multicatTotal" class="body-sm" style="margin-top: 6px; color: var(--on-surface-variant);">Total: 0,00 / 0,00 €</div>
+      </div>
     </div>
     <div class="field" id="wrapEstablecimiento">
       <div style="display: flex; justify-content: space-between; align-items: center;"><label>Establecimiento (opcional)</label><button type="button" class="btn btn-ghost btn-sm" id="btnQuickEst" style="padding: 2px 8px;">+ Nuevo</button></div>
@@ -2976,6 +2985,7 @@ const Estado = {
   graf: { vista: 'categorias', medida: 'gasto', tipo: 'lineas', desde: '', hasta: '', ocultas: new Set(), busca: '', orden: { col: '', dir: 'asc' } },
   txTipo: 'gasto',
   txRepartoDest: [],
+  txRepartoCats: [],
   repRecDest: [],
   cuentasExpandidas: new Set(),
   cuentasMostrarArchivadas: false,
@@ -3348,6 +3358,56 @@ function parseRepartoDestinoLocal_(raw) {
     .filter(r => r.subcuenta_id && r.importe > 0);
 }
 
+// Parsea reparto_categorias (string JSON o array) igual que el backend:
+// reparto del importe de un gasto entre varias categorías.
+function parseRepartoCategoriasLocal_(raw) {
+  if (!raw) return [];
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try { parsed = JSON.parse(raw); } catch (_) { return []; }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map(r => ({
+      categoria_id: (r && r.categoria_id) || '',
+      importe: Number(r && r.importe || 0)
+    }))
+    .filter(r => r.categoria_id && r.importe > 0);
+}
+
+// Categorías imputadas a una tx: las del reparto por categorías si los hay,
+// o la categoría única. Sirve para filtrar y para pintar pills.
+function categoriasDeTx_(t) {
+  const rep = parseRepartoCategoriasLocal_(t && t.reparto_categorias);
+  if (rep.length) return rep.map(r => r.categoria_id);
+  return (t && t.categoria_id) ? [t.categoria_id] : [];
+}
+
+// Parte del importe de la tx que corresponde a una categoría concreta.
+// Para txs con reparto por categorías devuelve el parcial; si la tx no
+// toca esa categoría devuelve 0.
+function importeTxParaCategoria_(t, categoriaId) {
+  const rep = parseRepartoCategoriasLocal_(t && t.reparto_categorias);
+  if (rep.length) {
+    return rep.filter(r => r.categoria_id === categoriaId)
+      .reduce((s, r) => s + Number(r.importe || 0), 0);
+  }
+  return (t && t.categoria_id === categoriaId) ? Number(t.importe || 0) : 0;
+}
+
+// Etiqueta legible de las categorías de una tx: "Comida · Transporte" para un
+// gasto multicategoría, o el nombre de la categoría única.
+function etiquetaCategoriasTx_(t) {
+  const cats = Estado.bootstrap.categorias || [];
+  const rep = parseRepartoCategoriasLocal_(t && t.reparto_categorias);
+  const ids = rep.length ? rep.map(r => r.categoria_id) : ((t && t.categoria_id) ? [t.categoria_id] : []);
+  if (!ids.length) return '—';
+  return ids.map(id => {
+    const c = cats.find(x => x.id === id);
+    return c ? c.nombre : '—';
+  }).join(' · ');
+}
+
 // ── Cálculos locales de resúmenes (evitan round-trips a Apps Script) ──
 // Replican la lógica de obtenerResumen / obtenerCategoriasResumen /
 // obtenerResumenEstablecimientos usando las transacciones ya en memoria.
@@ -3563,16 +3623,39 @@ function calcularCategoriasResumenLocal_(anio, mes) {
       porCatRep[catId] = (porCatRep[catId] || 0) + imp;
     });
   });
+  // Gastos multicategoría: el importe de la tx se reparte entre varias
+  // categorías y cada una recibe sólo su parte. Los importes del reparto
+  // están en la moneda de la tx, así que se prorratean sobre
+  // importe_en_defecto (igual que el reparto destino).
+  const porCatSplit = {};
+  txs.forEach(t => {
+    if (t.tipo !== 'gasto' && t.tipo !== 'devolucion') return;
+    if (!txEnMes_(t, a, m)) return;
+    const rep = parseRepartoCategoriasLocal_(t.reparto_categorias);
+    if (!rep.length) return;
+    const totalRep = rep.reduce((s, x) => s + Number(x.importe || 0), 0);
+    if (!(totalRep > 0)) return;
+    const signo = t.tipo === 'devolucion' ? -1 : 1;
+    rep.forEach(r => {
+      const frac = Number(r.importe || 0) / totalRep;
+      const imp = impDefLocal_(t) * frac * signo;
+      if (!imp) return;
+      porCatSplit[r.categoria_id] = (porCatSplit[r.categoria_id] || 0) + imp;
+    });
+  });
   return cats.map(c => {
     const esperado = ps.filter(p => p.categoria_id === c.id).reduce((s, p) => s + Number(p.importe_esperado || 0), 0);
     const real = txs.filter(t => {
       if (t.tipo === 'transferencia') return false;
+      // los gastos multicategoría se cuentan por porCatSplit (cada categoría
+      // sólo con su parte), no por el campo categoria_id.
+      if (parseRepartoCategoriasLocal_(t.reparto_categorias).length) return false;
       if (t.categoria_id !== c.id) return false;
       return txEnMes_(t, a, m);
     }).reduce((s, t) => {
       const imp = impDefLocal_(t);
       return s + (t.tipo === 'devolucion' ? -imp : imp);
-    }, 0) + (porCatRep[c.id] || 0);
+    }, 0) + (porCatRep[c.id] || 0) + (porCatSplit[c.id] || 0);
     return { id: c.id, nombre: c.nombre, color: c.color, esperado, real, diferencia: real - esperado };
   });
 }
@@ -5086,6 +5169,9 @@ function renderDashTx_() {
   if (f.tipo) lista = lista.filter(t => t.tipo === f.tipo);
   if (f.categoria_id) lista = lista.filter(t => {
     if (t.categoria_id === f.categoria_id) return true;
+    // ponytail: un gasto multicategoría toca varias categorías: cuenta si
+    // alguna de ellas es la filtrada.
+    if (categoriasDeTx_(t).indexOf(f.categoria_id) >= 0) return true;
     const rep = parseRepartoFromTx_(t);
     return rep ? rep.some(r => r.categoria_id === f.categoria_id) : false;
   });
@@ -5147,11 +5233,18 @@ function txRow(t) {
     : '';
   const detalle = isTransfer
     ? origen + ' ' + detalleDest
-    : origen + ' · ' + escape(cat ? cat.nombre : '—');
+    : origen + ' · ' + escape(etiquetaCategoriasTx_(t));
+  // ponytail: en un gasto multicategoría no hay categoría única: se usa la
+  // primera del reparto para el icono y el color.
+  const repCatsRow = parseRepartoCategoriasLocal_(t.reparto_categorias);
+  const catRow = cat || (repCatsRow.length
+    ? (Estado.bootstrap.categorias || []).find(c => c.id === repCatsRow[0].categoria_id) || null
+    : null);
+  const tituloCat = repCatsRow.length ? etiquetaCategoriasTx_(t) : (cat ? cat.nombre : 'Sin descripción');
   return `<div class="tx-row">
-    <div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoMov_(cat, establecimiento)}</div>
+    <div class="tx-ico" style="${tintCat(catRow ? catRow.color : '#00613e')}">${icoMov_(catRow, establecimiento)}</div>
     <div class="tx-main">
-      <div class="tx-title">${escape(t.descripcion || (cat ? cat.nombre : 'Sin descripción'))}</div>
+      <div class="tx-title">${escape(t.descripcion || tituloCat)}</div>
       <div class="tx-sub">${escape(t.fecha || '')} · ${detalle}</div>
     </div>
     <div class="tx-amount ${cls}" style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
@@ -5429,8 +5522,9 @@ function valorOrdenMovimiento(t, campo) {
     return cta ? cta.nombre : '';
   }
   if (campo === 'categoria') {
-    const cat = Estado.bootstrap.categorias.find(c => c.id === t.categoria_id);
-    return cat ? cat.nombre : '';
+    // ponytail: un gasto multicategoría se ordena por sus categorías (todas
+    // las que toca, unidas).
+    return etiquetaCategoriasTx_(t);
   }
   return '';
 }
@@ -5464,6 +5558,9 @@ function renderMovimientos() {
   if (f.tipo) lista = lista.filter(t => t.tipo === f.tipo);
   if (f.categoria_id) lista = lista.filter(t => {
     if (t.categoria_id === f.categoria_id) return true;
+    // ponytail: un gasto multicategoría toca varias categorías: cuenta si
+    // alguna de ellas es la filtrada.
+    if (categoriasDeTx_(t).indexOf(f.categoria_id) >= 0) return true;
     const reparto = parseRepartoFromTx_(t);
     return reparto ? reparto.some(r => r.categoria_id === f.categoria_id) : false;
   });
@@ -5515,10 +5612,17 @@ function renderMovimientos() {
       ? `${escape(cta ? cta.nombre : '—')}${sub ? ' · ' + escape(sub.nombre) : ''}${destinoHtml}`
       : `${escape(cta ? cta.nombre : '—')}${destinoHtml}`;
     const pill = t.estado === 'conciliado' ? 'pill-primary' : t.estado === 'vencido' ? 'pill-error' : t.estado === 'pagado' ? 'pill-secondary' : 'pill-outline';
-    // Una pill por categoría única: en transferencias con reparto, dedupe por id.
-    const catEntries = isTransfer && reparto.length
-      ? reparto.map(r => r.categoria_id ? Estado.bootstrap.categorias.find(c => c.id === r.categoria_id) : null)
-      : [cat || null];
+    // Una pill por categoría única: en transferencias con reparto y en gastos
+    // multicategoría, dedupe por id.
+    const repCatsFila = parseRepartoCategoriasLocal_(t.reparto_categorias);
+    const catFila = cat || (repCatsFila.length
+      ? (Estado.bootstrap.categorias.find(c => c.id === repCatsFila[0].categoria_id) || null)
+      : null);
+    const catEntries = repCatsFila.length
+      ? repCatsFila.map(r => Estado.bootstrap.categorias.find(c => c.id === r.categoria_id) || null)
+      : (isTransfer && reparto.length
+        ? reparto.map(r => r.categoria_id ? Estado.bootstrap.categorias.find(c => c.id === r.categoria_id) : null)
+        : [cat || null]);
     const seen = new Set();
     const pillsHtml = catEntries.reduce((acc, c) => {
       if (!c || seen.has(c.id)) return acc;
@@ -5527,7 +5631,7 @@ function renderMovimientos() {
     }, '');
     const catsHtml = pillsHtml || '—';
     return `<tr>
-      <td class="icon-cell"><div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}; width: 36px; height: 36px;">${establecimiento && faviconHostEst_(establecimiento) ? faviconImgEst_(establecimiento, 32) : icoCat(cat)}</div></td>
+      <td class="icon-cell"><div class="tx-ico" style="${tintCat(catFila ? catFila.color : '#00613e')}; width: 36px; height: 36px;">${establecimiento && faviconHostEst_(establecimiento) ? faviconImgEst_(establecimiento, 32) : icoCat(catFila)}</div></td>
       <td>${escape(t.fecha)}</td>
       <td><div style="font-weight: 600;">${escape(t.descripcion || '—')}</div>${establecimiento ? `<div class="body-sm" style="color: var(--on-surface-variant);">Establecimiento: ${escape(establecimiento.nombre)}</div>` : ''}${t.notas ? `<div class="body-sm" style="color: var(--on-surface-variant);">${escape(t.notas)}</div>` : ''}<div class="body-sm" style="color: var(--on-surface-variant);">Alta: ${escape(t.owner || '—')} · Última edición: ${escape(t.ultima_edicion_por || t.owner || '—')} · ${escape(fmtFechaHora(t.fecha_ultima_edicion))}</div></td>
       <td>${cuentaHtml}</td>
@@ -6175,12 +6279,17 @@ function txRowSimple(t, opts) {
     }
     detalle = origen + ' → ' + destino;
   } else {
-    detalle = origen + (showEst ? ' · ' + escape(establecimiento.nombre) : '') + ' · ' + escape(cat ? cat.nombre : '—');
+    detalle = origen + (showEst ? ' · ' + escape(establecimiento.nombre) : '') + ' · ' + escape(etiquetaCategoriasTx_(t));
   }
+  const repCatsSimple = parseRepartoCategoriasLocal_(t.reparto_categorias);
+  const catSimple = cat || (repCatsSimple.length
+    ? (Estado.bootstrap.categorias || []).find(c => c.id === repCatsSimple[0].categoria_id) || null
+    : null);
+  const tituloSimple = repCatsSimple.length ? etiquetaCategoriasTx_(t) : (cat ? cat.nombre : 'Sin descripción');
   return `<div class="tx-row tx-row-simple">
-    <div class="tx-ico" style="${tintCat(cat ? cat.color : '#00613e')}">${icoMov_(cat, establecimiento)}</div>
+    <div class="tx-ico" style="${tintCat(catSimple ? catSimple.color : '#00613e')}">${icoMov_(catSimple, establecimiento)}</div>
     <div class="tx-main">
-      <div class="tx-title">${escape(t.descripcion || (cat ? cat.nombre : 'Sin descripción'))}</div>
+      <div class="tx-title">${escape(t.descripcion || tituloSimple)}</div>
       <div class="tx-sub">${escape(t.fecha || '')} · ${detalle}</div>
     </div>
     <div class="tx-amount ${cls}" style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
@@ -6240,11 +6349,25 @@ function openCategoriaTxList(id, nombre, tipo) {
     // ponytail: la devolución reduce el real de la categoría de gasto; la
     // mostramos también aquí para que la suma de filas cuadre con el real.
     if (String(t.categoria_id || '') === target && (t.tipo === tipo || t.tipo === 'devolucion')) return true;
+    // ponytail: gasto multicategoría: aparece en cada categoría que toca,
+    // con el parcial de esa categoría.
+    const repCats = parseRepartoCategoriasLocal_(t.reparto_categorias);
+    if (repCats.length) {
+      if (tipo !== 'gasto') return false;
+      return repCats.some(r => String(r.categoria_id || '') === target);
+    }
     if (t.tipo !== 'transferencia') return false;
     if (tipoTransferenciaPresupuestoUI_(t.cuenta_id, t.cuenta_destino_id) !== tipo) return false;
     const rep = parseRepartoFromTx_(t) || [];
     return rep.some(r => r.categoria_id === id);
   }, t => {
+    const repCats = parseRepartoCategoriasLocal_(t.reparto_categorias);
+    if (repCats.length) {
+      const parcial = repCats.filter(x => x.categoria_id === target).reduce((s, x) => s + Number(x.importe || 0), 0);
+      if (!(parcial > 0)) return t;
+      const desc = t.descripcion ? `${t.descripcion} (parcial)` : 'Gasto (parcial)';
+      return Object.assign({}, t, { importe: parcial, descripcion: desc });
+    }
     if (t.tipo !== 'transferencia') return t;
     const rep = parseRepartoFromTx_(t) || [];
     // ponytail: una transferencia puede repartir a varias subcuentas con la
@@ -7000,6 +7123,13 @@ function repCategoryItems_(cats, tipo, txs) {
             return tipoTransferenciaPresupuestoUI_(t.cuenta_id, t.cuenta_destino_id) === tipo &&
               (parseRepartoFromTx_(t) || []).some(r => String(r.categoria_id || '') === String(c.id));
           }
+          // ponytail: gasto multicategoría: aparece en cada categoría que
+          // toca (con su parcial), no en una sola con el importe completo.
+          const repCats = parseRepartoCategoriasLocal_(t.reparto_categorias);
+          if (repCats.length) {
+            if (tipo !== 'gasto') return false;
+            return repCats.some(r => String(r.categoria_id || '') === String(c.id));
+          }
           if (tipo === 'gasto') return (t.tipo === 'gasto' || t.tipo === 'devolucion') && String(t.categoria_id || '') === String(c.id);
           return t.tipo === 'ingreso' && String(t.categoria_id || '') === String(c.id);
         });
@@ -7007,6 +7137,12 @@ function repCategoryItems_(cats, tipo, txs) {
           if (t.tipo === 'transferencia') {
             const parcial = (parseRepartoFromTx_(t) || []).filter(r => String(r.categoria_id || '') === String(c.id)).reduce((s, r) => s + Number(r.importe || 0), 0);
             return repMovementRow_(Object.assign({}, t, { importe: parcial, descripcion: t.descripcion ? t.descripcion + ' (parcial)' : 'Transferencia (parcial)' }), c);
+          }
+          const repCats = parseRepartoCategoriasLocal_(t.reparto_categorias);
+          if (repCats.length) {
+            const parcial = repCats.filter(r => String(r.categoria_id || '') === String(c.id)).reduce((s, r) => s + Number(r.importe || 0), 0);
+            const desc = t.descripcion ? t.descripcion + ' (parcial)' : 'Gasto (parcial)';
+            return repMovementRow_(Object.assign({}, t, { importe: parcial, descripcion: desc }), c);
           }
           return repMovementRow_(t, c);
         }).join('');
@@ -7041,7 +7177,7 @@ function repMovementRow_(t, category, account, saldoAnterior, saldoSub) {
   const amountClass = direccionTransferencia === 'gasto' ? 'neg' : (direccionTransferencia === 'ingreso' ? 'pos' : (t.tipo === 'ingreso' || t.tipo === 'devolucion' ? 'pos' : (t.tipo === 'gasto' ? 'neg' : 'neutral')));
   const movimiento = esTransferencia
     ? `${cuenta ? escape(cuenta.nombre) : '—'}${sub ? ' · ' + escape(sub.nombre) : ''} → ${cuentaDestino ? escape(cuentaDestino.nombre) : '—'}${subDestino ? ' · ' + escape(subDestino.nombre) : ''}`
-    : `${escape(t.descripcion || (categoria ? categoria.nombre : 'Sin descripción'))}${cuenta ? ' · ' + escape(cuenta.nombre) : ''}${sub ? ' · ' + escape(sub.nombre) : ''}`;
+    : `${escape(t.descripcion || (categoria ? categoria.nombre : etiquetaCategoriasTx_(t) === '—' ? 'Sin descripción' : etiquetaCategoriasTx_(t)))}${cuenta ? ' · ' + escape(cuenta.nombre) : ''}${sub ? ' · ' + escape(sub.nombre) : ''}`;
   const saldoResultante = account ? repSaldoCuentaTras_(saldoAnterior, t, account.id) : null;
   const saldoHtml = account
     ? `<span class="rep-movement-balance">Saldo ${fmtMoneda(saldoResultante, account.moneda)}</span>`
@@ -7392,6 +7528,23 @@ function grafDatosAgrupados_(meses) {
         const cat = entidades[r.categoria_id];
         if (!cat || cat.tipo !== g.medida) return;
         acumular(String(r.categoria_id), i, impDefLocal_(t) * r.importe / totalRep);
+      });
+      return;
+    }
+    // Gasto multicategoría: el importe se reparte entre las categorías del
+    // reparto y cada una recibe su parte (prorrateada sobre el importe en
+    // moneda por defecto, igual que en los resúmenes).
+    const repCats = parseRepartoCategoriasLocal_(t.reparto_categorias);
+    if (repCats.length && esCat) {
+      if (g.medida !== 'gasto') return;
+      if (t.tipo !== 'gasto' && t.tipo !== 'devolucion') return;
+      const totalRep = repCats.reduce((a, x) => a + x.importe, 0);
+      if (!(totalRep > 0)) return;
+      const signo = t.tipo === 'devolucion' ? -1 : 1;
+      repCats.forEach(r => {
+        const cat = entidades[r.categoria_id];
+        if (!cat || cat.tipo !== 'gasto') return;
+        acumular(String(r.categoria_id), i, impDefLocal_(t) * r.importe / totalRep * signo);
       });
       return;
     }
@@ -7840,6 +7993,12 @@ function openTx(id, copiar) {
   poblarSelectMoneda_('#txMoneda', f.moneda);
   actualizarHintMoneda_();
   setTipoTx(f.tipo || 'gasto');
+  // ponytail: gasto multicategoría. Si la tx traía reparto por categorías, se
+  // reconstruye para poder editarlo (la categoría única queda oculta).
+  const repCatsAbiertos = parseRepartoCategoriasLocal_(f.reparto_categorias);
+  Estado.txRepartoCats = repCatsAbiertos.map(r => ({ categoria_id: r.categoria_id, importe: r.importe }));
+  $('#txMulticatSwitch').checked = Estado.txRepartoCats.length > 0;
+  syncMulticatUI();
   if ((f.tipo || 'gasto') !== 'transferencia') {
     // ponytail: la devolución debe elegir una categoría de gasto.
     const catTipo = f.tipo === 'devolucion' ? 'gasto' : (f.tipo || 'gasto');
@@ -7910,6 +8069,9 @@ function setTipoTx(tipo) {
   const lblCat = $('#wrapCategoria label');
   if (lblCat && tipo !== 'transferencia') lblCat.textContent = 'Categoría';
   if (tipo !== 'transferencia') Estado.txRepartoDest = [];
+  // ponytail: el reparto por categorías sólo tiene sentido en gastos y
+  // devoluciones; al cambiar de tipo se descarta.
+  syncMulticatUI();
   // ponytail: devolucion con destino también usa ratio 1 por defecto (1:1) para
   // que el campo importe_destino se autorrellene como en una transferencia.
   if ((tipo === 'transferencia' || tipo === 'devolucion') && !$('#txRatio').value) $('#txRatio').value = '1';
@@ -8004,7 +8166,7 @@ $('#quickEstNombre').addEventListener('keydown', (e) => {
 });
 
 const txMonedaSel = $('#txMoneda');
-if (txMonedaSel) txMonedaSel.addEventListener('change', actualizarHintMoneda_);
+if (txMonedaSel) txMonedaSel.addEventListener('change', () => { actualizarHintMoneda_(); actualizarTotalMulticat(); });
 const txImporteEl = $('#txImporte');
 if (txImporteEl) txImporteEl.addEventListener('input', actualizarHintMoneda_);
 
@@ -8306,6 +8468,124 @@ function actualizarTotalReparto() {
     el.classList.add(Math.abs(suma - total) <= 0.01 ? 'reparto-total-ok' : 'reparto-total-bad');
   }
 }
+
+// ── Gasto multicategoría: reparto del importe entre varias categorías ──
+// El switch sólo aplica a gastos y devoluciones (una devolución revierte un
+// gasto, así que hereda su reparto). Cuando está activo, la tx no tiene
+// categoría única: cada categoría del reparto recibe su parte.
+function puedeMulticat_() {
+  return Estado.txTipo === 'gasto' || Estado.txTipo === 'devolucion';
+}
+
+function catsMulticat_() {
+  return catsAlfabetico_((Estado.bootstrap.categorias || []).filter(c => c.tipo === 'gasto'));
+}
+
+function renderMulticatRows() {
+  const wrap = $('#multicatList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  const cats = catsMulticat_();
+  const btn = $('#btnAddMulticat');
+  if (!cats.length) {
+    wrap.innerHTML = '<div class="body-sm" style="color: var(--on-surface-variant);">No hay categorías de gasto. Crea una para poder repartir el importe.</div>';
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  if (btn) btn.style.display = '';
+  Estado.txRepartoCats.forEach((r, i) => wrap.appendChild(buildMulticatRow(cats, r, i)));
+}
+
+function buildMulticatRow(cats, row, idx) {
+  const div = document.createElement('div');
+  div.className = 'reparto-row';
+  const opts = '<option value="">— Categoría —</option>' + cats.map(c =>
+    `<option value="${c.id}" ${c.id === row.categoria_id ? 'selected' : ''}>${escape(c.nombre)}</option>`
+  ).join('');
+  div.innerHTML = `
+    <select class="select reparto-cat">${opts}</select>
+    <input class="input reparto-imp" type="number" step="0.01" min="0" placeholder="0,00" value="${row.importe || ''}">
+    <button type="button" class="icon-btn reparto-remove" title="Quitar categoría">×</button>
+  `;
+  div.querySelector('.reparto-cat').addEventListener('change', e => {
+    Estado.txRepartoCats[idx].categoria_id = e.target.value;
+    actualizarTotalMulticat();
+  });
+  div.querySelector('.reparto-imp').addEventListener('input', e => {
+    Estado.txRepartoCats[idx].importe = Number(e.target.value || 0);
+    actualizarTotalMulticat();
+  });
+  div.querySelector('.reparto-remove').addEventListener('click', () => {
+    Estado.txRepartoCats.splice(idx, 1);
+    renderMulticatRows();
+    actualizarTotalMulticat();
+  });
+  return div;
+}
+
+function addMulticatRow() {
+  const cats = catsMulticat_();
+  if (!cats.length) { toast('No hay categorías de gasto'); return; }
+  const usadas = new Set(Estado.txRepartoCats.map(r => r.categoria_id));
+  const libre = cats.find(c => !usadas.has(c.id));
+  Estado.txRepartoCats.push({ categoria_id: libre ? libre.id : '', importe: 0 });
+  renderMulticatRows();
+  actualizarTotalMulticat();
+}
+
+function multicatMoneda_() {
+  return $('#txMoneda').value || (Estado.bootstrap.moneda_por_defecto || 'EUR');
+}
+
+function actualizarTotalMulticat() {
+  const el = $('#multicatTotal');
+  if (!el) return;
+  const suma = Estado.txRepartoCats.reduce((s, r) => s + Number(r.importe || 0), 0);
+  const total = Number($('#txImporte').value || 0);
+  const m = multicatMoneda_();
+  el.textContent = 'Total: ' + fmtMoneda(suma, m) + ' / ' + fmtMoneda(total, m);
+  el.classList.remove('reparto-total-ok', 'reparto-total-bad');
+  if (Estado.txRepartoCats.length) {
+    el.classList.add(Math.abs(suma - total) <= 0.01 ? 'reparto-total-ok' : 'reparto-total-bad');
+  }
+}
+
+// Muestra/oculta el bloque de multicategoría según el tipo de tx y el switch.
+// Si el reparto está activo pero vacío, se siembran dos filas (la primera con
+// la primera categoría de gasto) para que el usuario sólo teclee importes.
+function syncMulticatUI() {
+  const sw = $('#txMulticatSwitch');
+  if (!sw) return;
+  const puede = puedeMulticat_();
+  if (!puede) {
+    sw.checked = false;
+    Estado.txRepartoCats = [];
+  }
+  const activo = puede && sw.checked;
+  $('#wrapMulticatSwitch').style.display = puede ? '' : 'none';
+  $('#wrapMulticatRows').style.display = activo ? '' : 'none';
+  $('#txCategoria').style.display = activo ? 'none' : '';
+  if (activo) {
+    if (!Estado.txRepartoCats.length) {
+      const cats = catsMulticat_();
+      Estado.txRepartoCats = cats.length
+        ? [{ categoria_id: cats[0].id, importe: 0 }, { categoria_id: '', importe: 0 }]
+        : [];
+    }
+    renderMulticatRows();
+  } else {
+    Estado.txRepartoCats = [];
+  }
+  actualizarTotalMulticat();
+}
+
+// Reparto por categorías listo para enviar al backend (sólo filas completas).
+function repartoCategoriasPayload_() {
+  return (Estado.txRepartoCats || [])
+    .map(r => ({ categoria_id: String(r.categoria_id || ''), importe: Number(r.importe || 0) }))
+    .filter(r => r.categoria_id && r.importe > 0);
+}
+
 $('#txCuenta').addEventListener('change', () => actualizarSubcuentasTx());
 $('#txCuentaDest').addEventListener('change', () => actualizarSubcuentasTx());
 $('#txSubcuenta').addEventListener('change', () => {
@@ -8316,7 +8596,18 @@ $('#txSubcuenta').addEventListener('change', () => {
   actualizarSubcuentasTx();
 });
 $('#btnAddRepartoDest').addEventListener('click', addRepartoRow);
-$('#txImporte').addEventListener('input', () => { syncDestino(); actualizarTotalReparto(); });
+$('#btnAddMulticat').addEventListener('click', addMulticatRow);
+$('#txMulticatSwitch').addEventListener('change', () => {
+  if (!$('#txMulticatSwitch').checked) {
+    // Al desactivar el reparto, la categoría única toma la primera del
+    // reparto: si no, la tx se quedaría sin categoría al guardar.
+    const primera = (Estado.txRepartoCats || []).find(r => r.categoria_id);
+    Estado.txRepartoCats = [];
+    if (primera) $('#txCategoria').value = primera.categoria_id;
+  }
+  syncMulticatUI();
+});
+$('#txImporte').addEventListener('input', () => { syncDestino(); actualizarTotalReparto(); actualizarTotalMulticat(); });
 $('#txImporteDest').addEventListener('input', actualizarTotalReparto);
 $('#txRatio').addEventListener('input', () => { syncDestino(); actualizarTotalReparto(); });
 $('#txRecurrenteSwitch').addEventListener('change', e => {
@@ -8353,6 +8644,24 @@ $('#formTx').addEventListener('submit', async (e) => {
         }))
         .filter(r => r.subcuenta_id && r.importe > 0)
     : [];
+  // ponytail: gasto multicategoría. Con el switch activo, el importe se
+  // reparte entre las categorías del reparto y la tx se guarda sin categoría
+  // única. La suma debe cuadrar con el importe (lo valida el backend, pero
+  // aquí damos el error exacto antes de gastar una llamada).
+  const multicatOn = puedeMulticat_() && $('#txMulticatSwitch').checked;
+  const repartoCats = multicatOn ? repartoCategoriasPayload_() : [];
+  if (multicatOn) {
+    if (repartoCats.length < 2) {
+      toast('Añade al menos dos categorías al reparto');
+      return;
+    }
+    const sumaCats = repartoCats.reduce((s, r) => s + r.importe, 0);
+    const importeTx = Number(f.get('importe'));
+    if (Math.abs(sumaCats - importeTx) > 0.01) {
+      toast('El reparto (' + fmtDec(sumaCats) + ') no coincide con el importe (' + fmtDec(importeTx) + ')');
+      return;
+    }
+  }
   const tx = {
     id: txId,
     tipo: Estado.txTipo,
@@ -8368,7 +8677,8 @@ $('#formTx').addEventListener('submit', async (e) => {
     importe_destino: f.get('importe_destino') || '',
     ratio_conversion: f.get('ratio_conversion') || '',
     reparto_destino: reparto,
-    categoria_id: Estado.txTipo === 'transferencia' ? '' : (f.get('categoria_id') || ''),
+    reparto_categorias: repartoCats,
+    categoria_id: Estado.txTipo === 'transferencia' ? '' : (multicatOn ? '' : (f.get('categoria_id') || '')),
     establecimiento_id: Estado.txTipo === 'transferencia' ? '' : (f.get('establecimiento_id') || ''),
     descripcion: f.get('descripcion') || '',
     estado: f.get('estado'),
@@ -9313,7 +9623,9 @@ $('#formRec').addEventListener('submit', async (e) => {
     importe_destino: esTransfer && importeDestino > 0 ? importeDestino : '',
     ratio_conversion: esTransfer && ratioConversion > 0 ? ratioConversion : '',
     reparto_destino: usarReparto ? JSON.stringify(repartoInput) : '',
-    categoria_id: f.get('categoria_id') || '',
+    // ponytail: si la plantilla ya tiene reparto por categorías, no hay
+    // categoría única (si no, la tx contaría el importe dos veces).
+    categoria_id: parseRepartoCategoriasLocal_(base.reparto_categorias).length ? '' : (f.get('categoria_id') || ''),
     establecimiento_id: esTransfer ? '' : (f.get('establecimiento_id') || '')
   });
   if (!esTransfer) {
