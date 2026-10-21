@@ -939,17 +939,56 @@
   /* Reparto destino: lista de subcuentas con su importe dentro de la tx sheet */
   .reparto-row { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
   .reparto-row .select { flex: 2; }
+  .reparto-row .cb { flex: 2; }
   .reparto-row .input { flex: 1; }
-  .reparto-row .field { min-width: 120px; }
-  .reparto-row .field.field-sub { flex: 2; min-width: 170px; }
-  .reparto-row .field.field-cat { flex: 2; min-width: 150px; }
-  .reparto-row .field.field-num { flex: 1; min-width: 120px; }
-  .reparto-row .field .select,
-  .reparto-row .field .input { width: 100%; }
-  .reparto-row .input.reparto-imp-auto { background: var(--surface-container-high); }
   .reparto-row .icon-btn { flex: 0; }
   .reparto-total-ok { color: var(--primary) !important; }
   .reparto-total-bad { color: var(--error) !important; }
+
+  /* Reparto entre subcuentas destino: una tarjeta por subcuenta, cada una con su color */
+  .reparto-list { display: flex; flex-direction: column; gap: var(--s-3); }
+  .reparto-card { --c: var(--outline); display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-3); border: 1px solid color-mix(in srgb, var(--c) 35%, var(--outline-variant)); border-left: 6px solid var(--c); border-radius: var(--r-lg); background: color-mix(in srgb, var(--c) 8%, var(--surface-container-lowest)); }
+  .reparto-head { display: flex; align-items: center; gap: var(--s-2); }
+  .reparto-num { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--c); color: #fff; font-size: 13px; font-weight: 700; display: grid; place-items: center; }
+  .reparto-card .icon-btn { flex: none; width: 36px; height: 36px; font-size: 20px; }
+  .reparto-sub-slot { flex: 1; min-width: 0; }
+  .reparto-card .cb .input { font-weight: 600; border-color: color-mix(in srgb, var(--c) 45%, transparent); }
+
+  /* Combobox con búsqueda (sustituye a los <select> de categoría, establecimiento y subcuenta) */
+  .cb { position: relative; min-width: 0; }
+  .cb-native { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); pointer-events: none; }
+  .cb .input { padding-right: 32px; text-overflow: ellipsis; }
+  .cb.has-lead .input { padding-left: 44px; }
+  .cb-lead { position: absolute; left: 12px; top: 50%; width: 24px; height: 24px; margin-top: -12px; display: none; align-items: center; justify-content: center; pointer-events: none; }
+  .cb.has-lead .cb-lead { display: flex; }
+  .cb-lead svg, .cb-opt-lead svg { width: 18px; height: 18px; color: var(--on-surface-variant); }
+  .cb-lead img, .cb-opt-lead img { width: 20px; height: 20px; }
+  .cb-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .cb-caret { position: absolute; right: 12px; top: 50%; width: 0; height: 0; margin-top: -2px; border: 5px solid transparent; border-top-color: var(--on-surface-variant); border-bottom: 0; pointer-events: none; }
+  .cb-list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; margin: 0; padding: 4px; list-style: none; max-height: 240px; overflow-y: auto; overscroll-behavior: contain; background: var(--surface-container-lowest); border: 1px solid var(--outline-variant); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); }
+  .cb-list[hidden] { display: none; }
+  .cb-opt { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 8px 10px; border-radius: var(--r-md); font-size: 15px; cursor: pointer; }
+  .cb-opt-lead { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+  .cb-opt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cb-opt small { color: var(--on-surface-variant); font-size: 12px; }
+  .cb-opt.is-active, .cb-opt:hover:not(.is-disabled) { background: var(--surface-container); }
+  .cb-opt.is-on { font-weight: 700; }
+  .cb-opt.is-disabled { opacity: 0.45; cursor: not-allowed; }
+  .cb-empty { padding: 10px; font-size: 14px; color: var(--on-surface-variant); }
+  .reparto-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--s-2) var(--s-3); }
+  .reparto-grid .reparto-span { grid-column: 1 / -1; }
+  .reparto-card.is-rec .reparto-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  @media (max-width: 480px) { .reparto-card:not(.is-rec) .reparto-grid { grid-template-columns: minmax(0, 1fr); } }
+  .reparto-amt { display: flex; gap: var(--s-2); align-items: stretch; }
+  .reparto-amt .input { min-width: 0; }
+  .reparto-amt .reparto-rest { flex: none; }
+  .reparto-card .input.reparto-imp-auto { background: var(--surface-container-high); }
+  .reparto-bar { display: flex; height: 10px; margin-top: var(--s-3); border-radius: var(--r-full); overflow: hidden; background: var(--surface-container-high); }
+  .reparto-bar span { height: 100%; min-width: 2px; }
+  .reparto-leyenda { display: flex; flex-wrap: wrap; gap: 4px var(--s-3); margin-top: var(--s-2); font-size: 12px; color: var(--on-surface-variant); }
+  .reparto-leg { display: inline-flex; align-items: center; gap: 4px; }
+  .reparto-leg i { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+  .reparto-estado { margin-top: 6px; font-weight: 600; }
 
   /* Cargas locales por sección/vista */
   .spinner { width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--surface-container-high); border-top-color: var(--primary); animation: spin 0.7s linear infinite; }
@@ -2263,9 +2302,10 @@
     <div class="field" id="wrapCuentaDest" style="display: none;"><label>Cuenta destino</label><select class="select" name="cuenta_destino_id" id="txCuentaDest"></select></div>
     <div class="field" id="wrapRepartoDest" style="display: none;">
       <label>Subcuentas destino</label>
-      <div id="repartoDestList" style="display: flex; flex-direction: column; gap: 4px;"></div>
+      <div id="repartoDestList" class="reparto-list"></div>
       <button type="button" class="btn btn-sm btn-outline" id="btnAddRepartoDest" style="margin-top: 6px; align-self: flex-start;">+ Añadir destino</button>
-      <div id="repartoDestTotal" class="body-sm" style="margin-top: 6px; color: var(--on-surface-variant);">Total: 0,00 / 0,00 €</div>
+      <div id="repartoDestResumen"></div>
+      <div id="repartoDestTotal" class="body-sm reparto-estado" style="color: var(--on-surface-variant);">Total: 0,00 / 0,00 €</div>
     </div>
     <div class="field" id="wrapSubcuentaDest" style="display: none;"><label>Subcuenta destino</label><select class="select" name="subcuenta_destino_id" id="txSubcuentaDest"><option value="">— Ninguna —</option></select></div>
     <div class="field" id="wrapCategoria">
@@ -2505,9 +2545,10 @@
     <div class="field" id="wrapRecCuentaDest" style="display: none;"><label>Cuenta destino</label><select class="select" name="cuenta_destino_id" id="recCuentaDest"></select></div>
     <div class="field" id="wrapRecSubcuentaDest" style="display: none;"><label>Subcuenta destino</label><select class="select" name="subcuenta_destino_id" id="recSubcuentaDest"><option value="">— Ninguna —</option></select></div>
     <div id="wrapRecReparto" style="display: none;">
-      <div id="recRepartoList" style="display: flex; flex-direction: column; gap: 4px;"></div>
+      <div id="recRepartoList" class="reparto-list"></div>
       <button type="button" class="btn btn-sm btn-outline" id="btnAddRecReparto" style="margin-top: 6px; align-self: flex-start;">+ Añadir destino</button>
-      <div id="recRepartoTotal" class="body-sm" style="margin-top: 6px; color: var(--on-surface-variant);">Total: 0,00 € / 0,00 €</div>
+      <div id="recRepartoResumen"></div>
+      <div id="recRepartoTotal" class="body-sm reparto-estado" style="color: var(--on-surface-variant);">Total: 0,00 € / 0,00 €</div>
     </div>
     <div class="field" id="wrapRecCat"><label>Categoría</label><select class="select" name="categoria_id" id="recCat"></select></div>
     <div class="field" id="wrapRecEstablecimiento"><label>Establecimiento (opcional)</label><select class="select" name="establecimiento_id" id="recEstablecimiento"><option value="">— Ninguno —</option></select></div>
@@ -8336,7 +8377,236 @@ function syncImporteTxDesdeRepartoRecurrente_() {
   }
 }
 
+// Combobox con búsqueda. cfg = { items(): [{value,label,lead,disabled,note}],
+// value(), pick(v), placeholder?, label? }. Devuelve { el, refresh }.
+function crearCombo_(cfg) {
+  const quitarAcentos = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const el = document.createElement('div');
+  el.className = 'cb';
+  el.innerHTML = '<span class="cb-lead"></span><input class="input cb-input" type="text" role="combobox" aria-expanded="false" aria-autocomplete="list" autocomplete="off"><span class="cb-caret"></span><ul class="cb-list" role="listbox" hidden></ul>';
+  const lead = el.querySelector('.cb-lead');
+  const entrada = el.querySelector('input');
+  const lista = el.querySelector('ul');
+  if (cfg.label) entrada.setAttribute('aria-label', cfg.label);
+  const refresh = force => {
+    const items = cfg.items();
+    const actual = items.find(i => i.value !== '' && i.value === cfg.value());
+    const vacio = items.find(i => i.value === '');
+    entrada.placeholder = cfg.placeholder || (vacio && vacio.label.length > 1 ? vacio.label : 'Buscar...');
+    if (force || document.activeElement !== entrada) entrada.value = actual ? actual.label : '';
+    lead.innerHTML = actual && actual.lead ? actual.lead : '';
+    el.classList.toggle('has-lead', !!(actual && actual.lead));
+  };
+  const marcar = op => {
+    lista.querySelectorAll('.is-active').forEach(x => x.classList.remove('is-active'));
+    if (op) { op.classList.add('is-active'); op.scrollIntoView({ block: 'nearest' }); }
+  };
+  const activas = () => Array.from(lista.querySelectorAll('.cb-opt:not(.is-disabled)'));
+  const abrir = filtro => {
+    const f = quitarAcentos(filtro).trim();
+    const todos = cfg.items();
+    const hayLead = todos.some(i => i.lead);
+    const items = todos.filter(i => !f || quitarAcentos(i.label).includes(f));
+    lista.innerHTML = items.length ? items.map(i =>
+      `<li role="option" class="cb-opt${i.value === cfg.value() ? ' is-on' : ''}${i.disabled ? ' is-disabled' : ''}" data-n="${todos.indexOf(i)}" aria-disabled="${!!i.disabled}">`
+      + (hayLead ? `<span class="cb-opt-lead">${i.lead || ''}</span>` : '')
+      + `<span class="cb-opt-name">${escape(i.value === '' && i.label.length <= 1 ? 'Sin selección' : i.label)}</span>${i.note ? `<small>${escape(i.note)}</small>` : ''}</li>`
+    ).join('') : '<li class="cb-empty">Sin resultados</li>';
+    lista.hidden = false;
+    entrada.setAttribute('aria-expanded', 'true');
+    marcar(f ? activas()[0] : lista.querySelector('.cb-opt.is-on:not(.is-disabled)'));
+    lista.scrollIntoView({ block: 'nearest' });
+  };
+  const cerrar = () => {
+    lista.hidden = true;
+    entrada.setAttribute('aria-expanded', 'false');
+    refresh(true);
+  };
+  const elegir = op => {
+    const it = cfg.items()[Number(op.dataset.n)];
+    if (it && !it.disabled) cfg.pick(it.value);
+    cerrar();
+    entrada.blur();
+  };
+  entrada.addEventListener('focus', () => { entrada.select(); abrir(''); });
+  entrada.addEventListener('click', () => { if (lista.hidden) abrir(''); });
+  entrada.addEventListener('input', () => abrir(entrada.value));
+  entrada.addEventListener('blur', cerrar);
+  entrada.addEventListener('keydown', e => {
+    const ops = activas();
+    const i = ops.findIndex(x => x.classList.contains('is-active'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (lista.hidden) { abrir(''); return; }
+      if (ops.length) marcar(ops[(i + (e.key === 'ArrowDown' ? 1 : -1) + ops.length) % ops.length]);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!lista.hidden && ops[i]) elegir(ops[i]);
+    } else if (e.key === 'Escape' && !lista.hidden) {
+      e.stopPropagation();
+      cerrar();
+    }
+  });
+  // mousedown evita que el input pierda el foco (y cierre la lista) antes del click
+  lista.addEventListener('mousedown', e => e.preventDefault());
+  lista.addEventListener('click', e => {
+    const op = e.target.closest('.cb-opt');
+    if (op && !op.classList.contains('is-disabled')) elegir(op);
+  });
+  refresh();
+  return { el, refresh };
+}
+
+// Convierte un <select> en combobox con búsqueda manteniendo el select como
+// fuente de verdad (FormData, .value, innerHTML y eventos change siguen igual).
+// opt.lead(value) devuelve el HTML del icono de cada opción.
+function enhanceSelect_(sel, opt) {
+  if (!sel || sel._cb) return;
+  const lead = (opt && opt.lead) || null;
+  const cb = crearCombo_({
+    items: () => Array.from(sel.options).map(o => ({ value: o.value, label: o.textContent, lead: lead && o.value ? lead(o.value) : '', disabled: o.disabled })),
+    value: () => sel.value,
+    pick: v => {
+      if (sel.value === v) return;
+      sel.value = v;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    },
+    label: (sel.closest('.field') && sel.closest('.field').querySelector('label') || {}).textContent || ''
+  });
+  sel._cb = cb;
+  sel.classList.add('cb-native');
+  sel.tabIndex = -1;
+  sel.setAttribute('aria-hidden', 'true');
+  sel.insertAdjacentElement('afterend', cb.el);
+  // El código de la app asigna .value sin disparar eventos: se refleja en el combobox.
+  const desc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+  Object.defineProperty(sel, 'value', {
+    configurable: true,
+    get() { return desc.get.call(this); },
+    set(v) { desc.set.call(this, v); cb.refresh(); }
+  });
+  const syncAtributos = () => {
+    cb.el.style.display = sel.style.display === 'none' ? 'none' : '';
+    cb.el.querySelector('input').disabled = sel.disabled;
+  };
+  new MutationObserver(() => cb.refresh()).observe(sel, { childList: true });
+  new MutationObserver(syncAtributos).observe(sel, { attributes: true, attributeFilter: ['style', 'disabled'] });
+  syncAtributos();
+}
+
+// Icono de establecimiento para listas: favicon o, sin web, un icono genérico.
+function leadEstablecimiento_(id) {
+  const e = ((Estado.bootstrap && Estado.bootstrap.establecimientos) || []).find(x => x.id === id);
+  return e ? (faviconImgEst_(e, 20) || ICONOS.store) : '';
+}
+
+// Color estable por subcuenta: se deriva de su posición en la lista de la cuenta
+// destino, así dos subcuentas de una misma cuenta nunca comparten color.
+function colorSubReparto_(subsD, id) {
+  const i = id ? subsD.findIndex(s => s.id === id) : -1;
+  return i < 0 ? 'var(--outline)' : 'hsl(' + ((150 + i * 67) % 360) + ' 60% 42%)';
+}
+
+// Tarjeta de un destino del reparto. Compartida por el form de transacción y el
+// de recurrentes; o = { subsD, rows, idx, recurrente, cats, normalizar, total,
+// onTotal, rerender, onRemoved }.
+function buildRepartoCard_(o) {
+  const rows = o.rows;
+  const row = rows[o.idx];
+  const usadas = new Set(rows.filter((_, i) => i !== o.idx).map(r => r.subcuenta_id).filter(Boolean));
+  const div = document.createElement('div');
+  div.className = 'reparto-card' + (o.recurrente ? ' is-rec' : '');
+  div.style.setProperty('--c', colorSubReparto_(o.subsD, row.subcuenta_id));
+  const catOpts = '<option value="">— Categoría —</option>' + o.cats.map(c =>
+    `<option value="${c.id}" ${c.id === row.categoria_id ? 'selected' : ''}>${escape(c.nombre)}</option>`
+  ).join('');
+  const campos = o.recurrente ? `
+      <div class="field"><label>Meses de uso</label><input class="input reparto-periodo-uso" type="number" inputmode="numeric" step="1" min="1" placeholder="Meses" value="${row.periodo_uso || ''}"></div>
+      <div class="field"><label>Monto a usar</label><input class="input reparto-monto-usar" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0,00" value="${row.monto_a_usar || ''}"></div>
+      <div class="field reparto-span"><label>Monto a colectar</label><input class="input reparto-imp reparto-imp-auto" type="number" step="0.01" min="0" placeholder="Auto" value="${row.importe || ''}" readonly></div>
+      <div class="field reparto-span"><label>Categoría</label><select class="select reparto-cat">${catOpts}</select></div>`
+    : `
+      <div class="field"><label>Importe</label><div class="reparto-amt"><input class="input reparto-imp" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0,00" value="${row.importe || ''}"><button type="button" class="btn btn-sm btn-outline reparto-rest" title="Asignar lo que falta por repartir">Resto</button></div></div>
+      <div class="field"><label>Categoría</label><select class="select reparto-cat">${catOpts}</select></div>`;
+  div.innerHTML = `
+    <div class="reparto-head">
+      <span class="reparto-num">${o.idx + 1}</span>
+      <div class="reparto-sub-slot"></div>
+      <button type="button" class="icon-btn reparto-remove" title="Quitar destino" aria-label="Quitar destino ${o.idx + 1}">×</button>
+    </div>
+    <div class="reparto-grid">${campos}</div>
+  `;
+  const dotSub = id => `<span class="cb-dot" style="background:${colorSubReparto_(o.subsD, id)}"></span>`;
+  const combo = crearCombo_({
+    items: () => o.subsD.map(s => ({ value: s.id, label: s.nombre, lead: dotSub(s.id), disabled: usadas.has(s.id), note: usadas.has(s.id) ? 'en uso' : '' })),
+    value: () => row.subcuenta_id,
+    pick: v => { row.subcuenta_id = v; o.rerender(); o.onTotal(); },
+    placeholder: 'Buscar subcuenta...',
+    label: 'Subcuenta destino ' + (o.idx + 1)
+  });
+  div.querySelector('.reparto-sub-slot').appendChild(combo.el);
+  enhanceSelect_(div.querySelector('.reparto-cat'));
+  const inputImporte = div.querySelector('.reparto-imp');
+  if (!o.recurrente) {
+    inputImporte.addEventListener('input', e => {
+      row.importe = Number(e.target.value || 0);
+      o.onTotal();
+    });
+    div.querySelector('.reparto-rest').addEventListener('click', () => {
+      const otros = rows.reduce((s, r, i) => i === o.idx ? s : s + Number(r.importe || 0), 0);
+      row.importe = Math.max(0, Number((o.total() - otros).toFixed(2)));
+      inputImporte.value = row.importe || '';
+      o.onTotal();
+    });
+  } else {
+    const recalcular = campo => e => {
+      row[campo] = Number(e.target.value || 0);
+      o.normalizar(row);
+      inputImporte.value = row.importe || '';
+      o.onTotal();
+    };
+    div.querySelector('.reparto-periodo-uso').addEventListener('input', recalcular('periodo_uso'));
+    div.querySelector('.reparto-monto-usar').addEventListener('input', recalcular('monto_a_usar'));
+  }
+  div.querySelector('.reparto-cat').addEventListener('change', e => { row.categoria_id = e.target.value; });
+  div.querySelector('.reparto-remove').addEventListener('click', () => {
+    rows.splice(o.idx, 1);
+    o.rerender();
+    o.onTotal();
+    if (o.onRemoved) o.onRemoved();
+  });
+  return div;
+}
+
+// Barra proporcional + leyenda con el color de cada subcuenta del reparto.
+function renderRepartoResumen_(el, rows, subsD, total) {
+  if (!el) return;
+  const validas = rows.filter(r => r.subcuenta_id && Number(r.importe) > 0);
+  if (!validas.length) { el.innerHTML = ''; return; }
+  const suma = validas.reduce((s, r) => s + Number(r.importe), 0);
+  const base = Math.max(total, suma, 0.01);
+  const nombre = r => { const s = subsD.find(x => x.id === r.subcuenta_id); return s ? s.nombre : ''; };
+  const bar = validas.map(r =>
+    `<span style="width:${(Number(r.importe) / base * 100).toFixed(2)}%;background:${colorSubReparto_(subsD, r.subcuenta_id)}" title="${escape(nombre(r))}"></span>`
+  ).join('');
+  const leyenda = validas.map(r => {
+    const pct = total > 0 ? Math.round(Number(r.importe) / total * 100) : 0;
+    return `<span class="reparto-leg"><i style="background:${colorSubReparto_(subsD, r.subcuenta_id)}"></i>${escape(nombre(r))} <b>${escape(fmtMoneda(Number(r.importe)))}</b> · ${pct}%</span>`;
+  }).join('');
+  el.innerHTML = `<div class="reparto-bar">${bar}</div><div class="reparto-leyenda">${leyenda}</div>`;
+}
+
+function pintarRepartoTotal_(el, suma, total, hayFilas) {
+  const dif = total - suma;
+  let txt = 'Asignado ' + fmtMoneda(suma) + ' de ' + fmtMoneda(total);
+  if (hayFilas) txt += Math.abs(dif) <= 0.01 ? ' · Cuadra' : (dif > 0 ? ' · Faltan ' + fmtMoneda(dif) : ' · Sobran ' + fmtMoneda(-dif));
+  el.textContent = txt;
+  el.classList.remove('reparto-total-ok', 'reparto-total-bad');
+  if (hayFilas) el.classList.add(Math.abs(dif) <= 0.01 ? 'reparto-total-ok' : 'reparto-total-bad');
+}
+
 function renderRepartoRows(subsD, rows) {
+  Estado._repartoSubsD = subsD;
   const wrap = $('#repartoDestList');
   wrap.innerHTML = '';
   const btn = $('#btnAddRepartoDest');
@@ -8350,82 +8620,29 @@ function renderRepartoRows(subsD, rows) {
 }
 
 function buildRepartoRow(subsD, row, idx) {
-  const div = document.createElement('div');
-  div.className = 'reparto-row';
   const recurrenteTransfer = isTransferenciaRecurrenteTx_();
   if (recurrenteTransfer) normalizarFilaRepartoRecurrenteTx_(row);
-  const opts = '<option value="">— Subcuenta —</option>' + subsD.map(s =>
-    `<option value="${s.id}" ${s.id === row.subcuenta_id ? 'selected' : ''}>${escape(s.nombre)}</option>`
-  ).join('');
-  const catOpts = '<option value="">— Categoría —</option>' + categoriasTransferenciaSegunDireccion_($('#txCuenta').value, $('#txCuentaDest').value).map(c =>
-    `<option value="${c.id}" ${c.id === row.categoria_id ? 'selected' : ''}>${escape(c.nombre)}</option>`
-  ).join('');
-  if (recurrenteTransfer) {
-    div.innerHTML = `
-      <div class="field field-sub"><label>Subcta</label><select class="select reparto-sub">${opts}</select></div>
-      <div class="field field-num"><label>Per. uso</label><input class="input reparto-periodo-uso" type="number" step="1" min="1" placeholder="Meses" value="${row.periodo_uso || ''}" title="Meses de uso"></div>
-      <div class="field field-num"><label>Monto uso</label><input class="input reparto-monto-usar" type="number" step="0.01" min="0" placeholder="0,00" value="${row.monto_a_usar || ''}" title="Monto total a usar"></div>
-      <div class="field field-num"><label>Monto col.</label><input class="input reparto-imp reparto-imp-auto" type="number" step="0.01" min="0" placeholder="Auto" value="${row.importe || ''}" title="Monto a colectar" readonly></div>
-      <div class="field field-cat"><label>Cat.</label><select class="select reparto-cat">${catOpts}</select></div>
-      <button type="button" class="icon-btn reparto-remove" title="Quitar destino">×</button>
-    `;
-  } else {
-    div.innerHTML = `
-      <select class="select reparto-sub">${opts}</select>
-      <input class="input reparto-imp" type="number" step="0.01" min="0" placeholder="0,00" value="${row.importe || ''}">
-      <select class="select reparto-cat">${catOpts}</select>
-      <button type="button" class="icon-btn reparto-remove" title="Quitar destino">×</button>
-    `;
-  }
-  div.querySelector('.reparto-sub').addEventListener('change', e => {
-    Estado.txRepartoDest[idx].subcuenta_id = e.target.value;
-    actualizarTotalReparto();
+  return buildRepartoCard_({
+    subsD, idx, rows: Estado.txRepartoDest, recurrente: recurrenteTransfer,
+    cats: categoriasTransferenciaSegunDireccion_($('#txCuenta').value, $('#txCuentaDest').value),
+    normalizar: normalizarFilaRepartoRecurrenteTx_,
+    total: destinoTotalTx_,
+    onTotal: actualizarTotalReparto,
+    rerender: () => renderRepartoRows(subsD, Estado.txRepartoDest)
   });
-  const inputImporte = div.querySelector('.reparto-imp');
-  if (inputImporte && !recurrenteTransfer) {
-    inputImporte.addEventListener('input', e => {
-      Estado.txRepartoDest[idx].importe = Number(e.target.value || 0);
-      actualizarTotalReparto();
-    });
-  }
-  const inputPeriodoUso = div.querySelector('.reparto-periodo-uso');
-  if (inputPeriodoUso) {
-    inputPeriodoUso.addEventListener('input', e => {
-      Estado.txRepartoDest[idx].periodo_uso = Number(e.target.value || 0);
-      normalizarFilaRepartoRecurrenteTx_(Estado.txRepartoDest[idx]);
-      const out = div.querySelector('.reparto-imp');
-      if (out) out.value = Estado.txRepartoDest[idx].importe || '';
-      actualizarTotalReparto();
-    });
-  }
-  const inputMontoUsar = div.querySelector('.reparto-monto-usar');
-  if (inputMontoUsar) {
-    inputMontoUsar.addEventListener('input', e => {
-      Estado.txRepartoDest[idx].monto_a_usar = Number(e.target.value || 0);
-      normalizarFilaRepartoRecurrenteTx_(Estado.txRepartoDest[idx]);
-      const out = div.querySelector('.reparto-imp');
-      if (out) out.value = Estado.txRepartoDest[idx].importe || '';
-      actualizarTotalReparto();
-    });
-  }
-  div.querySelector('.reparto-cat').addEventListener('change', e => {
-    Estado.txRepartoDest[idx].categoria_id = e.target.value;
-  });
-  div.querySelector('.reparto-remove').addEventListener('click', () => {
-    Estado.txRepartoDest.splice(idx, 1);
-    renderRepartoRows(subsD, Estado.txRepartoDest);
-    actualizarTotalReparto();
-  });
-  return div;
 }
 
 function addRepartoRow() {
-  const ctaD = Estado.bootstrap.cuentas.find(c => c.id === $('#txCuentaDest').value);
-  const subsD = subsUsables_(ctaD, (Estado.txRepartoDest || []).map(r => r.subcuenta_id));
+  const subsD = Estado._repartoSubsD || [];
   if (!subsD.length) { toast('La cuenta destino no tiene subcuentas'); return; }
-  Estado.txRepartoDest.push({ subcuenta_id: '', importe: 0, categoria_id: '', periodo_uso: Number($('#txRecPeriodoMeses').value || 1), monto_a_usar: 0 });
+  const usadas = new Set(Estado.txRepartoDest.map(r => r.subcuenta_id));
+  const libre = subsD.find(s => !usadas.has(s.id));
+  if (!libre) { toast('Ya hay un destino por cada subcuenta'); return; }
+  Estado.txRepartoDest.push({ subcuenta_id: libre.id, importe: 0, categoria_id: '', periodo_uso: Number($('#txRecPeriodoMeses').value || 1), monto_a_usar: 0 });
   renderRepartoRows(subsD, Estado.txRepartoDest);
   actualizarTotalReparto();
+  const wrap = $('#repartoDestList');
+  if (wrap.lastElementChild) wrap.lastElementChild.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 function destinoTotalTx_() {
@@ -8460,13 +8677,8 @@ function actualizarTotalReparto() {
   const suma = Estado.txRepartoDest.reduce((s, r) => s + Number(r.importe || 0), 0);
   const el = $('#repartoDestTotal');
   if (!el) return;
-  const fmt = v => fmtMoneda(v);
-  el.textContent = 'Total: ' + fmt(suma) + ' / ' + fmt(total);
-  const tieneReparto = Estado.txRepartoDest.length > 0;
-  el.classList.remove('reparto-total-ok', 'reparto-total-bad');
-  if (tieneReparto) {
-    el.classList.add(Math.abs(suma - total) <= 0.01 ? 'reparto-total-ok' : 'reparto-total-bad');
-  }
+  renderRepartoResumen_($('#repartoDestResumen'), Estado.txRepartoDest, Estado._repartoSubsD || [], total);
+  pintarRepartoTotal_(el, suma, total, Estado.txRepartoDest.length > 0);
 }
 
 // ── Gasto multicategoría: reparto del importe entre varias categorías ──
@@ -8520,6 +8732,7 @@ function buildMulticatRow(cats, row, idx) {
     renderMulticatRows();
     actualizarTotalMulticat();
   });
+  enhanceSelect_(div.querySelector('.reparto-cat'));
   return div;
 }
 
@@ -8596,6 +8809,10 @@ $('#txSubcuenta').addEventListener('change', () => {
   actualizarSubcuentasTx();
 });
 $('#btnAddRepartoDest').addEventListener('click', addRepartoRow);
+['#txCategoria', '#txSubcuenta', '#txSubcuentaDest', '#recCat', '#recSubcuenta', '#recSubcuentaDest']
+  .forEach(s => enhanceSelect_($(s)));
+['#txEstablecimiento', '#recEstablecimiento']
+  .forEach(s => enhanceSelect_($(s), { lead: leadEstablecimiento_ }));
 $('#btnAddMulticat').addEventListener('click', addMulticatRow);
 $('#txMulticatSwitch').addEventListener('change', () => {
   if (!$('#txMulticatSwitch').checked) {
@@ -9296,6 +9513,7 @@ const recDraft = { id: '', plantilla: '', ultima_generacion: '' };
 // catOpts viene de categoriasTransferenciaSegunDireccion_ con las cuentas
 // origen/destino actuales del rec sheet; igual que en buildRepartoRow.
 function renderRepartoRowsRec(subsD, rows) {
+  Estado._repartoSubsRec = subsD;
   const wrap = $('#recRepartoList');
   wrap.innerHTML = '';
   const btn = $('#btnAddRecReparto');
@@ -9308,62 +9526,33 @@ function renderRepartoRowsRec(subsD, rows) {
   rows.forEach((r, i) => wrap.appendChild(buildRepartoRowRec(subsD, r, i)));
 }
 function buildRepartoRowRec(subsD, row, idx) {
-  const div = document.createElement('div');
-  div.className = 'reparto-row';
   normalizarFilaRepartoRecurrenteRec_(row);
-  const opts = '<option value="">— Subcuenta —</option>' + subsD.map(s =>
-    `<option value="${s.id}" ${s.id === row.subcuenta_id ? 'selected' : ''}>${escape(s.nombre)}</option>`
-  ).join('');
-  const catOpts = '<option value="">— Categoría —</option>' + categoriasTransferenciaSegunDireccion_($('#recCuenta').value, $('#recCuentaDest').value).map(c =>
-    `<option value="${c.id}" ${c.id === row.categoria_id ? 'selected' : ''}>${escape(c.nombre)}</option>`
-  ).join('');
-  div.innerHTML = `
-    <div class="field field-sub"><label>Subcta</label><select class="select reparto-sub">${opts}</select></div>
-    <div class="field field-num"><label>Per. uso</label><input class="input reparto-periodo-uso" type="number" step="1" min="1" placeholder="Meses" value="${row.periodo_uso || ''}" title="Meses de uso"></div>
-    <div class="field field-num"><label>Monto uso</label><input class="input reparto-monto-usar" type="number" step="0.01" min="0" placeholder="0,00" value="${row.monto_a_usar || ''}" title="Monto total a usar"></div>
-    <div class="field field-num"><label>Monto col.</label><input class="input reparto-imp reparto-imp-auto" type="number" step="0.01" min="0" placeholder="Auto" value="${row.importe || ''}" title="Monto a colectar" readonly></div>
-    <div class="field field-cat"><label>Cat.</label><select class="select reparto-cat">${catOpts}</select></div>
-    <button type="button" class="icon-btn reparto-remove" title="Quitar destino">×</button>
-  `;
-  div.querySelector('.reparto-sub').addEventListener('change', e => {
-    Estado.repRecDest[idx].subcuenta_id = e.target.value;
-    actualizarTotalRepartoRec();
+  return buildRepartoCard_({
+    subsD, idx, rows: Estado.repRecDest, recurrente: true,
+    cats: categoriasTransferenciaSegunDireccion_($('#recCuenta').value, $('#recCuentaDest').value),
+    normalizar: normalizarFilaRepartoRecurrenteRec_,
+    total: destinoTotalRec_,
+    onTotal: actualizarTotalRepartoRec,
+    rerender: () => renderRepartoRowsRec(subsD, Estado.repRecDest),
+    // ponytail: sin filas de reparto se devuelve el dropdown para volver al
+    // modo "subcuenta única".
+    onRemoved: () => {
+      const wrapSubDest = $('#wrapRecSubcuentaDest');
+      if (wrapSubDest && Estado.repRecDest.length === 0) wrapSubDest.style.display = '';
+    }
   });
-  div.querySelector('.reparto-cat').addEventListener('change', e => {
-    Estado.repRecDest[idx].categoria_id = e.target.value;
-  });
-  div.querySelector('.reparto-periodo-uso').addEventListener('input', e => {
-    Estado.repRecDest[idx].periodo_uso = Number(e.target.value || 0);
-    normalizarFilaRepartoRecurrenteRec_(Estado.repRecDest[idx]);
-    const out = div.querySelector('.reparto-imp');
-    if (out) out.value = Estado.repRecDest[idx].importe || '';
-    actualizarTotalRepartoRec();
-  });
-  div.querySelector('.reparto-monto-usar').addEventListener('input', e => {
-    Estado.repRecDest[idx].monto_a_usar = Number(e.target.value || 0);
-    normalizarFilaRepartoRecurrenteRec_(Estado.repRecDest[idx]);
-    const out = div.querySelector('.reparto-imp');
-    if (out) out.value = Estado.repRecDest[idx].importe || '';
-    actualizarTotalRepartoRec();
-  });
-  div.querySelector('.reparto-remove').addEventListener('click', () => {
-    Estado.repRecDest.splice(idx, 1);
-    renderRepartoRowsRec(subsD, Estado.repRecDest);
-    actualizarTotalRepartoRec();
-    // ponytail: si no quedan filas de reparto, devolver el dropdown para
-    // que el usuario pueda volver al modo "subcuenta única".
-    const wrapSubDest = $('#wrapRecSubcuentaDest');
-    if (wrapSubDest && Estado.repRecDest.length === 0) wrapSubDest.style.display = '';
-  });
-  return div;
 }
 function addRepartoRowRec() {
-  const ctaD = Estado.bootstrap.cuentas.find(c => c.id === $('#recCuentaDest').value);
-  const subsD = subsAlfabetico_(ctaD && ctaD.subcuentas);
+  const subsD = Estado._repartoSubsRec || [];
   if (!subsD.length) { toast('La cuenta destino no tiene subcuentas'); return; }
-  Estado.repRecDest.push({ subcuenta_id: '', importe: 0, categoria_id: '', periodo_uso: Number($('#recPer').value || 1), monto_a_usar: 0 });
+  const usadas = new Set(Estado.repRecDest.map(r => r.subcuenta_id));
+  const libre = subsD.find(s => !usadas.has(s.id));
+  if (!libre) { toast('Ya hay un destino por cada subcuenta'); return; }
+  Estado.repRecDest.push({ subcuenta_id: libre.id, importe: 0, categoria_id: '', periodo_uso: Number($('#recPer').value || 1), monto_a_usar: 0 });
   renderRepartoRowsRec(subsD, Estado.repRecDest);
   actualizarTotalRepartoRec();
+  const wrapLista = $('#recRepartoList');
+  if (wrapLista.lastElementChild) wrapLista.lastElementChild.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   // ponytail: dropdown y reparto son excluyentes. Al añadir un destino se
   // asume que el usuario abandona el modo "subcuenta única".
   const wrapSubDest = $('#wrapRecSubcuentaDest');
@@ -9401,12 +9590,8 @@ function actualizarTotalRepartoRec() {
   const suma = Estado.repRecDest.reduce((s, r) => s + Number(r.importe || 0), 0);
   const el = $('#recRepartoTotal');
   if (!el) return;
-  el.textContent = 'Total: ' + fmtMoneda(suma) + ' / ' + fmtMoneda(total);
-  const tieneReparto = Estado.repRecDest.length > 0;
-  el.classList.remove('reparto-total-ok', 'reparto-total-bad');
-  if (tieneReparto) {
-    el.classList.add(Math.abs(suma - total) <= 0.01 ? 'reparto-total-ok' : 'reparto-total-bad');
-  }
+  renderRepartoResumen_($('#recRepartoResumen'), Estado.repRecDest, Estado._repartoSubsRec || [], total);
+  pintarRepartoTotal_(el, suma, total, Estado.repRecDest.length > 0);
 }
 // ponytail: true solo si la plantilla trae reparto_destino crudo (no el
 // fallback legacy de parseRepartoFromTx_ sobre subcuenta_destino_id).
