@@ -1003,6 +1003,7 @@
   .reset-cta-head, .reset-cat-head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .reset-cta-head .input { flex: 1 1 140px; min-width: 140px; }
   .reset-cta-head .select { width: auto; }
+  .reset-cta-head .cb, .reset-cat-head .cb { flex: 0 1 150px; }
   .reset-cta-head .reset-remove { margin-left: auto; }
   .reset-subs { display: flex; flex-direction: column; gap: 6px; padding-left: var(--s-3); border-left: 2px solid var(--surface-container); }
   .reset-sub-row { display: flex; gap: 6px; align-items: center; }
@@ -8469,6 +8470,7 @@ function enhanceSelect_(sel, opt) {
     pick: v => {
       if (sel.value === v) return;
       sel.value = v;
+      sel.dispatchEvent(new Event('input', { bubbles: true }));
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     },
     label: (sel.closest('.field') && sel.closest('.field').querySelector('label') || {}).textContent || ''
@@ -8813,6 +8815,14 @@ $('#btnAddRepartoDest').addEventListener('click', addRepartoRow);
   .forEach(s => enhanceSelect_($(s)));
 ['#txEstablecimiento', '#recEstablecimiento']
   .forEach(s => enhanceSelect_($(s), { lead: leadEstablecimiento_ }));
+// El popup nativo de <select> se pinta mal con dos monitores de distinto escalado:
+// todos los .select usan el combobox, también los que se crean después.
+$$('select.select').forEach(s => enhanceSelect_(s));
+new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+  if (n.nodeType !== 1) return;
+  if (n.matches('select.select')) enhanceSelect_(n);
+  n.querySelectorAll('select.select').forEach(s => enhanceSelect_(s));
+}))).observe(document.body, { childList: true, subtree: true });
 $('#btnAddMulticat').addEventListener('click', addMulticatRow);
 $('#txMulticatSwitch').addEventListener('change', () => {
   if (!$('#txMulticatSwitch').checked) {
