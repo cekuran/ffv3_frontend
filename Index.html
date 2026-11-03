@@ -876,12 +876,12 @@
   .more-dropdown-item:hover, .more-dropdown-item:active { background: var(--surface-container-low); }
   .more-dropdown-item .ico { width: 20px; height: 20px; }
 
-  .fab-menu { position: fixed; right: 24px; bottom: calc(174px + env(safe-area-inset-bottom, 0)); z-index: 39; min-width: 220px; padding: var(--s-2); background: var(--surface-container-lowest); border: 1px solid var(--surface-container); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); display: none; }
+  .fab-menu { position: fixed; right: 24px; bottom: calc(174px + env(safe-area-inset-bottom, 0)); z-index: 2147483000; min-width: 220px; max-height: calc(100vh - 120px); overflow-y: auto; overscroll-behavior: contain; padding: var(--s-2); background: var(--surface-container-lowest); border: 1px solid var(--outline-variant); border-radius: var(--r-lg); box-shadow: 0 16px 40px rgba(11, 28, 48, 0.28); display: none; }
   .fab-menu.is-open { display: block; }
   .fab-menu-sep { height: 1px; background: var(--surface-container); margin: var(--s-1) 0; }
   .fab-menu-section[hidden] { display: none; }
   .fab-manage-head { display: flex; align-items: center; gap: var(--s-2); padding: 4px 4px var(--s-2); font-weight: 700; }
-  .fab-manage-list { display: flex; flex-direction: column; gap: 2px; max-height: min(55dvh, 420px); overflow-y: auto; overscroll-behavior: contain; }
+  .fab-manage-list { display: flex; flex-direction: column; gap: 2px; max-height: min(42dvh, 360px); overflow-y: auto; overscroll-behavior: contain; }
   .fab-manage-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: var(--s-2); min-height: 44px; padding: 4px; border-radius: var(--r-md); }
   .fab-manage-row:hover { background: var(--surface-container-low); }
   .fab-manage-icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--r-md); overflow: hidden; }
@@ -890,10 +890,18 @@
   .fab-manage-actions { display: flex; gap: 2px; }
   .fab-manage-actions .icon-btn { width: 34px; height: 34px; }
   .fab-manage-add { width: 100%; margin-top: var(--s-2); }
+  @media (max-width: 600px) {
+    .fab-menu { right: 12px; width: min(360px, calc(100vw - 24px)); max-height: calc(100dvh - 190px - env(safe-area-inset-bottom, 0)); padding: 10px; }
+    .fab-menu .more-dropdown-item { min-height: 48px; padding: 12px; font-size: 15px; }
+    .fab-manage-row { min-height: 50px; }
+    .fab-manage-name { font-size: 14px; }
+    .fab-manage-actions .icon-btn { width: 40px; height: 40px; }
+  }
   .fab { position: fixed; right: 24px; bottom: calc(110px + env(safe-area-inset-bottom, 0)); z-index: 40; width: 56px; height: 56px; border-radius: var(--r-full); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; box-shadow: var(--shadow-pop); transition: transform 0.15s; }
   .fab:hover { transform: scale(1.05); }
   .fab:active { transform: scale(0.95); }
   @media (min-width: 900px) { .fab { bottom: 32px; right: 32px; } .fab-menu { bottom: 96px; right: 32px; } }
+  @media (min-width: 900px) { .fab-menu { max-height: calc(100dvh - 120px); } }
 
   /* === Sheet / Modal === */
   .sheet-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
@@ -10267,16 +10275,17 @@ fabMenu.addEventListener('click', e => {
   if (e.target.closest('[data-fab-back]')) { volverFabAcciones_(); return; }
   const add = e.target.closest('[data-fab-add]');
   if (add) {
+    closeFabMenu();
     if (add.dataset.fabAdd === 'categorias') openCat();
     else openEstablecimiento();
     return;
   }
   const editCat = e.target.closest('[data-fab-edit-cat]');
-  if (editCat) { openCat(editCat.dataset.fabEditCat); return; }
+  if (editCat) { closeFabMenu(); openCat(editCat.dataset.fabEditCat); return; }
   const delCat = e.target.closest('[data-fab-del-cat]');
   if (delCat) { borrarCategoria(delCat.dataset.fabDelCat); return; }
   const editEst = e.target.closest('[data-fab-edit-est]');
-  if (editEst) { openEstablecimiento(editEst.dataset.fabEditEst); return; }
+  if (editEst) { closeFabMenu(); openEstablecimiento(editEst.dataset.fabEditEst); return; }
   const delEst = e.target.closest('[data-fab-del-est]');
   if (delEst) borrarEstablecimiento(delEst.dataset.fabDelEst);
 });
