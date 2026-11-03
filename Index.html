@@ -879,6 +879,17 @@
   .fab-menu { position: fixed; right: 24px; bottom: calc(174px + env(safe-area-inset-bottom, 0)); z-index: 39; min-width: 220px; padding: var(--s-2); background: var(--surface-container-lowest); border: 1px solid var(--surface-container); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); display: none; }
   .fab-menu.is-open { display: block; }
   .fab-menu-sep { height: 1px; background: var(--surface-container); margin: var(--s-1) 0; }
+  .fab-menu-section[hidden] { display: none; }
+  .fab-manage-head { display: flex; align-items: center; gap: var(--s-2); padding: 4px 4px var(--s-2); font-weight: 700; }
+  .fab-manage-list { display: flex; flex-direction: column; gap: 2px; max-height: min(55dvh, 420px); overflow-y: auto; overscroll-behavior: contain; }
+  .fab-manage-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: var(--s-2); min-height: 44px; padding: 4px; border-radius: var(--r-md); }
+  .fab-manage-row:hover { background: var(--surface-container-low); }
+  .fab-manage-icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--r-md); overflow: hidden; }
+  .fab-manage-icon svg, .fab-manage-icon img { width: 24px; height: 24px; }
+  .fab-manage-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .fab-manage-actions { display: flex; gap: 2px; }
+  .fab-manage-actions .icon-btn { width: 34px; height: 34px; }
+  .fab-manage-add { width: 100%; margin-top: var(--s-2); }
   .fab { position: fixed; right: 24px; bottom: calc(110px + env(safe-area-inset-bottom, 0)); z-index: 40; width: 56px; height: 56px; border-radius: var(--r-full); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; box-shadow: var(--shadow-pop); transition: transform 0.15s; }
   .fab:hover { transform: scale(1.05); }
   .fab:active { transform: scale(0.95); }
@@ -2267,13 +2278,21 @@
   </nav>
 
   <div class="fab-menu" id="fabMenu" role="menu" aria-label="Acciones rápidas">
-    <button class="more-dropdown-item" type="button" data-fab-action="tx" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>Nueva transacción</button>
-    <button class="more-dropdown-item" type="button" data-fab-action="rec" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l5-4-5-4v3H5v6h2zm10 10H7v-3l-5 4 5 4v-3h12v-6h-2z"/></svg>Nueva recurrente</button>
-    <button class="more-dropdown-item" type="button" data-fab-action="cat" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4v6h6zm10 0h-6v6h6zM10 14H4v6h6zm10 0h-6v6h6z"/></svg>Nueva categoría</button>
-    <button class="more-dropdown-item" type="button" data-fab-action="est" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16l-1 5h-3v2h-2V9h-4v2H8V9H5zm1 7h14v10H5z"/></svg>Nuevo establecimiento</button>
-    <div class="fab-menu-sep" role="separator"></div>
-    <button class="more-dropdown-item" type="button" data-fab-action="manage-cat" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4v6h6zm10 0h-6v6h6zM10 14H4v6h6zm10 0h-6v6h6z"/></svg>Gestionar categorías</button>
-    <button class="more-dropdown-item" type="button" data-fab-action="manage-est" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16l-1 5h-3v2h-2V9h-4v2H8V9H5zm1 7h14v10H5z"/></svg>Gestionar establecimientos</button>
+    <div class="fab-menu-section" id="fabActions">
+      <button class="more-dropdown-item" type="button" data-fab-action="tx" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>Nueva transacción</button>
+      <button class="more-dropdown-item" type="button" data-fab-action="rec" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l5-4-5-4v3H5v6h2zm10 10H7v-3l-5 4 5 4v-3h12v-6h-2z"/></svg>Nueva recurrente</button>
+      <div class="fab-menu-sep" role="separator"></div>
+      <button class="more-dropdown-item" type="button" data-fab-action="manage-cat" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4v6h6zm10 0h-6v6h6zM10 14H4v6h6zm10 0h-6v6h6z"/></svg>Categorías</button>
+      <button class="more-dropdown-item" type="button" data-fab-action="manage-est" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16l-1 5h-3v2h-2V9h-4v2H8V9H5zm1 7h14v10H5z"/></svg>Establecimientos</button>
+    </div>
+    <div class="fab-menu-section" id="fabManage" hidden>
+      <div class="fab-manage-head">
+        <button class="icon-btn" type="button" data-fab-back title="Volver" aria-label="Volver"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg></button>
+        <span id="fabManageTitle">Categorías</span>
+      </div>
+      <div class="fab-manage-list" id="fabManageList"></div>
+      <button class="btn btn-primary btn-sm fab-manage-add" type="button" id="fabManageAdd">Añadir</button>
+    </div>
   </div>
   <button class="fab" id="fab" type="button" title="Acciones rápidas" aria-label="Acciones rápidas" aria-haspopup="menu" aria-expanded="false" aria-controls="fabMenu"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg></button>
 </div>
@@ -6222,16 +6241,22 @@ function renderCategorias() {
     </div>
   `).join('') : emptyHtml('Sin categorías', 'Crea categorías para clasificar tus movimientos.');
   $$('[data-cat-edit]').forEach(b => b.addEventListener('click', () => openCat(b.dataset.catEdit)));
-  $$('[data-cat-del]').forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('¿Eliminar categoría?')) return;
-    Estado.bootstrap.categorias = await call('eliminarCategoria', b.dataset.catDel);
+  $$('[data-cat-del]').forEach(b => b.addEventListener('click', () => borrarCategoria(b.dataset.catDel)));
+  aplicarFiltroLista_($('#catSearch'), $('#catList'));
+  wireCategoryDragReorder();
+}
+
+async function borrarCategoria(id) {
+  const cat = Estado.bootstrap.categorias.find(c => c.id === id);
+  if (!cat || !confirm('¿Eliminar categoría?')) return;
+  try {
+    Estado.bootstrap.categorias = await call('eliminarCategoria', id);
     poblarFiltros();
     renderCategorias();
     renderMovimientos();
+    refrescarFabGestion_('categorias');
     toast('Categoría eliminada');
-  }));
-  aplicarFiltroLista_($('#catSearch'), $('#catList'));
-  wireCategoryDragReorder();
+  } catch (e) { toast('Error: ' + e.message); }
 }
 
 async function renderEstablecimientos() {
@@ -6293,6 +6318,7 @@ async function borrarEstablecimiento(id) {
     limpiarFiltrosInvalidos();
     poblarFiltroEstablecimiento_();
     await renderEstablecimientos();
+    refrescarFabGestion_('establecimientos');
     toast('Establecimiento eliminado');
   } catch (e) { toast('Error: ' + e.message); }
 }
@@ -9291,6 +9317,7 @@ $('#formCat').addEventListener('submit', async (e) => {
     poblarFiltros();
     renderCategorias();
     renderMovimientos();
+    refrescarFabGestion_('categorias');
     toast('Categoría guardada');
   } catch (err) { toast('Error: ' + err.message); }
 });
@@ -9317,6 +9344,7 @@ $('#formEst').addEventListener('submit', async (e) => {
     closeAllSheets();
     poblarFiltroEstablecimiento_();
     await renderEstablecimientos();
+    refrescarFabGestion_('establecimientos');
     toast('Establecimiento guardado');
   } catch (err) { toast('Error: ' + err.message); }
 });
@@ -10162,31 +10190,99 @@ async function recargar() {
 $('#btnNuevaTx').addEventListener('click', () => openTx());
 const fabButton = $('#fab');
 const fabMenu = $('#fabMenu');
+let fabGestionTipo = '';
 function closeFabMenu() {
   fabMenu.classList.remove('is-open');
   fabButton.setAttribute('aria-expanded', 'false');
+}
+function renderFabGestionList(tipo) {
+  const list = $('#fabManageList');
+  if (tipo === 'categorias') {
+    const cats = catsAlfabetico_(Estado.bootstrap.categorias);
+    $('#fabManageTitle').textContent = 'Categorías';
+    $('#fabManageAdd').textContent = 'Nueva categoría';
+    $('#fabManageAdd').dataset.fabAdd = 'categorias';
+    list.innerHTML = cats.length ? cats.map(c => `
+      <div class="fab-manage-row">
+        <span class="fab-manage-icon" style="${tintCat(c.color)}">${icoCat(c)}</span>
+        <span class="fab-manage-name" title="${escape(c.nombre)}">${escape(c.nombre)}</span>
+        <span class="fab-manage-actions">
+          <button class="icon-btn" type="button" data-fab-edit-cat="${c.id}" title="Editar categoría" aria-label="Editar ${escape(c.nombre)}">${ICONOS.edit}</button>
+          <button class="icon-btn" type="button" data-fab-del-cat="${c.id}" title="Eliminar categoría" aria-label="Eliminar ${escape(c.nombre)}">${ICONOS.delete}</button>
+        </span>
+      </div>`).join('') : '<div class="body-sm" style="padding: var(--s-2); color: var(--on-surface-variant);">No hay categorías.</div>';
+    return;
+  }
+  const establecimientos = [...Estado.bootstrap.establecimientos].sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
+  $('#fabManageTitle').textContent = 'Establecimientos';
+  $('#fabManageAdd').textContent = 'Nuevo establecimiento';
+  $('#fabManageAdd').dataset.fabAdd = 'establecimientos';
+  list.innerHTML = establecimientos.length ? establecimientos.map(est => {
+    const icono = faviconHostEst_(est) ? faviconImgEst_(est, 24) : ICONOS.store;
+    return `
+      <div class="fab-manage-row">
+        <span class="fab-manage-icon" style="background: var(--surface-container);">${icono}</span>
+        <span class="fab-manage-name" title="${escape(est.nombre)}">${escape(est.nombre)}</span>
+        <span class="fab-manage-actions">
+          <button class="icon-btn" type="button" data-fab-edit-est="${est.id}" title="Editar establecimiento" aria-label="Editar ${escape(est.nombre)}">${ICONOS.edit}</button>
+          <button class="icon-btn" type="button" data-fab-del-est="${est.id}" title="Eliminar establecimiento" aria-label="Eliminar ${escape(est.nombre)}">${ICONOS.delete}</button>
+        </span>
+      </div>`;
+  }).join('') : '<div class="body-sm" style="padding: var(--s-2); color: var(--on-surface-variant);">No hay establecimientos.</div>';
+}
+function refrescarFabGestion_(tipo) {
+  if (fabGestionTipo === tipo) renderFabGestionList(tipo);
+}
+function abrirFabGestion_(tipo) {
+  fabGestionTipo = tipo;
+  $('#fabActions').hidden = true;
+  $('#fabManage').hidden = false;
+  renderFabGestionList(tipo);
+  $('#fabManage').querySelector('[data-fab-back]').focus();
+}
+function volverFabAcciones_() {
+  $('#fabManage').hidden = true;
+  $('#fabActions').hidden = false;
+  $('#fabActions').querySelector('[data-fab-action="manage-' + (fabGestionTipo === 'categorias' ? 'cat' : 'est') + '"]').focus();
 }
 fabButton.addEventListener('click', () => {
   const willOpen = !fabMenu.classList.contains('is-open');
   fabMenu.classList.toggle('is-open', willOpen);
   fabButton.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-  if (willOpen) fabMenu.querySelector('[data-fab-action]').focus();
+  if (willOpen) {
+    const panel = $('#fabManage').hidden ? $('#fabActions') : $('#fabManage');
+    panel.querySelector('button:not([disabled])').focus();
+  }
 });
 fabMenu.addEventListener('click', e => {
   const action = e.target.closest('[data-fab-action]');
-  if (!action) return;
-  closeFabMenu();
-  switch (action.dataset.fabAction) {
-    case 'tx': openTx(); break;
-    case 'rec': openRec(); break;
-    case 'cat': openCat(); break;
-    case 'est': openEstablecimiento(); break;
-    case 'manage-cat': go('categorias'); break;
-    case 'manage-est': go('establecimientos'); break;
+  if (action) {
+    if (action.dataset.fabAction === 'manage-cat') { abrirFabGestion_('categorias'); return; }
+    if (action.dataset.fabAction === 'manage-est') { abrirFabGestion_('establecimientos'); return; }
+    closeFabMenu();
+    if (action.dataset.fabAction === 'tx') openTx();
+    else if (action.dataset.fabAction === 'rec') openRec();
+    return;
   }
+  if (e.target.closest('[data-fab-back]')) { volverFabAcciones_(); return; }
+  const add = e.target.closest('[data-fab-add]');
+  if (add) {
+    if (add.dataset.fabAdd === 'categorias') openCat();
+    else openEstablecimiento();
+    return;
+  }
+  const editCat = e.target.closest('[data-fab-edit-cat]');
+  if (editCat) { openCat(editCat.dataset.fabEditCat); return; }
+  const delCat = e.target.closest('[data-fab-del-cat]');
+  if (delCat) { borrarCategoria(delCat.dataset.fabDelCat); return; }
+  const editEst = e.target.closest('[data-fab-edit-est]');
+  if (editEst) { openEstablecimiento(editEst.dataset.fabEditEst); return; }
+  const delEst = e.target.closest('[data-fab-del-est]');
+  if (delEst) borrarEstablecimiento(delEst.dataset.fabDelEst);
 });
 fabMenu.addEventListener('keydown', e => {
-  const items = $$('[data-fab-action]', fabMenu);
+  const panel = $('#fabManage').hidden ? $('#fabActions') : $('#fabManage');
+  const items = $$('button:not([disabled])', panel);
   const index = items.indexOf(document.activeElement);
   let next = null;
   if (e.key === 'ArrowDown') next = (index + 1) % items.length;
