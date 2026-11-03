@@ -790,7 +790,7 @@
 
   @media print {
     body { background: #fff; }
-    .sidebar, .header, .bottom-nav, .fab, .sheet-overlay, .sheet, .view:not(.is-active) { display: none !important; }
+    .sidebar, .header, .bottom-nav, .fab, .fab-menu, .sheet-overlay, .sheet, .view:not(.is-active) { display: none !important; }
     .app { padding: 0 !important; }
     .main { padding: 0 !important; max-width: none !important; }
     .view.is-active { display: block !important; }
@@ -876,10 +876,13 @@
   .more-dropdown-item:hover, .more-dropdown-item:active { background: var(--surface-container-low); }
   .more-dropdown-item .ico { width: 20px; height: 20px; }
 
+  .fab-menu { position: fixed; right: 24px; bottom: calc(174px + env(safe-area-inset-bottom, 0)); z-index: 39; min-width: 220px; padding: var(--s-2); background: var(--surface-container-lowest); border: 1px solid var(--surface-container); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); display: none; }
+  .fab-menu.is-open { display: block; }
+  .fab-menu-sep { height: 1px; background: var(--surface-container); margin: var(--s-1) 0; }
   .fab { position: fixed; right: 24px; bottom: calc(110px + env(safe-area-inset-bottom, 0)); z-index: 40; width: 56px; height: 56px; border-radius: var(--r-full); background: var(--primary); color: var(--on-primary); display: grid; place-items: center; box-shadow: var(--shadow-pop); transition: transform 0.15s; }
   .fab:hover { transform: scale(1.05); }
   .fab:active { transform: scale(0.95); }
-  @media (min-width: 900px) { .fab { bottom: 32px; right: 32px; } }
+  @media (min-width: 900px) { .fab { bottom: 32px; right: 32px; } .fab-menu { bottom: 96px; right: 32px; } }
 
   /* === Sheet / Modal === */
   .sheet-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
@@ -2263,7 +2266,16 @@
     </div>
   </nav>
 
-  <button class="fab" id="fab" title="Nueva transacción"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg></button>
+  <div class="fab-menu" id="fabMenu" role="menu" aria-label="Acciones rápidas">
+    <button class="more-dropdown-item" type="button" data-fab-action="tx" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>Nueva transacción</button>
+    <button class="more-dropdown-item" type="button" data-fab-action="rec" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l5-4-5-4v3H5v6h2zm10 10H7v-3l-5 4 5 4v-3h12v-6h-2z"/></svg>Nueva recurrente</button>
+    <button class="more-dropdown-item" type="button" data-fab-action="cat" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4v6h6zm10 0h-6v6h6zM10 14H4v6h6zm10 0h-6v6h6z"/></svg>Nueva categoría</button>
+    <button class="more-dropdown-item" type="button" data-fab-action="est" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16l-1 5h-3v2h-2V9h-4v2H8V9H5zm1 7h14v10H5z"/></svg>Nuevo establecimiento</button>
+    <div class="fab-menu-sep" role="separator"></div>
+    <button class="more-dropdown-item" type="button" data-fab-action="manage-cat" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4v6h6zm10 0h-6v6h6zM10 14H4v6h6zm10 0h-6v6h6z"/></svg>Gestionar categorías</button>
+    <button class="more-dropdown-item" type="button" data-fab-action="manage-est" role="menuitem"><svg class="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h16l-1 5h-3v2h-2V9h-4v2H8V9H5zm1 7h14v10H5z"/></svg>Gestionar establecimientos</button>
+  </div>
+  <button class="fab" id="fab" type="button" title="Acciones rápidas" aria-label="Acciones rápidas" aria-haspopup="menu" aria-expanded="false" aria-controls="fabMenu"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg></button>
 </div>
 
 <!-- Sheet: nueva transacción / edición -->
@@ -4338,6 +4350,7 @@ function aplicarRestriccionSinHojas() {
   const navSels = '.sidebar .nav-item, .bottom-nav .bn-item[data-route], .more-dropdown [data-route]';
   const banner = document.getElementById('noHojasBanner');
   const fab = $('#fab');
+  const fabMenu = $('#fabMenu');
   const mensajeSinDatos = isAdmin
     ? '<strong>No hay datos financieros para mostrar para este usuario.</strong> Este usuario no tiene hojas de calculo registradas. Usa la vista Admin para vincular una hoja.'
     : '<strong>No hay datos financieros para mostrar para este usuario.</strong> Este usuario no tiene hojas de calculo registradas. Pide al administrador que vincule una hoja.';
@@ -4352,6 +4365,8 @@ function aplicarRestriccionSinHojas() {
   }
   document.querySelectorAll(navSels).forEach(el => { el.style.display = el.dataset.route === 'admin' ? '' : 'none'; });
   if (fab) fab.style.display = 'none';
+  if (fabMenu) fabMenu.classList.remove('is-open');
+  if (fab) fab.setAttribute('aria-expanded', 'false');
   if (!isAdmin) {
     if (banner) banner.style.display = 'none';
     return;
@@ -10145,7 +10160,53 @@ async function recargar() {
 }
 
 $('#btnNuevaTx').addEventListener('click', () => openTx());
-$('#fab').addEventListener('click', () => openTx());
+const fabButton = $('#fab');
+const fabMenu = $('#fabMenu');
+function closeFabMenu() {
+  fabMenu.classList.remove('is-open');
+  fabButton.setAttribute('aria-expanded', 'false');
+}
+fabButton.addEventListener('click', () => {
+  const willOpen = !fabMenu.classList.contains('is-open');
+  fabMenu.classList.toggle('is-open', willOpen);
+  fabButton.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  if (willOpen) fabMenu.querySelector('[data-fab-action]').focus();
+});
+fabMenu.addEventListener('click', e => {
+  const action = e.target.closest('[data-fab-action]');
+  if (!action) return;
+  closeFabMenu();
+  switch (action.dataset.fabAction) {
+    case 'tx': openTx(); break;
+    case 'rec': openRec(); break;
+    case 'cat': openCat(); break;
+    case 'est': openEstablecimiento(); break;
+    case 'manage-cat': go('categorias'); break;
+    case 'manage-est': go('establecimientos'); break;
+  }
+});
+fabMenu.addEventListener('keydown', e => {
+  const items = $$('[data-fab-action]', fabMenu);
+  const index = items.indexOf(document.activeElement);
+  let next = null;
+  if (e.key === 'ArrowDown') next = (index + 1) % items.length;
+  else if (e.key === 'ArrowUp') next = (index - 1 + items.length) % items.length;
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = items.length - 1;
+  if (next !== null) {
+    e.preventDefault();
+    items[next].focus();
+  }
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#fab, #fabMenu')) closeFabMenu();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && fabMenu.classList.contains('is-open')) {
+    closeFabMenu();
+    fabButton.focus();
+  }
+});
 $('#btnNuevaCuenta').addEventListener('click', () => openCuenta());
 $('#chkCuentasArchivadas').addEventListener('change', e => {
   Estado.cuentasMostrarArchivadas = e.target.checked;
