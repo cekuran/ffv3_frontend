@@ -8255,6 +8255,10 @@ if (txMonedaSel) txMonedaSel.addEventListener('change', () => { actualizarHintMo
 const txImporteEl = $('#txImporte');
 if (txImporteEl) txImporteEl.addEventListener('input', actualizarHintMoneda_);
 
+function etiquetaSubcuentaDisponible_(subcuenta, cuenta) {
+  return subcuenta.nombre + ' - Disponible: ' + fmtMoneda(subcuenta.saldo, cuenta.moneda);
+}
+
 function actualizarSubcuentasTx(preferred) {
   const isTransfer = Estado.txTipo === 'transferencia';
   const isDevol = Estado.txTipo === 'devolucion';
@@ -8278,7 +8282,7 @@ function actualizarSubcuentasTx(preferred) {
     let current = preferred ? preferred.subcuenta_id : selO.value;
     if (!current) current = subs[0].id; // ponytail: al elegir cuenta, primera subcuenta por defecto
     selO.innerHTML = '<option value="">— Ninguna —</option>' + subs.map(s =>
-      `<option value="${s.id}" ${s.id === current ? 'selected' : ''}>${escape(s.nombre)}</option>`
+      `<option value="${s.id}" ${s.id === current ? 'selected' : ''}>${escape(etiquetaSubcuentaDisponible_(s, cta))}</option>`
     ).join('');
   } else {
     selO.value = '';
@@ -8320,7 +8324,7 @@ function actualizarSubcuentasTx(preferred) {
     const subDVal = subsD.some(s => s.id === prevSubD) ? prevSubD : '';
     const subDFinal = subDVal || (preferred ? '' : subsD[0].id); // ponytail: primera subcuenta por defecto
     selD.innerHTML = '<option value="">— Ninguna —</option>' + subsD.map(s =>
-      `<option value="${s.id}" ${s.id === subDFinal ? 'selected' : ''}>${escape(s.nombre)}</option>`
+      `<option value="${s.id}" ${s.id === subDFinal ? 'selected' : ''}>${escape(etiquetaSubcuentaDisponible_(s, ctaD))}</option>`
     ).join('');
   } else {
     $('#txSubcuentaDest').value = '';
@@ -8583,7 +8587,7 @@ function buildRepartoCard_(o) {
   `;
   const dotSub = id => `<span class="cb-dot" style="background:${colorSubReparto_(o.subsD, id)}"></span>`;
   const combo = crearCombo_({
-    items: () => o.subsD.map(s => ({ value: s.id, label: s.nombre, lead: dotSub(s.id), disabled: usadas.has(s.id), note: usadas.has(s.id) ? 'en uso' : '' })),
+    items: () => o.subsD.map(s => ({ value: s.id, label: o.cuenta ? etiquetaSubcuentaDisponible_(s, o.cuenta) : s.nombre, lead: dotSub(s.id), disabled: usadas.has(s.id), note: usadas.has(s.id) ? 'en uso' : '' })),
     value: () => row.subcuenta_id,
     pick: v => { row.subcuenta_id = v; o.rerender(); o.onTotal(); },
     placeholder: 'Buscar subcuenta...',
@@ -8669,6 +8673,7 @@ function buildRepartoRow(subsD, row, idx) {
   if (recurrenteTransfer) normalizarFilaRepartoRecurrenteTx_(row);
   return buildRepartoCard_({
     subsD, idx, rows: Estado.txRepartoDest, recurrente: recurrenteTransfer,
+    cuenta: Estado.bootstrap.cuentas.find(c => c.id === $('#txCuentaDest').value),
     cats: categoriasTransferenciaSegunDireccion_($('#txCuenta').value, $('#txCuentaDest').value),
     normalizar: normalizarFilaRepartoRecurrenteTx_,
     total: destinoTotalTx_,
