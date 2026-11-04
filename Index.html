@@ -8432,13 +8432,14 @@ function normalizarFilaRepartoRecurrenteTx_(row) {
 }
 
 function syncImporteTxDesdeRepartoRecurrente_() {
-  if (!isTransferenciaRecurrenteTx_()) return;
-  Estado.txRepartoDest.forEach(normalizarFilaRepartoRecurrenteTx_);
+  if (Estado.txTipo !== 'transferencia' || !(Estado._repartoSubsD || []).length) return;
+  if (isTransferenciaRecurrenteTx_()) Estado.txRepartoDest.forEach(normalizarFilaRepartoRecurrenteTx_);
   const suma = Estado.txRepartoDest.reduce((s, r) => s + Number(r.importe || 0), 0);
-  if (suma > 0) {
-    $('#txImporte').value = suma.toFixed(2);
-    syncDestino();
-  }
+  const ratio = Number($('#txRatio').value || 0);
+  $('#txImporte').value = (ratio > 0 ? suma / ratio : suma).toFixed(2);
+  $('#txImporteDest').value = suma.toFixed(2);
+  updateConversionHint();
+  actualizarHintMoneda_();
 }
 
 // Combobox con búsqueda. cfg = { items(): [{value,label,lead,disabled,note,color,amount,name}],
@@ -8628,6 +8629,7 @@ function buildRepartoCard_(o) {
   enhanceSelect_(div.querySelector('.reparto-cat'));
   const inputImporte = div.querySelector('.reparto-imp');
   if (!o.recurrente) {
+    if (o.totalAutomatico) div.querySelector('.reparto-rest').style.display = 'none';
     inputImporte.addEventListener('input', e => {
       row.importe = Number(e.target.value || 0);
       o.onTotal();
@@ -8704,6 +8706,7 @@ function buildRepartoRow(subsD, row, idx) {
   if (recurrenteTransfer) normalizarFilaRepartoRecurrenteTx_(row);
   return buildRepartoCard_({
     subsD, idx, rows: Estado.txRepartoDest, recurrente: recurrenteTransfer,
+    totalAutomatico: true,
     cuenta: Estado.bootstrap.cuentas.find(c => c.id === $('#txCuentaDest').value),
     cats: categoriasTransferenciaSegunDireccion_($('#txCuenta').value, $('#txCuentaDest').value),
     normalizar: normalizarFilaRepartoRecurrenteTx_,
@@ -8734,6 +8737,7 @@ function destinoTotalTx_() {
 }
 
 function syncDestino() {
+  if (Estado.txTipo === 'transferencia') $('#txRatio').value = '1';
   updateConversionHint();
   if (Estado.txTipo !== 'transferencia' && Estado.txTipo !== 'devolucion') return;
   const src = Number($('#txImporte').value || 0);
@@ -8751,9 +8755,15 @@ function updateConversionHint() {
 }
 
 function actualizarTotalReparto() {
-  if (isTransferenciaRecurrenteTx_()) {
-    syncImporteTxDesdeRepartoRecurrente_();
-  }
+  const transferencia = Estado.txTipo === 'transferencia';
+  $('#txRatio').closest('.field').style.display = transferencia ? 'none' : '';
+  $('#conversionHint').hidden = transferencia;
+  if (transferencia) syncDestino();
+  const automatico = Estado.txTipo === 'transferencia' && (Estado._repartoSubsD || []).length > 0;
+  $('#txImporte').closest('.field').style.display = automatico ? 'none' : '';
+  $('#txImporte').required = !automatico;
+  $('#txImporteDest').closest('.field').style.display = automatico ? 'none' : '';
+  syncImporteTxDesdeRepartoRecurrente_();
   const total = destinoTotalTx_();
   const suma = Estado.txRepartoDest.reduce((s, r) => s + Number(r.importe || 0), 0);
   const el = $('#repartoDestTotal');
