@@ -1002,6 +1002,13 @@
   .cb-opt.is-on { font-weight: 700; }
   .cb-opt.is-disabled { opacity: 0.45; cursor: not-allowed; }
   .cb-empty { padding: 10px; font-size: 14px; color: var(--on-surface-variant); }
+  @media (max-width: 600px) {
+    .cb.has-amount .cb-input { height: 64px; }
+    .cb-balance-label { display: block; white-space: normal; }
+    .cb-account-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 22px; }
+    .cb-balance-separator { display: none; }
+    .cb-balance-detail { display: block; font-size: 13px; line-height: 20px; white-space: nowrap; }
+  }
   .reparto-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: var(--s-2) var(--s-3); }
   .reparto-grid .reparto-span { grid-column: 1 / -1; }
   .reparto-card.is-rec .reparto-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -8291,7 +8298,7 @@ function actualizarSubcuentasTx(preferred) {
     let current = preferred ? preferred.subcuenta_id : selO.value;
     if (!current) current = subs[0].id; // ponytail: al elegir cuenta, primera subcuenta por defecto
     selO.innerHTML = '<option value="">— Ninguna —</option>' + subs.map(s =>
-      `<option value="${s.id}" ${s.id === current ? 'selected' : ''} data-color="${colorSaldoDisponible_(s.saldo)}" data-amount="${escape(fmtMoneda(s.saldo, cta.moneda))}">${escape(etiquetaSubcuentaDisponible_(s, cta))}</option>`
+      `<option value="${s.id}" ${s.id === current ? 'selected' : ''} data-name="${escape(s.nombre)}" data-color="${colorSaldoDisponible_(s.saldo)}" data-amount="${escape(fmtMoneda(s.saldo, cta.moneda))}">${escape(etiquetaSubcuentaDisponible_(s, cta))}</option>`
     ).join('');
   } else {
     selO.value = '';
@@ -8333,7 +8340,7 @@ function actualizarSubcuentasTx(preferred) {
     const subDVal = subsD.some(s => s.id === prevSubD) ? prevSubD : '';
     const subDFinal = subDVal || (preferred ? '' : subsD[0].id); // ponytail: primera subcuenta por defecto
     selD.innerHTML = '<option value="">— Ninguna —</option>' + subsD.map(s =>
-      `<option value="${s.id}" ${s.id === subDFinal ? 'selected' : ''} data-color="${colorSaldoDisponible_(s.saldo)}" data-amount="${escape(fmtMoneda(s.saldo, ctaD.moneda))}">${escape(etiquetaSubcuentaDisponible_(s, ctaD))}</option>`
+      `<option value="${s.id}" ${s.id === subDFinal ? 'selected' : ''} data-name="${escape(s.nombre)}" data-color="${colorSaldoDisponible_(s.saldo)}" data-amount="${escape(fmtMoneda(s.saldo, ctaD.moneda))}">${escape(etiquetaSubcuentaDisponible_(s, ctaD))}</option>`
     ).join('');
   } else {
     $('#txSubcuentaDest').value = '';
@@ -8434,7 +8441,7 @@ function syncImporteTxDesdeRepartoRecurrente_() {
   }
 }
 
-// Combobox con búsqueda. cfg = { items(): [{value,label,lead,disabled,note,color,amount}],
+// Combobox con búsqueda. cfg = { items(): [{value,label,lead,disabled,note,color,amount,name}],
 // value(), pick(v), placeholder?, label? }. Devuelve { el, refresh }.
 function crearCombo_(cfg) {
   const quitarAcentos = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -8447,6 +8454,11 @@ function crearCombo_(cfg) {
   const valor = el.querySelector('.cb-value');
   const etiquetaHtml = item => {
     if (!item.amount || !item.label.endsWith(item.amount)) return escape(item.label);
+    if (item.name != null) {
+      return `<span class="cb-opt-name cb-balance-label"><span class="cb-account-name">${escape(item.name)}</span>`
+        + `<span class="cb-balance-separator"> - </span><span class="cb-balance-detail">Disponible: `
+        + `<span class="cb-amount" style="color:${escape(item.color || 'inherit')}">${escape(item.amount)}</span></span></span>`;
+    }
     return `<span class="cb-opt-name">${escape(item.label.slice(0, -item.amount.length))}`
       + `<span class="cb-amount" style="color:${escape(item.color || 'inherit')}">${escape(item.amount)}</span></span>`;
   };
@@ -8531,7 +8543,7 @@ function enhanceSelect_(sel, opt) {
   if (!sel || sel._cb) return;
   const lead = (opt && opt.lead) || null;
   const cb = crearCombo_({
-    items: () => Array.from(sel.options).map(o => ({ value: o.value, label: o.textContent, lead: lead && o.value ? lead(o.value) : '', disabled: o.disabled, color: o.dataset.color || '', amount: o.dataset.amount || '' })),
+    items: () => Array.from(sel.options).map(o => ({ value: o.value, label: o.textContent, lead: lead && o.value ? lead(o.value) : '', disabled: o.disabled, color: o.dataset.color || '', amount: o.dataset.amount || '', name: o.dataset.name })),
     value: () => sel.value,
     pick: v => {
       if (sel.value === v) return;
@@ -8606,7 +8618,7 @@ function buildRepartoCard_(o) {
   `;
   const dotSub = id => `<span class="cb-dot" style="background:${colorSubReparto_(o.subsD, id)}"></span>`;
   const combo = crearCombo_({
-    items: () => o.subsD.map(s => ({ value: s.id, label: o.cuenta ? etiquetaSubcuentaDisponible_(s, o.cuenta) : s.nombre, color: o.cuenta ? colorSaldoDisponible_(s.saldo) : '', amount: o.cuenta ? fmtMoneda(s.saldo, o.cuenta.moneda) : '', lead: dotSub(s.id), disabled: usadas.has(s.id), note: usadas.has(s.id) ? 'en uso' : '' })),
+    items: () => o.subsD.map(s => ({ value: s.id, label: o.cuenta ? etiquetaSubcuentaDisponible_(s, o.cuenta) : s.nombre, name: s.nombre, color: o.cuenta ? colorSaldoDisponible_(s.saldo) : '', amount: o.cuenta ? fmtMoneda(s.saldo, o.cuenta.moneda) : '', lead: dotSub(s.id), disabled: usadas.has(s.id), note: usadas.has(s.id) ? 'en uso' : '' })),
     value: () => row.subcuenta_id,
     pick: v => { row.subcuenta_id = v; o.rerender(); o.onTotal(); },
     placeholder: 'Buscar subcuenta...',
