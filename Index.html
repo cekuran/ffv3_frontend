@@ -8259,6 +8259,10 @@ function etiquetaSubcuentaDisponible_(subcuenta, cuenta) {
   return subcuenta.nombre + ' - Disponible: ' + fmtMoneda(subcuenta.saldo, cuenta.moneda);
 }
 
+function colorSaldoDisponible_(saldo) {
+  return Number(saldo || 0) < 0 ? 'var(--error)' : 'var(--primary)';
+}
+
 function actualizarSubcuentasTx(preferred) {
   const isTransfer = Estado.txTipo === 'transferencia';
   const isDevol = Estado.txTipo === 'devolucion';
@@ -8282,7 +8286,7 @@ function actualizarSubcuentasTx(preferred) {
     let current = preferred ? preferred.subcuenta_id : selO.value;
     if (!current) current = subs[0].id; // ponytail: al elegir cuenta, primera subcuenta por defecto
     selO.innerHTML = '<option value="">— Ninguna —</option>' + subs.map(s =>
-      `<option value="${s.id}" ${s.id === current ? 'selected' : ''}>${escape(etiquetaSubcuentaDisponible_(s, cta))}</option>`
+      `<option value="${s.id}" ${s.id === current ? 'selected' : ''} data-color="${colorSaldoDisponible_(s.saldo)}">${escape(etiquetaSubcuentaDisponible_(s, cta))}</option>`
     ).join('');
   } else {
     selO.value = '';
@@ -8324,7 +8328,7 @@ function actualizarSubcuentasTx(preferred) {
     const subDVal = subsD.some(s => s.id === prevSubD) ? prevSubD : '';
     const subDFinal = subDVal || (preferred ? '' : subsD[0].id); // ponytail: primera subcuenta por defecto
     selD.innerHTML = '<option value="">— Ninguna —</option>' + subsD.map(s =>
-      `<option value="${s.id}" ${s.id === subDFinal ? 'selected' : ''}>${escape(etiquetaSubcuentaDisponible_(s, ctaD))}</option>`
+      `<option value="${s.id}" ${s.id === subDFinal ? 'selected' : ''} data-color="${colorSaldoDisponible_(s.saldo)}">${escape(etiquetaSubcuentaDisponible_(s, ctaD))}</option>`
     ).join('');
   } else {
     $('#txSubcuentaDest').value = '';
@@ -8425,7 +8429,7 @@ function syncImporteTxDesdeRepartoRecurrente_() {
   }
 }
 
-// Combobox con búsqueda. cfg = { items(): [{value,label,lead,disabled,note}],
+// Combobox con búsqueda. cfg = { items(): [{value,label,lead,disabled,note,color}],
 // value(), pick(v), placeholder?, label? }. Devuelve { el, refresh }.
 function crearCombo_(cfg) {
   const quitarAcentos = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -8442,6 +8446,7 @@ function crearCombo_(cfg) {
     const vacio = items.find(i => i.value === '');
     entrada.placeholder = cfg.placeholder || (vacio && vacio.label.length > 1 ? vacio.label : 'Buscar...');
     if (force || document.activeElement !== entrada) entrada.value = actual ? actual.label : '';
+    entrada.style.color = actual && actual.color ? actual.color : '';
     lead.innerHTML = actual && actual.lead ? actual.lead : '';
     el.classList.toggle('has-lead', !!(actual && actual.lead));
   };
@@ -8458,7 +8463,7 @@ function crearCombo_(cfg) {
     lista.innerHTML = items.length ? items.map(i =>
       `<li role="option" class="cb-opt${i.value === cfg.value() ? ' is-on' : ''}${i.disabled ? ' is-disabled' : ''}" data-n="${todos.indexOf(i)}" aria-disabled="${!!i.disabled}">`
       + (hayLead ? `<span class="cb-opt-lead">${i.lead || ''}</span>` : '')
-      + `<span class="cb-opt-name">${escape(i.value === '' && i.label.length <= 1 ? 'Sin selección' : i.label)}</span>${i.note ? `<small>${escape(i.note)}</small>` : ''}</li>`
+      + `<span class="cb-opt-name" style="color:${escape(i.color || 'inherit')}">${escape(i.value === '' && i.label.length <= 1 ? 'Sin selección' : i.label)}</span>${i.note ? `<small>${escape(i.note)}</small>` : ''}</li>`
     ).join('') : '<li class="cb-empty">Sin resultados</li>';
     lista.hidden = false;
     entrada.setAttribute('aria-expanded', 'true');
@@ -8512,7 +8517,7 @@ function enhanceSelect_(sel, opt) {
   if (!sel || sel._cb) return;
   const lead = (opt && opt.lead) || null;
   const cb = crearCombo_({
-    items: () => Array.from(sel.options).map(o => ({ value: o.value, label: o.textContent, lead: lead && o.value ? lead(o.value) : '', disabled: o.disabled })),
+    items: () => Array.from(sel.options).map(o => ({ value: o.value, label: o.textContent, lead: lead && o.value ? lead(o.value) : '', disabled: o.disabled, color: o.dataset.color || '' })),
     value: () => sel.value,
     pick: v => {
       if (sel.value === v) return;
@@ -8587,7 +8592,7 @@ function buildRepartoCard_(o) {
   `;
   const dotSub = id => `<span class="cb-dot" style="background:${colorSubReparto_(o.subsD, id)}"></span>`;
   const combo = crearCombo_({
-    items: () => o.subsD.map(s => ({ value: s.id, label: o.cuenta ? etiquetaSubcuentaDisponible_(s, o.cuenta) : s.nombre, lead: dotSub(s.id), disabled: usadas.has(s.id), note: usadas.has(s.id) ? 'en uso' : '' })),
+    items: () => o.subsD.map(s => ({ value: s.id, label: o.cuenta ? etiquetaSubcuentaDisponible_(s, o.cuenta) : s.nombre, color: o.cuenta ? colorSaldoDisponible_(s.saldo) : '', lead: dotSub(s.id), disabled: usadas.has(s.id), note: usadas.has(s.id) ? 'en uso' : '' })),
     value: () => row.subcuenta_id,
     pick: v => { row.subcuenta_id = v; o.rerender(); o.onTotal(); },
     placeholder: 'Buscar subcuenta...',
