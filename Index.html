@@ -8447,8 +8447,8 @@ function crearCombo_(cfg) {
   const valor = el.querySelector('.cb-value');
   const etiquetaHtml = item => {
     if (!item.amount || !item.label.endsWith(item.amount)) return escape(item.label);
-    return `<span class="cb-opt-name">${escape(item.label.slice(0, -item.amount.length))}</span>`
-      + `<span class="cb-amount" style="color:${escape(item.color || 'inherit')}">${escape(item.amount)}</span>`;
+    return `<span class="cb-opt-name">${escape(item.label.slice(0, -item.amount.length))}`
+      + `<span class="cb-amount" style="color:${escape(item.color || 'inherit')}">${escape(item.amount)}</span></span>`;
   };
   if (cfg.label) entrada.setAttribute('aria-label', cfg.label);
   const refresh = force => {
